@@ -1,5 +1,5 @@
 export default {
-  mainTitle: 'FOR LOVE <3',
+  mainTitle: 'FOR LOVE <3+1',
   getStarted: 'Get Started',
   startAnnotation: 'Start Annotation',
   featuresTitle: 'The best features',
