@@ -191,24 +191,24 @@ LOGOUT_REDIRECT_URL = "/"
 
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
-# DATABASES = {
-#    "default": {
-#        "ENGINE": "django.db.backends.sqlite3",
-#        "NAME": path.join(BASE_DIR, "db.sqlite3"),
-#    }
-# }
-
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "doccano",
-        "USER": "doccano_admin",
-        "PASSWORD": "doccano_pass",
-        "HOST": "localhost",
-        "PORT": "5432",
-    }
+   "default": {
+       "ENGINE": "django.db.backends.sqlite3",
+       "NAME": path.join(BASE_DIR, "db.sqlite3"),
+   }
 }
 
+# Database com uma conta psql
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": "doccano",
+#         "USER": "doccano_admin",
+#         "PASSWORD": "doccano_pass",
+#         "HOST": "localhost",
+#         "PORT": "5432",
+#     }
+# }
 
 # Change 'default' database configuration with $DATABASE_URL.
 DATABASES["default"].update(
