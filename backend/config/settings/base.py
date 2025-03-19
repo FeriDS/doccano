@@ -75,6 +75,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -83,7 +84,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 
@@ -191,34 +191,47 @@ LOGOUT_REDIRECT_URL = "/"
 
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
+# DATABASES = {
+#    "default": {
+#        "ENGINE": "django.db.backends.sqlite3",
+#        "NAME": path.join(BASE_DIR, "db.sqlite3"),
+#    }
+# }
+
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": path.join(BASE_DIR, "db.sqlite3"),
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "doccano",
+        "USER": "doccano_admin",
+        "PASSWORD": "doccano_pass",
+        "HOST": "localhost",
+        "PORT": "5432",
     }
 }
+
+
 # Change 'default' database configuration with $DATABASE_URL.
-DATABASES["default"].update(
-    dj_database_url.config(
-        env="DATABASE_URL",
-        conn_max_age=env.int("DATABASE_CONN_MAX_AGE", 500),
-        ssl_require="sslmode" not in furl(env("DATABASE_URL", "")).args,
-    )
-)
+# DATABASES["default"].update(
+#     dj_database_url.config(
+#         env="DATABASE_URL",
+#         conn_max_age=env.int("DATABASE_CONN_MAX_AGE", 500),
+#         ssl_require="sslmode" not in furl(env("DATABASE_URL", "")).args,
+#     )
+# )
 
 # work-around for dj-database-url: explicitly disable ssl for sqlite
-if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
-    DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
-
-# work-around for dj-database-url: patch ssl for mysql
-if DATABASES["default"].get("ENGINE") == "django.db.backends.mysql":
-    DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
-    if env("MYSQL_SSL_CA", None):
-        DATABASES["default"].setdefault("OPTIONS", {}).setdefault("ssl", {}).setdefault("ca", env("MYSQL_SSL_CA", None))
-
-# default to a sensible modern driver for Azure SQL
-if DATABASES["default"].get("ENGINE") == "sql_server.pyodbc":
-    DATABASES["default"].setdefault("OPTIONS", {}).setdefault("driver", "ODBC Driver 17 for SQL Server")
+# if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
+#     DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
+#
+# # work-around for dj-database-url: patch ssl for mysql
+# if DATABASES["default"].get("ENGINE") == "django.db.backends.mysql":
+#     DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
+#     if env("MYSQL_SSL_CA", None):
+#         DATABASES["default"].setdefault("OPTIONS", {}).setdefault("ssl", {}).setdefault("ca", env("MYSQL_SSL_CA", None))
+#
+# # default to a sensible modern driver for Azure SQL
+# if DATABASES["default"].get("ENGINE") == "sql_server.pyodbc":
+#     DATABASES["default"].setdefault("OPTIONS", {}).setdefault("driver", "ODBC Driver 17 for SQL Server")
 
 
 # Sessions and CSRF
@@ -228,7 +241,12 @@ SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", False)
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", False)
 CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS",
-    ["http://127.0.0.1:3000", "http://0.0.0.0:3000", "http://localhost:3000", "http://192.168.1.66:3000/"],
+    [
+        "http://127.0.0.1:3000",
+        "http://0.0.0.0:3000",
+        "http://localhost:3000",
+        "http://192.168.1.66:3000"
+    ],
 )
 
 # Allow all host headers
@@ -300,3 +318,13 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 SITE_ID = 1
+
+
+print("\n DJANGO DB DATA:")
+print(f"ENGINE: {DATABASES['default'].get('ENGINE', 'Não definido')}")
+print(f"NAME: {DATABASES['default'].get('NAME', 'Não definido')}")
+print(f"USER: {DATABASES['default'].get('USER', 'Não definido')}")
+print(f"PASSWORD: {DATABASES['default'].get('PASSWORD', 'Não definido')}")
+print(f"HOST: {DATABASES['default'].get('HOST', 'Não definido')}")
+print(f"PORT: {DATABASES['default'].get('PORT', 'Não definido')}")
+print("\n")
