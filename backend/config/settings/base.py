@@ -211,27 +211,27 @@ DATABASES = {
 
 
 # Change 'default' database configuration with $DATABASE_URL.
-# DATABASES["default"].update(
-#     dj_database_url.config(
-#         env="DATABASE_URL",
-#         conn_max_age=env.int("DATABASE_CONN_MAX_AGE", 500),
-#         ssl_require="sslmode" not in furl(env("DATABASE_URL", "")).args,
-#     )
-# )
+DATABASES["default"].update(
+    dj_database_url.config(
+        env="DATABASE_URL",
+        conn_max_age=env.int("DATABASE_CONN_MAX_AGE", 500),
+        ssl_require="sslmode" not in furl(env("DATABASE_URL", "")).args,
+    )
+)
 
 # work-around for dj-database-url: explicitly disable ssl for sqlite
-# if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
-#     DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
-#
-# # work-around for dj-database-url: patch ssl for mysql
-# if DATABASES["default"].get("ENGINE") == "django.db.backends.mysql":
-#     DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
-#     if env("MYSQL_SSL_CA", None):
-#         DATABASES["default"].setdefault("OPTIONS", {}).setdefault("ssl", {}).setdefault("ca", env("MYSQL_SSL_CA", None))
-#
-# # default to a sensible modern driver for Azure SQL
-# if DATABASES["default"].get("ENGINE") == "sql_server.pyodbc":
-#     DATABASES["default"].setdefault("OPTIONS", {}).setdefault("driver", "ODBC Driver 17 for SQL Server")
+if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
+    DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
+
+# work-around for dj-database-url: patch ssl for mysql
+if DATABASES["default"].get("ENGINE") == "django.db.backends.mysql":
+    DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
+    if env("MYSQL_SSL_CA", None):
+        DATABASES["default"].setdefault("OPTIONS", {}).setdefault("ssl", {}).setdefault("ca", env("MYSQL_SSL_CA", None))
+
+# default to a sensible modern driver for Azure SQL
+if DATABASES["default"].get("ENGINE") == "sql_server.pyodbc":
+    DATABASES["default"].setdefault("OPTIONS", {}).setdefault("driver", "ODBC Driver 17 for SQL Server")
 
 
 # Sessions and CSRF
@@ -318,13 +318,3 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 SITE_ID = 1
-
-
-print("\n DJANGO DB DATA:")
-print(f"ENGINE: {DATABASES['default'].get('ENGINE', 'Não definido')}")
-print(f"NAME: {DATABASES['default'].get('NAME', 'Não definido')}")
-print(f"USER: {DATABASES['default'].get('USER', 'Não definido')}")
-print(f"PASSWORD: {DATABASES['default'].get('PASSWORD', 'Não definido')}")
-print(f"HOST: {DATABASES['default'].get('HOST', 'Não definido')}")
-print(f"PORT: {DATABASES['default'].get('PORT', 'Não definido')}")
-print("\n")
