@@ -241,12 +241,7 @@ SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", False)
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", False)
 CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS",
-    [
-        "http://127.0.0.1:3000",
-        "http://0.0.0.0:3000",
-        "http://localhost:3000",
-        "http://192.168.1.66:3000"
-    ],
+    ["http://127.0.0.1:3000", "http://0.0.0.0:3000", "http://localhost:3000", "http://192.168.1.66:3000"],
 )
 
 # Allow all host headers
