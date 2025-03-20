@@ -51,6 +51,7 @@ if settings.DEBUG or os.environ.get("STANDALONE", False):
 
 urlpatterns += [
     path("admin/", admin.site.urls),
+    path("admin1/", admin.site.urls),
     path("api-auth/", include("rest_framework.urls")),
     path("social/", include("social.urls")),
     path("v1/social/", include("social.v1_urls")),

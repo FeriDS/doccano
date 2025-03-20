@@ -2,15 +2,16 @@
 
 set -o errexit
 
-if [[ -z "${ADMIN_USERNAME}" ]]; then echo "Missing ADMIN_USERNAME environment variable" >&2; exit 1; fi
-if [[ -z "${ADMIN_PASSWORD}" ]]; then echo "Missing ADMIN_PASSWORD environment variable" >&2; exit 1; fi
-if [[ -z "${ADMIN_EMAIL}" ]]; then echo "Missing ADMIN_EMAIL environment variable" >&2; exit 1; fi
-if [[ -z "${PORT}" ]]; then echo "Missing PORT environment variable" >&2; exit 1; fi
-if [[ -z "${WORKERS}" ]]; then echo "Missing WORKERS environment variable" >&2; exit 1; fi
-if [[ -z "${CELERY_WORKERS}" ]]; then echo "Missing CELERY_WORKERS environment variable" >&2; exit 1; fi
+# if [[ -z "${ADMIN_USERNAME}" ]]; then echo "Missing ADMIN_USERNAME environment variable" >&2; exit 1; fi
+# if [[ -z "${ADMIN_PASSWORD}" ]]; then echo "Missing ADMIN_PASSWORD environment variable" >&2; exit 1; fi
+# if [[ -z "${ADMIN_EMAIL}" ]]; then echo "Missing ADMIN_EMAIL environment variable" >&2; exit 1; fi
+# if [[ -z "${PORT}" ]]; then echo "Missing PORT environment variable" >&2; exit 1; fi
+# if [[ -z "${WORKERS}" ]]; then echo "Missing WORKERS environment variable" >&2; exit 1; fi
+# if [[ -z "${CELERY_WORKERS}" ]]; then echo "Missing CELERY_WORKERS environment variable" >&2; exit 1; fi
 
 set -o nounset
 
+cd backend
 echo "Making staticfiles"
 static_dir=staticfiles
 mkdir -p client/dist/static
@@ -25,14 +26,14 @@ python manage.py migrate
 python manage.py create_roles
 
 echo "Creating admin"
-if [[ -n "${ADMIN_USERNAME}" ]] && [[ -n "${ADMIN_PASSWORD}" ]] && [[ -n "${ADMIN_EMAIL}" ]]; then
+# if [[ -n "${ADMIN_USERNAME}" ]] && [[ -n "${ADMIN_PASSWORD}" ]] && [[ -n "${ADMIN_EMAIL}" ]]; then
   python manage.py create_admin \
-    --username "${ADMIN_USERNAME}" \
-    --password "${ADMIN_PASSWORD}" \
-    --email "${ADMIN_EMAIL}" \
+    --username "admin" \
+    --password "password" \
+    --email "admin@gmail.com" \
     --noinput \
   || true
-fi
+# fi
 
 echo "Starting django"
 gunicorn \

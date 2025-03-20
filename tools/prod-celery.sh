@@ -3,7 +3,7 @@
 set -o errexit
 set -o nounset
 
-cd /backend
+cd backend
 
 (
   echo "Waiting for database"

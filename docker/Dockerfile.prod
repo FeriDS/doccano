@@ -17,12 +17,14 @@ WORKDIR /tmp
 COPY backend/pyproject.toml backend/poetry.lock /tmp/
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-RUN pip install -U --no-cache-dir pip==22.2.2 \
- && curl -sSL https://install.python-poetry.org | python - \
+RUN pip install -U --no-cache-dir setuptools==68.2.2 pip==25.0.1
+
+RUN pip3 install -U --no-cache-dir pip==25.0.1 \
+ && curl -sSL https://install.python-poetry.org | python3 - --version 1.8.5 \
  && export PATH="/root/.local/bin:$PATH" \
  && poetry export --without-hashes -o /requirements.txt \
  && echo "psycopg2-binary==2.8.6" >> /requirements.txt \
- && pip install --no-cache-dir -r /requirements.txt
+ && pip3 install --no-cache-dir -r /requirements.txt
 
 FROM python:${PYTHON_VERSION} AS runtime
 

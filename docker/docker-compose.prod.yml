@@ -3,6 +3,9 @@ services:
 
   backend:
     image: doccano/doccano:backend
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.prod
     volumes:
       - static_volume:/backend/staticfiles
       - media:/backend/media
@@ -69,7 +72,7 @@ services:
   nginx:
     image: doccano/doccano:frontend
     build:
-      context: ../ 
+      context: ../
       dockerfile: docker/Dockerfile.nginx
     command: >
       /bin/sh -c

@@ -1,7 +1,7 @@
 export default {
   mainTitle: 'Text Annotation for Humans',
   getStarted: 'Get Started',
-  test: 'Teste',
+  test: 'Test',
   startAnnotation: 'Start Annotation',
   featuresTitle: 'The best features',
   featuresTitle1: 'Team Collaboration',

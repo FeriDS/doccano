@@ -1,6 +1,6 @@
 export default {
   login: 'Login',
-  create: 'Create',
+  create: 'Create!',
   email: 'Email',
   signOut: 'Sign Out',
   username: 'Username',
