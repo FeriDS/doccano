@@ -229,14 +229,29 @@ if DATABASES["default"].get("ENGINE") == "sql_server.pyodbc":
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", False)
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", False)
+<<<<<<< Updated upstream
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", [])
+=======
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS",
+                                [
+                                    "http://127.0.0.1:3000",
+                                    "http://0.0.0.0:3000",
+                                    "http://localhost:3000",
+                                    "http://10.255.255.254:3000"
+                                ],
+                                )
+>>>>>>> Stashed changes
 
 # Allow all host headers
 ALLOWED_HOSTS = ["*"]
 
 if DEBUG:
     CORS_ORIGIN_ALLOW_ALL = True
+<<<<<<< Updated upstream
     CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:3000", "http://0.0.0.0:3000", "http://localhost:3000"]
+=======
+    CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:3000", "http://0.0.0.0:3000", "http://localhost:3000", "http://10.255.255.254:3000"]
+>>>>>>> Stashed changes
     CSRF_TRUSTED_ORIGINS += env.list("CSRF_TRUSTED_ORIGINS", [])
 
 # Batch size for importing data
