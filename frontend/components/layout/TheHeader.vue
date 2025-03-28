@@ -18,6 +18,15 @@
       </v-icon>
       <span> {{ currentProject.name }}</span>
     </v-btn>
+       <!-- Global Admin Button in the middle -->
+    <v-btn
+      v-if="isAuthenticated && isGlobalAdmin"
+      text
+      style="position: absolute; left: 50%; transform: translateX(-50%); text-transform: none;"
+      @click="$router.push('/admin')"
+    >
+      {{ $t('header.admin') }}
+    </v-btn>
     <div class="flex-grow-1" />
     <the-color-mode-switcher />
     <locale-menu />
@@ -69,7 +78,11 @@
         </v-btn>
       </template>
       <v-list>
-        <v-subheader>{{ getUsername }}</v-subheader>
+        <v-subheader>{{ getUsername }}</v-subheader><v-list-item>
+          <v-btn @click="deleteUser" style="color: red; background-color: lightgray;">
+            Delete Current User
+          </v-btn>
+        </v-list-item>
         <v-list-item>
           <v-list-item-content>
             <v-switch :input-value="isRTL" :label="direction" class="ms-1" @change="toggleRTL" />
@@ -95,6 +108,7 @@ import { mdiLogout, mdiDotsVertical, mdiMenuDown, mdiHexagonMultiple } from '@md
 import { mapGetters, mapActions } from 'vuex'
 import TheColorModeSwitcher from './TheColorModeSwitcher'
 import LocaleMenu from './LocaleMenu'
+import { APIUserRepository } from '~/repositories/user/apiUserRepository'
 
 export default {
   components: {
@@ -134,6 +148,12 @@ export default {
     isIndividualProject() {
       return this.$route.name && this.$route.name.startsWith('projects-id')
     },
+     // Overriding the computed property for demonstration:
+    isGlobalAdmin() {
+      // Force Vue reactivity:
+      console.log("Computed isGlobalAdmin:", this.$store.state.auth.isStaff);
+      return this.$store.state.auth.isStaff;  // Directly track Vuex state
+    },
 
     direction() {
       return this.isRTL ? 'RTL' : 'LTR'
@@ -143,6 +163,30 @@ export default {
   methods: {
     ...mapActions('auth', ['logout']),
     ...mapActions('config', ['toggleRTL']),
+
+    async deleteUser() {
+      if(confirm("Tem a certeza que quer apagar o user?")){
+      try {
+        const userRepository = new APIUserRepository()
+        // Retrieve the userId from the browser's cache (e.g., localStorage)
+        console.log(this.$store.state.auth.id);
+        const userId = this.$store.state.auth.id;
+        if (!userId) {
+          alert("User ID not found in cache.")
+          return
+        }
+
+        await userRepository.deleteSelf(userId)
+        await this.logout()
+        await this.$router.push(this.localePath('/'))
+        alert("User deleted successfully.")
+      } catch (error) {
+        console.error("Error deleting user:", error)
+        alert(`Error: ${error?.message || "User not found"}`)
+      }
+    }
+  },
+
     signout() {
       this.logout()
       this.$router.push(this.localePath('/'))

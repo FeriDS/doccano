@@ -41,3 +41,30 @@ class UserCreation(generics.CreateAPIView):
     def perform_create(self, serializer):
         user = serializer.save(self.request)
         return user
+    
+class UserRetrieve(APIView):  # New view to get user id by username
+    permission_classes = [IsAuthenticated & IsAdminUser]
+
+    def get(self, request, username, *args, **kwargs):
+        try:
+            user = User.objects.get(username=username)
+            return Response({"id": user.id}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+class UserDelete(generics.DestroyAPIView):  # Delete user by id
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated & IsAdminUser]
+    lookup_field = "id"
+    lookup_url_kwarg = "user_id"
+    pagination_class = None
+
+
+    def delete(self, request, id,*args, **kwargs):
+        try:
+            user = User.objects.get(id=id)
+            user.delete()
+            return Response({"message": "User deleted successfully."}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)

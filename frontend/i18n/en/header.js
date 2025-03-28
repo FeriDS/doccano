@@ -1,4 +1,5 @@
 export default {
   projects: 'projects',
-  users: 'users'
+  users: 'users',
+  admin: 'Admin Panel',
 }
