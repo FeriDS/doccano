@@ -79,9 +79,6 @@
       </template>
       <v-list>
         <v-subheader>{{ getUsername }}</v-subheader><v-list-item>
-          <v-btn @click="deleteUser" style="color: red; background-color: lightgray;">
-            Delete Current User
-          </v-btn>
         </v-list-item>
         <v-list-item>
           <v-list-item-content>

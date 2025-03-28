@@ -75,6 +75,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
+    'backend.config.middleware.CheckDBConnectionMiddleware', # para verificar a ligaçao a bd!!
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

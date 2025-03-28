@@ -175,5 +175,8 @@ export default {
         }
       })
     }
+  },
+  router: {
+    middleware: ['network-error']
   }
 }
