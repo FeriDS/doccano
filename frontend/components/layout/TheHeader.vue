@@ -33,7 +33,7 @@
       v-if="isAuthenticated && isStaff"
       text
       class="text-capitalize"
-      @click="$router.push(localePath('/users'))"
+      @click="$router.push(localePath('/manage/users'))"
     >
       {{ $t('header.users') }}
     </v-btn>
