@@ -38,6 +38,17 @@
     >
       {{ $t('header.projects') }}
     </v-btn>
+    <!-- Novo Botão criar perspectivas-->
+     <v-btn
+      v-if="isAuthenticated"
+      text
+      class="text-capitalize"
+      @click="criarPerspetiva"
+    >
+      Criar Perspectiva
+    </v-btn>
+
+  <!--Fim do botao-->
     <v-btn
       v-if="isAuthenticated && isStaff"
       text
