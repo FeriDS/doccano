@@ -5,7 +5,7 @@ from .models import Perspective, PerspectiveField
 class PerspectiveFieldSerializer(serializers.ModelSerializer):
     class Meta:
         model = PerspectiveField
-        fields = ("id", "name", "type", "options")
+        fields = ("id", "type", "options")
 
 
 class PerspectiveSerializer(serializers.ModelSerializer):
@@ -13,7 +13,7 @@ class PerspectiveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Perspective
-        fields = ("id", "project", "name", "type", "fields")
+        fields = ("id", "name", "project", "type", "fields")
         read_only_fields = ("id", "project")
 
     def create(self, validated_data):

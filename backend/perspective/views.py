@@ -19,7 +19,7 @@ class ProjectsWithoutPerspectives(APIView):
 
 class PerspectiveList(generics.ListCreateAPIView):
     serializer_class = PerspectiveSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectAdmin]
 
     def get_queryset(self):
         return Perspective.objects.filter(project=self.kwargs["project_id"])
