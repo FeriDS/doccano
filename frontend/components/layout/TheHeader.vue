@@ -1,5 +1,5 @@
 <template>
-  <v-app-bar app clipped-left>
+  <v-app-bar app clipped-right>
     <slot name="leftDrawerIcon" />
     <nuxt-link v-if="!isAuthenticated" to="/" style="line-height: 0">
       <img src="~/assets/icon.png" height="48" />
@@ -18,23 +18,13 @@
       </v-icon>
       <span> {{ currentProject.name }}</span>
     </v-btn>
-       <!-- Global Admin Button in the middle -->
-    <v-btn
-      v-if="isAuthenticated && isGlobalAdmin"
-      text
-      style="position: absolute; left: 50%; transform: translateX(-50%); text-transform: none;"
-      @click="$router.push('/admin')"
-    >
-      {{ $t('header.admin') }}
-    </v-btn>
-    <div class="flex-grow-1" />
-    <the-color-mode-switcher />
-    <locale-menu />
- 
-    <!-- Novo Botão criar perspectivas-->
-     <v-menu offset-y v-if="isAuthenticated && isGlobalAdmin">
+
+      <!-- Botões alinhados à direita -->
+    <div class="ml-auto d-flex align-center">
+
+    <v-menu v-if="isAuthenticated && isGlobalAdmin" offset-y>
       <template #activator="{ on }">
-        <v-btn text v-on="on" style="text-transform: none">
+        <v-btn text style="text-transform: none;" v-on="on">
           Perspectives
           <v-icon>{{ mdiMenuDown }}</v-icon>
         </v-btn>
@@ -56,8 +46,11 @@
           <v-list-item-title>Associate</v-list-item-title>
         </v-list-item>
       </v-list>
-</v-menu>
-  <!--Fim do botao-->
+    </v-menu>
+
+    </div>
+
+
     <v-btn
       v-if="isAuthenticated"
       text
@@ -66,15 +59,26 @@
     >
       {{ $t('header.projects') }}
     </v-btn>
-    <v-btn
-      v-if="isAuthenticated && isStaff"
-      text
-      class="text-capitalize"
-      @click="$router.push(localePath('/users'))"
-    >
-      {{ $t('header.users') }}
-    </v-btn>
-    <v-menu v-if="!isAuthenticated" open-on-hover offset-y>
+
+    <!--USERS MENU-->
+    <v-menu v-if="isAuthenticated && isGlobalAdmin" offset-y>
+      <template #activator="{ on }">
+        <v-btn text style="text-transform: none;" v-on="on">
+          Users
+          <v-icon>{{ mdiMenuDown }}</v-icon>
+        </v-btn>
+      </template>
+      <v-list>
+        <v-list-item  @click="$router.push(localePath('/register'))">
+          <v-list-item-title>Create</v-list-item-title>
+        </v-list-item>
+        <v-list-item @click="$router.push(localePath('/admin'))">
+          <v-list-item-title>Delete</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+    <!--END USERS MENU-->
+    <v-menu v-if="!isAuthenticated" offset-y open-on-hover>
       <template #activator="{ on }">
         <v-btn text v-on="on">
           {{ $t('home.demoDropDown') }}
@@ -94,20 +98,17 @@
     <v-btn v-if="!isAuthenticated" outlined @click="$router.push(localePath('/auth'))">
       {{ $t('user.login') }}
     </v-btn>
-    <v-btn v-if="isAuthenticated && isStaff"
-        outlined
-        @click="$router.push(localePath('/register'))">
-      {{ $t('user.create') }}
-    </v-btn>
+
+
     <v-menu v-if="isAuthenticated" offset-y z-index="200">
       <template #activator="{ on }">
-        <v-btn on icon v-on="on">
+        <v-btn icon v-on="on">
           <v-icon>{{ mdiDotsVertical }}</v-icon>
         </v-btn>
       </template>
       <v-list>
-        <v-subheader>{{ getUsername }}</v-subheader><v-list-item>
-        </v-list-item>
+        <v-subheader>{{ getUsername }}</v-subheader>
+        <v-list-item />
         <v-list-item>
           <v-list-item-content>
             <v-switch :input-value="isRTL" :label="direction" class="ms-1" @change="toggleRTL" />
@@ -131,16 +132,9 @@
 <script>
 import { mdiLogout, mdiDotsVertical, mdiMenuDown, mdiHexagonMultiple } from '@mdi/js'
 import { mapGetters, mapActions } from 'vuex'
-import TheColorModeSwitcher from './TheColorModeSwitcher'
-import LocaleMenu from './LocaleMenu'
 import { APIUserRepository } from '~/repositories/user/apiUserRepository'
 
 export default {
-  components: {
-    TheColorModeSwitcher,
-    LocaleMenu
-  },
-
   data() {
     return {
       items: [
@@ -173,11 +167,8 @@ export default {
     isIndividualProject() {
       return this.$route.name && this.$route.name.startsWith('projects-id')
     },
-     // Overriding the computed property for demonstration:
     isGlobalAdmin() {
-      // Force Vue reactivity:
-      console.log("Computed isGlobalAdmin:", this.$store.state.auth.isStaff);
-      return this.$store.state.auth.isStaff;  // Directly track Vuex state
+      return this.$store.state.auth.isStaff
     },
 
     direction() {
@@ -190,27 +181,25 @@ export default {
     ...mapActions('config', ['toggleRTL']),
 
     async deleteUser() {
-      if(confirm("Tem a certeza que quer apagar o user?")){
-      try {
-        const userRepository = new APIUserRepository()
-        // Retrieve the userId from the browser's cache (e.g., localStorage)
-        console.log(this.$store.state.auth.id);
-        const userId = this.$store.state.auth.id;
-        if (!userId) {
-          alert("User ID not found in cache.")
-          return
-        }
+      if (confirm("Tem a certeza que quer apagar o user?")) {
+        try {
+          const userRepository = new APIUserRepository()
+          const userId = this.$store.state.auth.id;
+          if (!userId) {
+            alert("User ID not found in cache.")
+            return
+          }
 
-        await userRepository.deleteSelf(userId)
-        await this.logout()
-        await this.$router.push(this.localePath('/'))
-        alert("User deleted successfully.")
-      } catch (error) {
-        console.error("Error deleting user:", error)
-        alert(`Error: ${error?.message || "User not found"}`)
+          await userRepository.deleteSelf(userId)
+          await this.logout()
+          await this.$router.push(this.localePath('/'))
+          alert("User deleted successfully.")
+        } catch (error) {
+          console.error("Error deleting user:", error)
+          alert(`Error: ${error?.message || "User not found"}`)
+        }
       }
-    }
-  },
+    },
 
     signout() {
       this.logout()
