@@ -32,7 +32,7 @@
     <locale-menu />
  
     <!-- Novo Botão criar perspectivas-->
-     <v-menu offset-y>
+     <v-menu offset-y v-if="isAuthenticated && isGlobalAdmin">
       <template #activator="{ on }">
         <v-btn text v-on="on" style="text-transform: none">
           Perspectives
