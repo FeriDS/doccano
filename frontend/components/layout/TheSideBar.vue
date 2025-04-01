@@ -38,7 +38,8 @@ import {
   mdiHome,
   mdiLabel,
   mdiPlayCircleOutline
-} from '@mdi/js'
+} 
+from '@mdi/js'
 import { getLinkToAnnotationPage } from '~/presenter/linkToAnnotationPage'
 
 export default {

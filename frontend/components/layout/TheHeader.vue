@@ -30,7 +30,7 @@
         </v-btn>
       </template>
       <v-list>
-        <v-list-item @click="$router.push(localePath('/perspectives/create'))">
+        <v-list-item @click="$router.push(localePath('/perspective/create'))">
           <v-list-item-title>Create</v-list-item-title>
         </v-list-item>
         <v-list-item @click="$router.push(localePath('/perspectives/edit'))">
