@@ -30,6 +30,34 @@
     <div class="flex-grow-1" />
     <the-color-mode-switcher />
     <locale-menu />
+ 
+    <!-- Novo Botão criar perspectivas-->
+     <v-menu offset-y>
+      <template #activator="{ on }">
+        <v-btn text v-on="on" style="text-transform: none">
+          Perspectives
+          <v-icon>{{ mdiMenuDown }}</v-icon>
+        </v-btn>
+      </template>
+      <v-list>
+        <v-list-item @click="$router.push(localePath('/perspectives/create'))">
+          <v-list-item-title>Create</v-list-item-title>
+        </v-list-item>
+        <v-list-item @click="$router.push(localePath('/perspectives/edit'))">
+          <v-list-item-title>Edit</v-list-item-title>
+        </v-list-item>
+        <v-list-item @click="$router.push(localePath('/perspectives/list'))">
+          <v-list-item-title>List</v-list-item-title>
+        </v-list-item>
+        <v-list-item @click="$router.push(localePath('/perspectives/delete'))">
+          <v-list-item-title>Delete</v-list-item-title>
+        </v-list-item>
+        <v-list-item @click="$router.push(localePath('/perspectives/associate'))">
+          <v-list-item-title>Associate</v-list-item-title>
+        </v-list-item>
+      </v-list>
+</v-menu>
+  <!--Fim do botao-->
     <v-btn
       v-if="isAuthenticated"
       text
@@ -38,17 +66,6 @@
     >
       {{ $t('header.projects') }}
     </v-btn>
-    <!-- Novo Botão criar perspectivas-->
-     <v-btn
-      v-if="isAuthenticated"
-      text
-      class="text-capitalize"
-      @click="criarPerspetiva"
-    >
-      Criar Perspectiva
-    </v-btn>
-
-  <!--Fim do botao-->
     <v-btn
       v-if="isAuthenticated && isStaff"
       text
