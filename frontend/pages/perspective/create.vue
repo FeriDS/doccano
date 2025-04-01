@@ -49,13 +49,23 @@
       <v-dialog v-model="dialogConfirm" max-width="500">
         <v-card>
           <v-card-title class="headline">Confirmação</v-card-title>
-          <v-card-text>
-            Criar uma perspetiva nova?
-          </v-card-text>
+          <v-card-text> Criar uma perspetiva nova? </v-card-text>
           <v-card-actions>
             <v-spacer></v-spacer>
             <v-btn color="grey" text @click="dialogConfirm = false">Cancelar</v-btn>
             <v-btn color="green darken-1" text @click="confirmarEnvio">Confirmar</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+  
+      <!-- Diálogo de Resultado -->
+      <v-dialog v-model="dialogResultado.show" max-width="400">
+        <v-card>
+          <v-card-title class="headline">{{ dialogResultado.titulo }}</v-card-title>
+          <v-card-text>{{ dialogResultado.mensagem }}</v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="primary" text @click="fecharResultado">Fechar</v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
@@ -71,7 +81,12 @@
         fields: [],
         projectOptions: [],
         fieldTypes: ['string', 'integer', 'boolean', 'choice'],
-        dialogConfirm: false
+        dialogConfirm: false,
+        dialogResultado: {
+          show: false,
+          titulo: '',
+          mensagem: ''
+        }
       }
     },
     async mounted() {
@@ -79,7 +94,8 @@
         const res = await this.$axios.get('/v1/projects/without-perspectives')
         this.projectOptions = res.data
       } catch (err) {
-        console.error('Erro ao carregar projetos:', err)
+        this.mostrarResultado('Erro', 'Erro ao carregar projetos.')
+        console.error(err)
       }
     },
     methods: {
@@ -94,36 +110,43 @@
       },
       confirmarCriacao() {
         if (!this.name || !this.projectId) {
-            alert("Preenche todos os campos obrigatórios.")
-            return
+          this.mostrarResultado('Erro', 'Preenche todos os campos obrigatórios.')
+          return
         }
-
-        console.log("Project ID:", this.projectId) // <-- ADICIONA isto para debug
         this.dialogConfirm = true
       },
       async confirmarEnvio() {
-        this.dialogConfirm = false;
+        this.dialogConfirm = false
         try {
-            const payload = {
+          const payload = {
             name: this.name,
-            project: parseInt(this.projectId), // <-- esta linha é essencial!
+            project: parseInt(this.projectId),
             type: 'string',
             fields: this.fields.map(field => ({
-                name: field.name,
-                type: field.type,
-                options: field.type === 'choice' ? field.options : null
+              name: field.name,
+              type: field.type,
+              options: field.type === 'choice' ? field.options : null
             }))
-            };
-
-            await this.$axios.post(`/v1/projects/${payload.project}/perspectives`, payload);
-            alert('Perspetiva criada com sucesso!');
-            this.$router.push('/projects');
+          }
+  
+          await this.$axios.post(`/v1/projects/${payload.project}/perspectives`, payload)
+          this.mostrarResultado('Sucesso', 'Perspetiva criada com sucesso!')
         } catch (err) {
-            console.error('Erro ao criar perspetiva:', err);
-            alert('Erro ao criar perspetiva.');
+          this.mostrarResultado('Erro', 'Erro ao criar perspetiva.')
+          console.error(err)
         }
+      },
+      mostrarResultado(titulo, mensagem) {
+        this.dialogResultado.titulo = titulo
+        this.dialogResultado.mensagem = mensagem
+        this.dialogResultado.show = true
+      },
+      fecharResultado() {
+        this.dialogResultado.show = false
+        if (this.dialogResultado.titulo === 'Sucesso') {
+          this.$router.push('/projects')
         }
-
+      }
     }
   }
   </script>
