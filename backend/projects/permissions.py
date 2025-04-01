@@ -1,7 +1,6 @@
+from rest_framework.permissions import BasePermission, IsAdminUser as DRFIsAdminUser
 from django.conf import settings
-from rest_framework.permissions import SAFE_METHODS, BasePermission
-
-from .models import Member
+from projects.models import Member
 
 
 class RolePermission(BasePermission):
@@ -14,17 +13,24 @@ class RolePermission(BasePermission):
         return view.kwargs.get("project_id") or request.query_params.get("project_id")
 
     def has_permission(self, request, view):
-        if request.user.is_superuser:
+        if request.user and request.user.is_authenticated and request.user.is_superuser:
             return True
 
         if self.unsafe_methods_check and request.method in self.UNSAFE_METHODS:
-            return request.user.is_superuser
+            return False
 
         project_id = self.get_project_id(request, view)
-        if not project_id and request.method in SAFE_METHODS:
+        if not project_id and request.method in ("GET", "HEAD", "OPTIONS"):
             return True
 
         return Member.objects.has_role(project_id, request.user, self.role_name)
+
+
+class IsAdminUser(DRFIsAdminUser):
+    """
+    Usa o IsAdminUser nativo do DRF.
+    """
+    pass
 
 
 class IsProjectAdmin(RolePermission):

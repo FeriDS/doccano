@@ -50,7 +50,7 @@
         <v-card>
           <v-card-title class="headline">Confirmação</v-card-title>
           <v-card-text>
-            Quer mesmo criar uma perspetiva nova?
+            Criar uma perspetiva nova?
           </v-card-text>
           <v-card-actions>
             <v-spacer></v-spacer>
@@ -94,33 +94,36 @@
       },
       confirmarCriacao() {
         if (!this.name || !this.projectId) {
-          alert("Preenche todos os campos obrigatórios.")
-          return
+            alert("Preenche todos os campos obrigatórios.")
+            return
         }
+
+        console.log("Project ID:", this.projectId) // <-- ADICIONA isto para debug
         this.dialogConfirm = true
       },
       async confirmarEnvio() {
-        this.dialogConfirm = false
+        this.dialogConfirm = false;
         try {
-          const payload = {
+            const payload = {
             name: this.name,
-            project: parseInt(this.projectId),
+            project: parseInt(this.projectId), // <-- esta linha é essencial!
             type: 'string',
             fields: this.fields.map(field => ({
-              name: field.name,
-              type: field.type,
-              options: field.type === 'choice' ? field.options : null
+                name: field.name,
+                type: field.type,
+                options: field.type === 'choice' ? field.options : null
             }))
-          }
-  
-          await this.$axios.post(`/api/projects/${payload.project}/perspectives`, payload)
-          alert('Perspetiva criada com sucesso!')
-          this.$router.push('/projects')
+            };
+
+            await this.$axios.post(`/v1/projects/${payload.project}/perspectives`, payload);
+            alert('Perspetiva criada com sucesso!');
+            this.$router.push('/projects');
         } catch (err) {
-          console.error('Erro ao criar perspetiva:', err)
-          alert('Erro ao criar perspetiva.')
+            console.error('Erro ao criar perspetiva:', err);
+            alert('Erro ao criar perspetiva.');
         }
-      }
+        }
+
     }
   }
   </script>
