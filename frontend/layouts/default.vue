@@ -1,19 +1,25 @@
 <template>
   <v-app>
-    <the-header />
-    <nuxt />
-    <the-footer />
+    <TheHeader />
+    <v-main>
+      <v-container fluid>
+        <Nuxt />
+      </v-container>
+    </v-main>
+    <TheFooter /> <!-- Se tiver footer -->
   </v-app>
 </template>
 
 <script>
-import TheFooter from '@/components/layout/TheFooter'
-import TheHeader from '@/components/layout/TheHeader'
+import TheHeader from '@/components/layout/TheHeader.vue'
 
 export default {
-  components: {
-    TheFooter,
-    TheHeader
-  }
+  components: { TheHeader }
 }
 </script>
+
+<style scoped>
+.v-main {
+  padding-top: 64px !important; /* Altura do header */
+}
+</style>

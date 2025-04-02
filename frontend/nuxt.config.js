@@ -50,6 +50,25 @@ export default {
     '~/plugins/color.ts',
     '~/plugins/role.ts'
   ],
+
+  router: {
+    extendRoutes(routes, resolve) {
+      routes.push(
+        {
+          name: 'perspective',
+          path: '/perspective',
+          component: resolve(__dirname, 'pages/perspective/index.vue'),
+          children: [
+            {
+              path: ':id',
+              component: resolve(__dirname, 'pages/perspective/_id.vue'),
+              name: 'perspective-id'
+            }
+          ]
+        }
+      )
+    }
+  },
   /*
    ** Nuxt.js modules
    */

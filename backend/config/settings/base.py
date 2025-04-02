@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "health_check.contrib.migrations",
     "health_check.contrib.celery",
     "django_cleanup",
+    "perspective",
 ]
 
 
@@ -193,8 +194,12 @@ LOGOUT_REDIRECT_URL = "/"
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": path.join(BASE_DIR, "db.sqlite3"),
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "doccano",
+        "USER": "doccano_admin",
+        "PASSWORD": "doccano_pass", # ou a que definiste
+        "HOST": "127.0.0.1",
+        "PORT": "5432"
     }
 }
 # Change 'default' database configuration with $DATABASE_URL.
@@ -231,7 +236,7 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS",
                                     "http://127.0.0.1:3000",
                                     "http://0.0.0.0:3000",
                                     "http://localhost:3000",
-                                    "http://192.168.1.66:3000/"
+                                    "http://192.168.1.66:3000"
                                 ],
                                 )
 
