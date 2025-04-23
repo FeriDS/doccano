@@ -87,6 +87,12 @@ export default {
             this.project.canDefineLabel
         },
         {
+          icon: mdiBookOpenOutline, // usa o ícone que quiseres
+          text: 'Project Rules',
+          link: 'rules', // vai para /projects/:id/rules
+          isVisible: true // visível para todos os utilizadores
+        },
+        {
           icon: mdiLabel,
           text: 'Relations',
           link: 'links',

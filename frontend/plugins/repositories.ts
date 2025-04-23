@@ -24,6 +24,8 @@ import { APICatalogRepository } from '@/repositories/upload/apiCatalogRepository
 import { APIParseRepository } from '@/repositories/upload/apiParseRepository'
 import { APIUserRepository } from '@/repositories/user/apiUserRepository'
 import { APISegmentationRepository } from '~/repositories/tasks/apiSegmentationRepository'
+import { APIRuleRepository } from '@/repositories/rule/apiRuleRepository'
+
 export interface Repositories {
   // User
   auth: APIAuthRepository
@@ -35,6 +37,9 @@ export interface Repositories {
   role: APIRoleRepository
   tag: APITagRepository
 
+  // Rule
+  rule: APIRuleRepository
+  
   // Example
   example: APIExampleRepository
   comment: APICommentRepository
@@ -117,7 +122,10 @@ const repositories: Repositories = {
   relation: new APIRelationRepository(),
   textLabel: new APITextLabelRepository(),
   boundingBox: new APIBoundingBoxRepository(),
-  segmentation: new APISegmentationRepository()
+  segmentation: new APISegmentationRepository(),
+
+  // Rule
+  rule: new APIRuleRepository(),
 }
 
 const plugin: Plugin = (_, inject) => {

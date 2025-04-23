@@ -1,0 +1,28 @@
+// services/application/rule/ruleApplicationService.ts
+import {
+  APIRuleRepository,
+  RuleDTO,
+  VoteResultDTO
+} from '@/repositories/rule/apiRuleRepository'
+
+export class RuleApplicationService {
+  constructor(
+    private readonly repository: APIRuleRepository = new APIRuleRepository()
+  ) {}
+
+  fetchRules(projectId: number): Promise<RuleDTO[]> {
+    return this.repository.fetchRules(projectId)
+  }
+
+  fetchClosedRules(projectId: number): Promise<RuleDTO[]> {
+    return this.repository.fetchClosedRules(projectId)
+  }
+
+  voteRule(
+    projectId: number,
+    ruleId: number,
+    vote: boolean
+  ): Promise<VoteResultDTO> {
+    return this.repository.voteRule(projectId, ruleId, vote)
+  }
+}

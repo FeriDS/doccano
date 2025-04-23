@@ -7,6 +7,15 @@
         @assign="dialogAssignment = true"
         @reset="dialogReset = true"
       />
+
+      <v-btn
+        class="ms-2"
+        color="warning"
+        @click="$router.push(`/projects/${projectId}/discrepancies`)"
+      >
+        Gerir Discrepancias
+      </v-btn>
+
       <v-btn
         class="text-capitalize ms-2"
         :disabled="!canDelete"
@@ -15,6 +24,8 @@
       >
         {{ $t('generic.delete') }}
       </v-btn>
+
+      
       <v-spacer />
       <v-btn
         :disabled="!item.count"
@@ -199,6 +210,9 @@ export default Vue.extend({
     },
 
     movePage(query: object) {
+      // movePage(){
+        // const projectId = this.$route.params.id
+        // this.$router.push(`/projects/${projectId}/perspective`)
       const link = getLinkToAnnotationPage(this.projectId, this.project.projectType)
       this.updateQuery({
         path: this.localePath(link),
