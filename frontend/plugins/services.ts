@@ -9,6 +9,10 @@ import { BoundingBoxApplicationService } from '@/services/application/tasks/boun
 import { SegmentationApplicationService } from '@/services/application/tasks/segmentation/segmentationApplicationService'
 import { SequenceLabelingApplicationService } from '@/services/application/tasks/sequenceLabeling/sequenceLabelingApplicationService'
 
+import { PerspectiveApplicationService } from '@/services/application/perspective/perspectiveApplicationService'
+import { DiscrepancyApplicationService } from '@/services/application/discrepancy/discrepancyApplicationService'
+import { RuleApplicationService } from '~/services/application/rule/ruleApplicationService'
+
 export interface Services {
   categoryType: LabelApplicationService
   spanType: LabelApplicationService
@@ -20,6 +24,9 @@ export interface Services {
   tag: TagApplicationService
   bbox: BoundingBoxApplicationService
   segmentation: SegmentationApplicationService
+  perspective: PerspectiveApplicationService
+  discrepancy: DiscrepancyApplicationService
+  rule: RuleApplicationService
 }
 
 declare module 'vue/types/vue' {
@@ -42,7 +49,10 @@ const plugin: Plugin = (_, inject) => {
     option: new OptionApplicationService(repositories.option),
     tag: new TagApplicationService(repositories.tag),
     bbox: new BoundingBoxApplicationService(repositories.boundingBox),
-    segmentation: new SegmentationApplicationService(repositories.segmentation)
+    segmentation: new SegmentationApplicationService(repositories.segmentation),
+    perspective: new PerspectiveApplicationService(repositories.perspective),
+    discrepancy: new DiscrepancyApplicationService(repositories.discrepancy),
+    rule: new RuleApplicationService(repositories.rule)
   }
   inject('services', services)
 }

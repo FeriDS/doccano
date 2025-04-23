@@ -13,6 +13,7 @@ import { APIMemberRepository } from '@/repositories/member/apiMemberRepository'
 import { APIMetricsRepository } from '@/repositories/metrics/apiMetricsRepository'
 import { LocalStorageOptionRepository } from '@/repositories/option/apiOptionRepository'
 import { APIProjectRepository } from '@/repositories/project/apiProjectRepository'
+import { APIPerspectiveRepository } from '@/repositories/perspective/apiPerspectiveRepository'
 import { APIRoleRepository } from '@/repositories/role/apiRoleRepository'
 import { APITagRepository } from '@/repositories/tag/apiTagRepository'
 import { APIBoundingBoxRepository } from '@/repositories/tasks/apiBoundingBoxRepository'
@@ -24,6 +25,11 @@ import { APICatalogRepository } from '@/repositories/upload/apiCatalogRepository
 import { APIParseRepository } from '@/repositories/upload/apiParseRepository'
 import { APIUserRepository } from '@/repositories/user/apiUserRepository'
 import { APISegmentationRepository } from '~/repositories/tasks/apiSegmentationRepository'
+
+import { APIDiscrepancyRepository } from '@/repositories/discrepancy/apiDiscrepancyRepository'
+import { APIRuleRepository } from '@/repositories/rule/apiRuleRepository'
+
+
 export interface Repositories {
   // User
   auth: APIAuthRepository
@@ -31,9 +37,16 @@ export interface Repositories {
 
   // Project
   project: APIProjectRepository
+  perspective: APIPerspectiveRepository
   member: APIMemberRepository
   role: APIRoleRepository
   tag: APITagRepository
+
+  // Descrepancy
+  discrepancy: APIDiscrepancyRepository
+
+  // Rule
+  rule: APIRuleRepository
 
   // Example
   example: APIExampleRepository
@@ -82,6 +95,7 @@ const repositories: Repositories = {
 
   // Project
   project: new APIProjectRepository(),
+  perspective: new APIPerspectiveRepository(),
   member: new APIMemberRepository(),
   role: new APIRoleRepository(),
   tag: new APITagRepository(),
@@ -117,7 +131,13 @@ const repositories: Repositories = {
   relation: new APIRelationRepository(),
   textLabel: new APITextLabelRepository(),
   boundingBox: new APIBoundingBoxRepository(),
-  segmentation: new APISegmentationRepository()
+  segmentation: new APISegmentationRepository(),
+
+  // Discrepancy
+   discrepancy: new APIDiscrepancyRepository(),
+
+  // Rule
+   rule: new APIRuleRepository()
 }
 
 const plugin: Plugin = (_, inject) => {
