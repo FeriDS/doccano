@@ -1,30 +1,25 @@
 <template>
   <v-container class="pa-5 mt-16">
-    <!-- BOTÃO NO TOPO -->
     <div class="d-flex justify-end mb-4">
       <v-btn color="primary" @click="goToClosed">
         Ver votações terminadas
       </v-btn>
     </div>
-    <!-- CARTÃO COM LISTAGEM DE VOTAÇÕES ABERTAS -->
+
     <v-card>
-      
       <v-card-title>Votação de Regras de Anotação</v-card-title>
 
       <v-card-text>
-        <!-- Erro ao carregar -->
         <v-alert v-if="error" type="error" dense class="mb-4">
           {{ error }}
         </v-alert>
-        
-        <!-- Loading spinner -->
+
         <v-progress-circular v-if="loading" indeterminate class="ma-4" />
 
-        <!-- Tabela de regras -->
         <v-data-table
-          v-if="rules.length"
+          v-if="openRules.length"
           :headers="headers"
-          :items="rules"
+          :items="openRules"
           item-key="id"
           class="elevation-1 mt-4"
         >
@@ -37,38 +32,90 @@
           </template>
 
           <template #[`item.action`]="{ item }">
+            <div class="d-flex">
+              <v-avatar
+                size="40"
+                v-if="item.vote === true"
+                color="green lighten-4"
+                class="mr-2"
+              >
+                <v-btn
+                  icon
+                  depressed
+                  :disabled="!item.is_open"
+                  color="green darken-2"
+                  class="text-white"
+                  @click="onVote(item.id, true)"
+                >
+                  👍
+                </v-btn>
+              </v-avatar>
+
+              <v-btn
+                v-else
+                icon
+                depressed
+                :disabled="!item.is_open"
+                :color="item.vote === false ? 'grey lighten-1' : 'green lighten-4'"
+                :class="item.vote === false ? 'text--secondary' : 'text--secondary'"
+                @click="onVote(item.id, true)"
+              >
+                👍
+              </v-btn>
+
+              <v-avatar
+                size="40"
+                v-if="item.vote === false"
+                color="red lighten-4"
+                class="ml-2"
+              >
+                <v-btn
+                  icon
+                  depressed
+                  :disabled="!item.is_open"
+                  color="red darken-2"
+                  class="text-white"
+                  @click="onVote(item.id, false)"
+                >
+                  👎
+                </v-btn>
+              </v-avatar>
+
+              <v-btn
+                v-else
+                icon
+                depressed
+                :disabled="!item.is_open"
+                :color="item.vote === true ? 'grey lighten-1' : 'red lighten-4'"
+                :class="item.vote === true ? 'text--secondary' : 'text--secondary'"
+                class="ml-2"
+                @click="onVote(item.id, false)"
+              >
+                👎
+              </v-btn>
+            </div>
+          </template>
+
+          <template #[`item.close`]="{ item }">
             <v-btn
-              icon
-              color="green"
-              :disabled="item.user_has_voted || !item.is_open"
-              @click="onVote(item.id, true)"
+              small
+              color="warning"
+              @click="closeVoting(item.id)"
             >
-              👍
-            </v-btn>
-            <v-btn
-              icon
-              color="red"
-              :disabled="item.user_has_voted || !item.is_open"
-              @click="onVote(item.id, false)"
-            >
-              👎
+              Encerrar
             </v-btn>
           </template>
         </v-data-table>
 
-        <!-- Nenhuma regra com votação aberta -->
-        <div v-if="!loading && !rules.length" class="text-gray-600 mt-4">
+        <div v-if="!loading && !openRules.length" class="text-gray-600 mt-4">
           Nenhuma regra disponível para votação neste momento.
         </div>
 
-        <!-- Snackbar de feedback -->
         <v-snackbar v-model="snackbar" top :color="snackbarColor" :timeout="3000">
           {{ snackbarMessage }}
         </v-snackbar>
       </v-card-text>
     </v-card>
-
-   
   </v-container>
 </template>
 
@@ -82,16 +129,23 @@ export default Vue.extend({
     return {
       rules: [] as RuleDTO[],
       loading: false,
-      error: '' as string,
-      snackbar: false as boolean,
-      snackbarMessage: '' as string,
+      error: '',
+      snackbar: false,
+      snackbarMessage: '',
       snackbarColor: 'success' as 'success' | 'error',
       headers: [
         { text: 'Regra', value: 'rule.text' },
         { text: 'Sim', value: 'votes_yes' },
         { text: 'Não', value: 'votes_no' },
-        { text: 'Ação', value: 'action', sortable: false }
+        { text: 'Ação', value: 'action', sortable: false },
+        { text: 'Encerrar Votação', value: 'close', sortable: false }
       ]
+    }
+  },
+
+  computed: {
+    openRules(): RuleDTO[] {
+      return this.rules.filter(rule => rule.is_open === true)
     }
   },
 
@@ -108,16 +162,13 @@ export default Vue.extend({
       }
 
       this.loading = true
-      this.error = ''
-
       const { fetchRules } = useRuleVoting()
 
       try {
         this.rules = await fetchRules(projectId)
       } catch (err: any) {
         this.error =
-          err.response?.data?.error ||
-          'Falha ao carregar regras. Por favor, tente mais tarde.'
+          err.response?.data?.error || 'Falha ao carregar regras. Por favor, tente mais tarde.'
       } finally {
         this.loading = false
       }
@@ -125,29 +176,49 @@ export default Vue.extend({
 
     async onVote(ruleId: number, choice: boolean) {
       const projectId = parseInt(this.$route.params.id, 10)
-      if (isNaN(projectId)) {
-        this.error = 'ID de projeto inválido.'
-        return
-      }
-
       const { voteRule } = useRuleVoting()
 
       try {
-        const result: VoteResultDTO = await voteRule(
-          projectId,
-          ruleId,
-          choice
-        )
+        const result: VoteResultDTO = await voteRule(projectId, ruleId, choice)
         const idx = this.rules.findIndex(r => r.id === ruleId)
         if (idx !== -1) {
-          this.rules.splice(idx, 1, { ...this.rules[idx], ...result })
+          this.rules.splice(idx, 1, {
+            ...this.rules[idx],
+            ...result,
+            user_has_voted: true,
+            vote: choice  // Atualiza o campo 'vote' no local
+          })
         }
 
-        this.snackbarMessage = 'Voto registado com sucesso.'
+        this.snackbarMessage = 'Voto registado.'
         this.snackbarColor = 'success'
       } catch (err: any) {
         this.snackbarMessage =
           err.response?.data?.error || 'Erro ao votar. Tente novamente.'
+        this.snackbarColor = 'error'
+      } finally {
+        this.snackbar = true
+      }
+    },
+
+
+    async closeVoting(ruleId: number) {
+      const projectId = parseInt(this.$route.params.id, 10)
+      const { closeVoting } = useRuleVoting()
+
+      try {
+        await closeVoting(projectId, ruleId)
+
+        const idx = this.rules.findIndex(r => r.id === ruleId)
+        if (idx !== -1) {
+          this.rules[idx].is_open = false
+        }
+
+        this.snackbarMessage = 'Votação encerrada com sucesso.'
+        this.snackbarColor = 'success'
+      } catch (err: any) {
+        this.snackbarMessage =
+          err.response?.data?.error || 'Erro ao encerrar votação.'
         this.snackbarColor = 'error'
       } finally {
         this.snackbar = true
@@ -163,5 +234,5 @@ export default Vue.extend({
 </script>
 
 <style scoped>
-/* Estilos personalizados (opcional) */
+/* Estilos personalizados */
 </style>

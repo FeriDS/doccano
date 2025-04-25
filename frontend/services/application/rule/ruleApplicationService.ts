@@ -1,4 +1,3 @@
-// services/application/rule/ruleApplicationService.ts
 import {
   APIRuleRepository,
   RuleDTO,
@@ -10,12 +9,12 @@ export class RuleApplicationService {
     private readonly repository: APIRuleRepository = new APIRuleRepository()
   ) {}
 
-  fetchRules(projectId: number): Promise<RuleDTO[]> {
-    return this.repository.fetchRules(projectId)
+  fetchRules(projectId: number, params?: Record<string, any>): Promise<RuleDTO[]> {
+    return this.repository.fetchRules(projectId, params)
   }
 
   fetchClosedRules(projectId: number): Promise<RuleDTO[]> {
-    return this.repository.fetchClosedRules(projectId)
+    return this.repository.fetchRules(projectId, { is_open: false })
   }
 
   voteRule(
@@ -24,5 +23,9 @@ export class RuleApplicationService {
     vote: boolean
   ): Promise<VoteResultDTO> {
     return this.repository.voteRule(projectId, ruleId, vote)
+  }
+
+  closeVoting(projectId: number, ruleId: number): Promise<any> {
+    return this.repository.closeVoting(projectId, ruleId)
   }
 }

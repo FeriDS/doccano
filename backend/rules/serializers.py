@@ -9,15 +9,23 @@ class RuleSerializer(serializers.ModelSerializer):
 class ProjectRuleSerializer(serializers.ModelSerializer):
     rule = RuleSerializer(read_only=True)
     votes_yes = serializers.SerializerMethodField()
-    votes_no  = serializers.SerializerMethodField()
+    votes_no = serializers.SerializerMethodField()
+    votes_count = serializers.SerializerMethodField()
     user_has_voted = serializers.SerializerMethodField()
+    vote = serializers.SerializerMethodField()  # <- Adicionado aqui!
     is_open = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = ProjectRule
         fields = [
-            "id", "rule", "votes_yes", "votes_no",
-            "user_has_voted", "is_open",
+            "id", "project", "rule",
+            "is_open",
+            "votes_yes", "votes_no", "votes_count",
+            "user_has_voted", "vote"  # <- Também aqui!
+        ]
+        read_only_fields = [
+            "is_open", "votes_yes", "votes_no",
+            "votes_count", "user_has_voted", "vote"
         ]
 
     def get_votes_yes(self, obj):
@@ -26,10 +34,22 @@ class ProjectRuleSerializer(serializers.ModelSerializer):
     def get_votes_no(self, obj):
         return obj.votes.filter(vote=False).count()
 
+    def get_votes_count(self, obj):
+        return obj.votes.count()
+
     def get_user_has_voted(self, obj):
-        req = self.context.get("request")
-        return bool(req and req.user.is_authenticated and
-                    obj.votes.filter(user=req.user).exists())
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return obj.votes.filter(user=request.user).exists()
+        return False
+
+    def get_vote(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            vote_obj = obj.votes.filter(user=request.user).first()
+            if vote_obj:
+                return vote_obj.vote  # True ou False
+        return None  # Não votou ainda
 
 class VoteInputSerializer(serializers.Serializer):
     vote = serializers.BooleanField()
