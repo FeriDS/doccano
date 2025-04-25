@@ -186,7 +186,7 @@ export default Vue.extend({
             ...this.rules[idx],
             ...result,
             user_has_voted: true,
-            vote: choice  // Atualiza o campo 'vote' no local
+            vote: choice  
           })
         }
 

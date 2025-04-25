@@ -64,6 +64,7 @@ class ProjectRuleUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
     def patch(self, request, project_id, rule_id):
+        
         project_rule = get_object_or_404(
             ProjectRule,
             project_id=project_id,
