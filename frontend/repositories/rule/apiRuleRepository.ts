@@ -44,7 +44,7 @@ export class APIRuleRepository {
 
   async createRule(projectId: number, data: { text: string }): Promise<RuleDTO> {
     const url = `/projects/${projectId}/rules/`
-    const response = await this.request.post(url, { rule: { text: data.text } })
+    const response = await this.request.post(url, data)  // ✅ corrigido aqui
     return response.data as RuleDTO
   }
 }

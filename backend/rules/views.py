@@ -91,3 +91,27 @@ class ProjectRuleUpdateView(APIView):
             "message": "Estado de votação atualizado com sucesso.",
             "is_open": project_rule.is_open
         })
+
+class ProjectRuleListCreateView(generics.ListCreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return ProjectRule.objects.filter(project_id=self.kwargs["project_id"])
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return CreateProjectRuleSerializer
+        return ProjectRuleSerializer
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request
+        if self.request.method == 'POST':
+            from projects.models import Project
+            ctx["project"] = get_object_or_404(Project, id=self.kwargs["project_id"])
+        return ctx
+
+    def perform_create(self, serializer):
+        serializer.save()
+

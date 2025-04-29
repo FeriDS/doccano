@@ -53,3 +53,18 @@ class ProjectRuleSerializer(serializers.ModelSerializer):
 
 class VoteInputSerializer(serializers.Serializer):
     vote = serializers.BooleanField()
+
+class CreateProjectRuleSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = ProjectRule
+        fields = ['id', 'project', 'is_open', 'text']
+        read_only_fields = ['id', 'project', 'is_open']
+
+    def create(self, validated_data):
+        text = validated_data.pop('text')
+        project = self.context['project']
+        rule = Rule.objects.create(text=text)
+        project_rule = ProjectRule.objects.create(project=project, rule=rule)
+        return project_rule
