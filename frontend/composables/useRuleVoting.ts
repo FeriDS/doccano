@@ -26,10 +26,15 @@ export function useRuleVoting() {
     return service.closeVoting(projectId, ruleId)
   }
 
+  function createRule(projectId: number, data: { text: string }): Promise<RuleDTO> {
+    return service.createRule(projectId, data)
+  }
+
   return {
     fetchRules,
     fetchClosedRules,
     voteRule,
-    closeVoting
+    closeVoting,
+    createRule
   }
 }

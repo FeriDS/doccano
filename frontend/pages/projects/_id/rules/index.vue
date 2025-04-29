@@ -1,6 +1,10 @@
 <template>
   <v-container class="pa-5 mt-16">
-    <div class="d-flex justify-end mb-4">
+    <div class="d-flex justify-space-between mb-4">
+      <v-btn color="primary" @click="goToCreate">
+        Criar nova regra
+      </v-btn>
+
       <v-btn color="primary" @click="goToClosed">
         Ver votações terminadas
       </v-btn>
@@ -186,7 +190,7 @@ export default Vue.extend({
             ...this.rules[idx],
             ...result,
             user_has_voted: true,
-            vote: choice  
+            vote: choice
           })
         }
 
@@ -200,7 +204,6 @@ export default Vue.extend({
         this.snackbar = true
       }
     },
-
 
     async closeVoting(ruleId: number) {
       const projectId = parseInt(this.$route.params.id, 10)
@@ -228,6 +231,11 @@ export default Vue.extend({
     goToClosed() {
       const projectId = this.$route.params.id
       this.$router.push(this.localePath(`/projects/${projectId}/rules/closed`))
+    },
+
+    goToCreate() {
+      const projectId = this.$route.params.id
+      this.$router.push(this.localePath(`/projects/${projectId}/rules/create`))
     }
   }
 })
