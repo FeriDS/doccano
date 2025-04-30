@@ -5,8 +5,59 @@ from rest_framework.permissions import IsAdminUser
 from django.shortcuts import get_object_or_404
 
 from .models import ProjectRule, RuleVote
-from .serializers import ProjectRuleSerializer, VoteInputSerializer
+from .serializers import ProjectRuleSerializer, VoteInputSerializer, RuleCreateSerializer
 
+class ProjectRuleCreateView(generics.CreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RuleCreateSerializer
+
+    def get_queryset(self):
+        return self.queryset.filter(project_id=self.kwargs["project_id"])
+
+    def perform_create(self, serializer):
+        project = get_object_or_404(Project, id=self.kwargs["project_id"])
+        serializer.save(project=project)
+
+    def create(self, request, *args, **kwargs):
+        project_id = kwargs.get('project_id')
+        project = get_object_or_404(Project, id=project_id)
+        
+        # Verifica se o usuário tem permissão para criar regras neste projeto
+        if not request.user.is_staff and project.created_by != request.user:
+            return Response(
+                {"error": "Você não tem permissão para criar regras neste projeto."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Cria a regra básica
+        rule_data = {"text": request.data.get("text")}
+        rule_serializer = RuleSerializer(data=rule_data)
+        rule_serializer.is_valid(raise_exception=True)
+        rule = rule_serializer.save()
+
+        # Cria a ligação com o projeto
+        project_rule = ProjectRule.objects.create(
+            project=project,
+            rule=rule,
+            is_open=True  # Por padrão, a votação começa aberta
+        )
+
+        serializer = self.get_serializer(project_rule)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+class ProjectRuleAPIView(APIView):
+    def get(self, request, project_id):  # 👈 Aceita GET
+        rules = ProjectRule.objects.filter(project_id=project_id)
+        serializer = ProjectRuleSerializer(rules, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, project_id):  # 👈 Aceita POST
+        serializer = ProjectRuleSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(project_id=project_id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ProjectRuleListView(generics.ListAPIView):
     serializer_class = ProjectRuleSerializer

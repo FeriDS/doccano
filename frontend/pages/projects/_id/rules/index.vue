@@ -1,13 +1,24 @@
 <template>
   <v-container class="pa-5 mt-16">
-    <div class="d-flex justify-end mb-4">
-      <v-btn color="primary" @click="goToClosed">
-        Ver votações terminadas
-      </v-btn>
-    </div>
-
     <v-card>
-      <v-card-title>Votação de Regras de Anotação</v-card-title>
+      <v-card-title class="d-flex justify-space-between align-center">
+        <span>Regras de Anotação</span>
+        <div>
+          <v-btn 
+            color="primary" 
+            class="mr-2"
+            @click="goToCreate"
+          >
+            Nova Regra
+          </v-btn>
+          <v-btn 
+            color="secondary"
+            @click="goToClosed"
+          >
+            Votações Encerradas
+          </v-btn>
+        </div>
+      </v-card-title>
 
       <v-card-text>
         <v-alert v-if="error" type="error" dense class="mb-4">
@@ -34,8 +45,8 @@
           <template #[`item.action`]="{ item }">
             <div class="d-flex">
               <v-avatar
+              v-if="item.vote === true"
                 size="40"
-                v-if="item.vote === true"
                 color="green lighten-4"
                 class="mr-2"
               >
@@ -64,8 +75,8 @@
               </v-btn>
 
               <v-avatar
+              v-if="item.vote === false"
                 size="40"
-                v-if="item.vote === false"
                 color="red lighten-4"
                 class="ml-2"
               >
@@ -119,120 +130,27 @@
   </v-container>
 </template>
 
-<script lang="ts">
-import Vue from 'vue'
-import { useRuleVoting } from '@/composables/useRuleVoting'
-import type { RuleDTO, VoteResultDTO } from '@/repositories/rule/apiRuleRepository'
-
-export default Vue.extend({
-  data() {
-    return {
-      rules: [] as RuleDTO[],
-      loading: false,
-      error: '',
-      snackbar: false,
-      snackbarMessage: '',
-      snackbarColor: 'success' as 'success' | 'error',
-      headers: [
-        { text: 'Regra', value: 'rule.text' },
-        { text: 'Sim', value: 'votes_yes' },
-        { text: 'Não', value: 'votes_no' },
-        { text: 'Ação', value: 'action', sortable: false },
-        { text: 'Encerrar Votação', value: 'close', sortable: false }
-      ]
-    }
-  },
-
-  computed: {
-    openRules(): RuleDTO[] {
-      return this.rules.filter(rule => rule.is_open === true)
-    }
-  },
-
-  created() {
-    this.fetchRules()
-  },
-
-  methods: {
-    async fetchRules() {
-      const projectId = parseInt(this.$route.params.id, 10)
-      if (isNaN(projectId)) {
-        this.error = 'ID de projeto inválido.'
-        return
+<script>
+export default {
+  async asyncData({ params, $axios, error }) {
+    try {
+      // 1. Busca dados do projeto
+      const project = await $axios.$get(`/api/projects/${params.id}`)
+      
+      // 2. Busca regras do projeto
+      const rules = await $axios.$get(`/api/projects/${params.id}/rules`)
+      
+      return {
+        projectId: params.id,
+        project,
+        rules
       }
-
-      this.loading = true
-      const { fetchRules } = useRuleVoting()
-
-      try {
-        this.rules = await fetchRules(projectId)
-      } catch (err: any) {
-        this.error =
-          err.response?.data?.error || 'Falha ao carregar regras. Por favor, tente mais tarde.'
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async onVote(ruleId: number, choice: boolean) {
-      const projectId = parseInt(this.$route.params.id, 10)
-      const { voteRule } = useRuleVoting()
-
-      try {
-        const result: VoteResultDTO = await voteRule(projectId, ruleId, choice)
-        const idx = this.rules.findIndex(r => r.id === ruleId)
-        if (idx !== -1) {
-          this.rules.splice(idx, 1, {
-            ...this.rules[idx],
-            ...result,
-            user_has_voted: true,
-            vote: choice  
-          })
-        }
-
-        this.snackbarMessage = 'Voto registado.'
-        this.snackbarColor = 'success'
-      } catch (err: any) {
-        this.snackbarMessage =
-          err.response?.data?.error || 'Erro ao votar. Tente novamente.'
-        this.snackbarColor = 'error'
-      } finally {
-        this.snackbar = true
-      }
-    },
-
-
-    async closeVoting(ruleId: number) {
-      const projectId = parseInt(this.$route.params.id, 10)
-      const { closeVoting } = useRuleVoting()
-
-      try {
-        await closeVoting(projectId, ruleId)
-
-        const idx = this.rules.findIndex(r => r.id === ruleId)
-        if (idx !== -1) {
-          this.rules[idx].is_open = false
-        }
-
-        this.snackbarMessage = 'Votação encerrada com sucesso.'
-        this.snackbarColor = 'success'
-      } catch (err: any) {
-        this.snackbarMessage =
-          err.response?.data?.error || 'Erro ao encerrar votação.'
-        this.snackbarColor = 'error'
-      } finally {
-        this.snackbar = true
-      }
-    },
-
-    goToClosed() {
-      const projectId = this.$route.params.id
-      this.$router.push(this.localePath(`/projects/${projectId}/rules/closed`))
+    } catch (err) {
+      error({
+        statusCode: err.response?.status || 500,
+        message: err.message
+      })
     }
   }
-})
+}
 </script>
-
-<style scoped>
-/* Estilos personalizados */
-</style>

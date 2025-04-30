@@ -28,4 +28,8 @@ export class RuleApplicationService {
   closeVoting(projectId: number, ruleId: number): Promise<any> {
     return this.repository.closeVoting(projectId, ruleId)
   }
+
+  createRule(projectId: number, data: { text: string }): Promise<RuleDTO> {
+    return this.repository.createRule(projectId, data)
+  }
 }

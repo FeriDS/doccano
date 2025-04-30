@@ -6,6 +6,12 @@ class RuleSerializer(serializers.ModelSerializer):
         model = Rule
         fields = ["id", "text"]
 
+class RuleCreateSerializer(serializers.Serializer):
+    text = serializers.CharField(min_length=10)
+    is_open = serializers.BooleanField(default=True)
+
+
+
 class ProjectRuleSerializer(serializers.ModelSerializer):
     rule = RuleSerializer(read_only=True)
     votes_yes = serializers.SerializerMethodField()

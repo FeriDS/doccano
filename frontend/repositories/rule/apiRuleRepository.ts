@@ -36,8 +36,15 @@ export class APIRuleRepository {
     return response.data as VoteResultDTO
   }
 
-  closeVoting(projectId: number, ruleId: number): Promise<any> {
+  async closeVoting(projectId: number, ruleId: number): Promise<any> {
     const url = `/projects/${projectId}/rules/${ruleId}/`
-    return this.request.patch(url, { is_open: false })
+    const response = await this.request.patch(url, { is_open: false })
+    return response.data
+  }
+
+  async createRule(projectId: number, data: { text: string; is_open?: boolean }): Promise<RuleDTO> {
+    const url = `/projects/${projectId}/rules/`
+    const response = await this.request.post(url, data)
+    return response.data as RuleDTO
   }
 }
