@@ -63,6 +63,7 @@ urlpatterns += [
     path("v1/", include("data_export.urls")),
     path("v1/", include("projects.urls")),
     path("v1/", include("backend.rules.urls")),
+    path("api/reports/", include("reports.urls")),
     path("v1/projects/<int:project_id>/metrics/", include("metrics.urls")),
     path("v1/projects/<int:project_id>/", include("auto_labeling.urls")),
     path("v1/projects/<int:project_id>/", include("examples.urls")),
