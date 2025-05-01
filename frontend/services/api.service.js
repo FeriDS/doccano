@@ -1,4 +1,5 @@
 import axios from 'axios'
+
 axios.defaults.xsrfCookieName = 'csrftoken'
 axios.defaults.xsrfHeaderName = 'X-CSRFToken'
 
@@ -7,6 +8,20 @@ class ApiService {
     this.instance = axios.create({
       baseURL: process.env.baseUrl
     })
+
+    this.instance.interceptors.response.use(
+      response => response,
+      error => {
+        const isServiceUnavailable =
+          error?.response?.status === 503 || error.message === 'Network Error'
+
+        if (isServiceUnavailable) {
+          window.location.href = '/?error=techissue'
+        }
+
+        return Promise.reject(error)
+      }
+    )
   }
 
   request(method, url, data = {}, config = {}) {

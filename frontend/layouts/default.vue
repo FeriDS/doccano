@@ -1,23 +1,20 @@
 <template>
   <v-app>
-    <!-- Alerta de falha de ligação -->
-    <v-alert
-      v-if="$store.state.connectionError"
-      type="error"
-      prominent
-      dense
-      border="left"
-      class="text-center"
+    <v-snackbar
+      v-model="showTechIssue"
+      :timeout="0"
+      top
+      color="error"
     >
-      ⚠️ Falha de ligação, por favor tente mais tarde!
-    </v-alert>
-
+      We're sorry, but there was a technical issue with the server. Please try again later.
+      <template v-slot:action="{ attrs }">
+        <v-btn color="white" text v-bind="attrs" @click="showTechIssue = false">
+          Understood
+        </v-btn>
+      </template>
+    </v-snackbar>
     <the-header />
-
-    <v-main>
-      <nuxt />
-    </v-main>
-
+    <nuxt />
     <the-footer />
   </v-app>
 </template>
@@ -30,6 +27,17 @@ export default {
   components: {
     TheFooter,
     TheHeader
+  },
+  data() {
+    return {
+      showTechIssue: false
+    }
+  },
+  mounted() {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') === 'techissue') {
+      this.showTechIssue = true
+    }
   }
 }
 </script>

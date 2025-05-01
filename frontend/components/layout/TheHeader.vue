@@ -1,3 +1,4 @@
+
 <template>
   <v-app-bar app clipped-right>
     <slot name="leftDrawerIcon" />

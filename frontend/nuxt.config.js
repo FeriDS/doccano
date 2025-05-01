@@ -48,7 +48,8 @@ export default {
     '~/plugins/services.ts',
     '~/plugins/repositories.ts',
     '~/plugins/color.ts',
-    '~/plugins/role.ts'
+    '~/plugins/role.ts',
+    '~/services/api.service.js',
   ],
   /*
    ** Nuxt.js modules
