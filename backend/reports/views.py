@@ -3,25 +3,27 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import ListAPIView
+from rest_framework import status
+from rest_framework.renderers import JSONRenderer
+
+from django.http import HttpResponse
+from django.contrib.auth import get_user_model
+from django.db.models import Count
+
 from labels.models import Span
 from projects.models import Project
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
 from backend.rules.models import Rule
-from django.db.models import Count
-from django.http import HttpResponse
-from rest_framework import status
-import csv
-import io
-from rest_framework.generics import ListAPIView
+
 from .models import HistoricalReport
 from .serializer import HistoricalReportSerializer
 
+import csv
+import io
 
-# backend/reports/views.py
 
-from .models import HistoricalReport
+User = get_user_model()
+
 
 class HistoricalAnnotationReportView(APIView):
     permission_classes = [IsAuthenticated]
@@ -37,7 +39,7 @@ class HistoricalAnnotationReportView(APIView):
         user_id = request.GET.get('user_id')
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
-        export_format = request.GET.get('format','').strip()
+        export_format = request.GET.get('format', '').strip()
 
         spans = Span.objects.filter(example__project=project)
 
@@ -79,7 +81,6 @@ class HistoricalAnnotationReportView(APIView):
 
         return Response(data)
 
-
     def export_csv(self, data):
         print("DATA A EXPORTAR:", data)
         buffer = io.StringIO()
@@ -94,7 +95,6 @@ class HistoricalAnnotationReportView(APIView):
     def export_pdf(self, data):
         from reportlab.pdfgen import canvas
         import io
-        from django.http import HttpResponse
 
         buffer = io.BytesIO()
         p = canvas.Canvas(buffer)
@@ -118,24 +118,25 @@ class HistoricalAnnotationReportView(APIView):
         return response
 
 
-    
 class HistoricalReportListView(ListAPIView):
     serializer_class = HistoricalReportSerializer
+    renderer_classes = [JSONRenderer]  # força resposta JSON
 
     def get_queryset(self):
         project_id = self.kwargs["project_id"]
-        return HistoricalReport.objects.filter(project_id=project_id).order_by("-created_at")
-    
-from django.http import HttpResponse
+        return HistoricalReport.objects.filter(project_links_id=project_id).order_by("-created_at")
+
+
+# Testes e debug
 
 def teste_de_rota(request, project_id):
     return HttpResponse(f"FUNCIONA: project_id={project_id}", content_type="text/plain")
 
-from django.http import HttpResponse
-from reportlab.pdfgen import canvas
-import io
 
 def pdf_teste(request):
+    from reportlab.pdfgen import canvas
+    import io
+
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer)
     p.drawString(100, 750, "TESTE PDF GERADO COM SUCESSO")
