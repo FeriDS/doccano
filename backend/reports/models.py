@@ -1,17 +1,23 @@
-# backend/reports/models.py
 from django.db import models
 from django.contrib.auth import get_user_model
-from projects.models import Project
+
 
 User = get_user_model()
 
-class AnnotationReport(models.Model):
-    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+class HistoricalReport(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    filters = models.JSONField()
-    csv_file = models.FileField(upload_to='reports/', null=True, blank=True)
-    pdf_file = models.FileField(upload_to='reports/', null=True, blank=True)
+
+    user_filter = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='filtered_reports')
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+
+    total_annotations = models.IntegerField()
+    total_users = models.IntegerField()
+    rules_count = models.IntegerField()
+
+    # ❗ A ForeignKey para Project fica aqui, mas definida *tardiamente* por string
+    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE)
 
     def __str__(self):
-        return f"Relatório de {self.project.name} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+        return f"Histórico de {self.project.name} em {self.created_at.date()}"

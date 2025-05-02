@@ -1,7 +1,9 @@
-from rest_framework import serializers
-from .models import AnnotationReport
+# backend/reports/serializer.py
 
-class AnnotationReportSerializer(serializers.ModelSerializer):
+from rest_framework import serializers
+from .models import HistoricalReport
+
+class HistoricalReportSerializer(serializers.ModelSerializer):
     class Meta:
-        model = AnnotationReport
-        fields = ['id', 'project', 'created_by', 'created_at', 'filters']  # <- inclui 'id'!
+        model = HistoricalReport
+        fields = "__all__"

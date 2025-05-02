@@ -1,78 +1,144 @@
+# backend/reports/views.py
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions
-from rest_framework.generics import RetrieveAPIView
-from django.shortcuts import get_object_or_404
-from .models import AnnotationReport
-from .serializer import AnnotationReportSerializer
+from rest_framework.permissions import IsAuthenticated
 from labels.models import Span
-from django.utils.timezone import make_aware
-from datetime import datetime
+from projects.models import Project
+from django.contrib.auth import get_user_model
 
-class AnnotationReportView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+User = get_user_model()
+from backend.rules.models import Rule
+from django.db.models import Count
+from django.http import HttpResponse
+from rest_framework import status
+import csv
+import io
+from rest_framework.generics import ListAPIView
+from .models import HistoricalReport
+from .serializer import HistoricalReportSerializer
 
-    def get(self, request):
-        project_id = request.query_params.get('project_id')
-        if not project_id:
-            return Response({"error": "Project ID obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
-        reports = AnnotationReport.objects.filter(project_id=project_id).order_by('-created_at')
-        serializer = AnnotationReportSerializer(reports, many=True)
-        return Response(serializer.data)
 
-    def post(self, request):
-        project_id = request.data.get('project_id')
-        if not project_id:
-            return Response({"error": "Project ID obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+# backend/reports/views.py
 
-        report = AnnotationReport.objects.create(
-            project_id=project_id,
+from .models import HistoricalReport
+
+class HistoricalAnnotationReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        print(f"🔍 Pedido GET para exportação do projeto {project_id}")
+
+        try:
+            project = Project.objects.get(id=project_id)
+        except Project.DoesNotExist:
+            return Response({"erro": f"Projeto {project_id} não encontrado."}, status=404)
+
+        user_id = request.GET.get('user_id')
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        export_format = request.GET.get('format','').strip()
+
+        spans = Span.objects.filter(example__project=project)
+
+        if user_id:
+            spans = spans.filter(user_id=user_id)
+        if start_date:
+            spans = spans.filter(created_at__gte=start_date)
+        if end_date:
+            spans = spans.filter(created_at__lte=end_date)
+
+        total_annotations = spans.count()
+        total_users = User.objects.filter(example__project=project).distinct().count()
+        rules_count = Rule.objects.filter(project=project).count()
+
+        report_obj = HistoricalReport.objects.create(
+            project=project,
             created_by=request.user,
-            filters={}
+            user_filter_id=user_id if user_id else None,
+            start_date=start_date or None,
+            end_date=end_date or None,
+            total_annotations=total_annotations,
+            total_users=total_users,
+            rules_count=rules_count
         )
 
-        # Devolve apenas id e created_at diretamente para simplificar a resposta
-        return Response({
-            'id': report.id,
-            'created_at': report.created_at
-        }, status=status.HTTP_201_CREATED)
+        data = {
+            "report_id": report_obj.id,
+            "total_annotations": total_annotations,
+            "total_users": total_users,
+            "rules_count": rules_count,
+        }
 
-class AnnotationReportDataView(RetrieveAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+        print("📦 Dados a exportar:", data)
 
-    def get(self, request, pk):
-        report = get_object_or_404(AnnotationReport, pk=pk)
-        filters = report.filters
-        queryset = Span.objects.filter(example__project_id=report.project_id)
+        if export_format == "csv":
+            return self.export_csv(data)
+        elif export_format == "pdf":
+            return self.export_pdf(data)
 
-        if filters.get('annotator_id'):
-            queryset = queryset.filter(user_id=filters['annotator_id'])
+        return Response(data)
 
-        if filters.get('start_date'):
-            start = make_aware(datetime.strptime(filters['start_date'], '%Y-%m-%d'))
-            queryset = queryset.filter(created_at__gte=start)
 
-        if filters.get('end_date'):
-            end = make_aware(datetime.strptime(filters['end_date'], '%Y-%m-%d'))
-            queryset = queryset.filter(created_at__lte=end)
+    def export_csv(self, data):
+        print("DATA A EXPORTAR:", data)
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["Total de Anotações", "Total de Utilizadores", "Regras Definidas"])
+        writer.writerow([data["total_annotations"], data["total_users"], data["rules_count"]])
 
-        data = [
-            {
-                'id': span.id,
-                'text': span.example.text[
-                    span.start_offset:span.end_offset
-                ],
-                'user': span.user.username,
-                'created_at': span.created_at,
-                'project': span.example.project.name,
-                'perspective': None
-            }
-            for span in queryset.select_related('user', 'example__project')
-        ]
+        response = HttpResponse(buffer.getvalue(), content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename=relatorio.csv'
+        return response
 
-        return Response({
-            'report_id': report.id,
-            'created_at': report.created_at,
-            'filters': filters,
-            'results': data
-        })
+    def export_pdf(self, data):
+        from reportlab.pdfgen import canvas
+        import io
+        from django.http import HttpResponse
+
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer)
+        p.setFont("Helvetica", 12)
+
+        y = 800
+        p.drawString(100, y, "📄 Relatório de Anotações")
+        y -= 30
+        p.drawString(100, y, f"Total de Anotações: {data['total_annotations']}")
+        y -= 20
+        p.drawString(100, y, f"Total de Utilizadores: {data['total_users']}")
+        y -= 20
+        p.drawString(100, y, f"Regras Definidas: {data['rules_count']}")
+
+        p.showPage()
+        p.save()
+
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=relatorio.pdf'
+        return response
+
+
+    
+class HistoricalReportListView(ListAPIView):
+    serializer_class = HistoricalReportSerializer
+
+    def get_queryset(self):
+        project_id = self.kwargs["project_id"]
+        return HistoricalReport.objects.filter(project_id=project_id).order_by("-created_at")
+    
+from django.http import HttpResponse
+
+def teste_de_rota(request, project_id):
+    return HttpResponse(f"FUNCIONA: project_id={project_id}", content_type="text/plain")
+
+from django.http import HttpResponse
+from reportlab.pdfgen import canvas
+import io
+
+def pdf_teste(request):
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer)
+    p.drawString(100, 750, "TESTE PDF GERADO COM SUCESSO")
+    p.save()
+    buffer.seek(0)
+    return HttpResponse(buffer, content_type='application/pdf')

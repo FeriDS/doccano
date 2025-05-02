@@ -73,7 +73,8 @@ INSTALLED_APPS = [
     "django_cleanup",
     'perspective',
     'backend.rules.apps.RulesConfig',
-    "reports",
+    'backend.reports',
+    
 ]
 
 

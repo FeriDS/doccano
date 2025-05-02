@@ -35,6 +35,7 @@
     "filepond": "^4.28.2",
     "filepond-plugin-file-validate-type": "^1.2.6",
     "fs-extra": "10.0.0",
+    "html2pdf.js": "^0.10.3",
     "js-cookie": "^2.2.1",
     "konva": "^8.3.10",
     "lodash": "^4.17.21",

@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import AnnotationReportView, AnnotationReportDataView
+from .views import HistoricalAnnotationReportView, HistoricalReportListView, pdf_teste
 
 urlpatterns = [
-    path('annotations/', AnnotationReportView.as_view(), name='annotation-report'),
-    path('annotations/<int:pk>/data/', AnnotationReportDataView.as_view(), name='annotation-report-data'),
+    path("historical-report/<int:project_id>/", HistoricalAnnotationReportView.as_view(), name="historical-report"),
+    #path("historical-report/list/<int:project_id>/", HistoricalReportListView.as_view(), name="historical-report-list"),
+    path("teste-pdf/", pdf_teste),
 ]
