@@ -219,9 +219,6 @@ export default {
     async list(docId) {
       const annotations = await this.$services.sequenceLabeling.list(this.projectId, docId)
       const relations = await this.$services.sequenceLabeling.listRelations(this.projectId, docId)
-      // In colab mode, if someone add a new label and annotate data
-      // with the label during your work, it occurs exception
-      // because there is no corresponding label.
       await this.maybeFetchSpanTypes(annotations)
       this.annotations = annotations
       this.relations = relations

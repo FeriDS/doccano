@@ -1,6 +1,6 @@
 import { AnnotationApplicationService } from '../annotationApplicationService'
-import { RelationDTO } from './relationData'
 import { SpanDTO } from './sequenceLabelingData'
+import { RelationDTO } from './relationData'
 import { APISpanRepository } from '@/repositories/tasks/apiSpanRepository'
 import { APIRelationRepository } from '@/repositories/tasks/apiRelationRepository'
 import { Span } from '@/domain/models/tasks/span'
@@ -11,7 +11,7 @@ export class SequenceLabelingApplicationService extends AnnotationApplicationSer
     readonly repository: APISpanRepository,
     readonly relationRepository: APIRelationRepository
   ) {
-    super(new APISpanRepository())
+    super(repository)
   }
 
   public async list(projectId: string, exampleId: number): Promise<SpanDTO[]> {
@@ -29,6 +29,27 @@ export class SequenceLabelingApplicationService extends AnnotationApplicationSer
     const item = new Span(0, labelId, 0, startOffset, endOffset)
     try {
       await this.repository.create(projectId, exampleId, item)
+    } catch (e: any) {
+      console.log(e.response.data.detail)
+    }
+  }
+
+  public async update(
+    projectId: string,
+    exampleId: number,
+    annotationId: number,
+    item: Span
+  ): Promise<void> {
+    try {
+      await this.repository.update(projectId, exampleId, annotationId, item)
+    } catch (e: any) {
+      console.log(e.response.data.detail)
+    }
+  }
+
+  public async delete(projectId: string, exampleId: number, annotationId: number): Promise<void> {
+    try {
+      await this.repository.delete(projectId, exampleId, annotationId)
     } catch (e: any) {
       console.log(e.response.data.detail)
     }
@@ -65,22 +86,26 @@ export class SequenceLabelingApplicationService extends AnnotationApplicationSer
     await this.relationRepository.create(projectId, exampleId, relation)
   }
 
-  public async deleteRelation(
-    projectId: string,
-    exampleId: number,
-    relationId: number
-  ): Promise<void> {
-    await this.relationRepository.delete(projectId, exampleId, relationId)
-  }
-
   public async updateRelation(
     projectId: string,
     exampleId: number,
     relationId: number,
     typeId: number
   ): Promise<void> {
-    const relation = await this.relationRepository.find(projectId, exampleId, relationId)
+    const relation = await this.relationRepository.find(
+      projectId,
+      exampleId,
+      relationId
+    )
     relation.changeType(typeId)
     await this.relationRepository.update(projectId, exampleId, relationId, relation)
+  }
+
+  public async deleteRelation(
+    projectId: string,
+    exampleId: number,
+    relationId: number
+  ): Promise<void> {
+    await this.relationRepository.delete(projectId, exampleId, relationId)
   }
 }

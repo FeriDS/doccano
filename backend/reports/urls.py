@@ -4,5 +4,6 @@ from .views import HistoricalAnnotationReportView, HistoricalReportListView, pdf
 urlpatterns = [
     path("historical-report/<int:project_id>/", HistoricalAnnotationReportView.as_view(), name="historical-report"),
     path("historical-report/list/<int:project_id>/", HistoricalReportListView.as_view(), name="historical-report-list"),
+    path("history/<int:project_id>/", HistoricalReportListView.as_view(), name="historical-report-history"),
     path("teste-pdf/", pdf_teste),
 ]

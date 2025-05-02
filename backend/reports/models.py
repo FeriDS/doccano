@@ -12,9 +12,21 @@ class HistoricalReport(models.Model):
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
 
+    # Estatísticas gerais
     total_annotations = models.IntegerField()
     total_users = models.IntegerField()
     rules_count = models.IntegerField()
+    
+    # Estatísticas por utilizador
+    annotations_per_user = models.JSONField(default=dict)  # {user_id: count}
+    avg_annotations_per_user = models.FloatField()
+    
+    # Estatísticas por data
+    annotations_per_day = models.JSONField(default=dict)  # {date: count}
+    avg_annotations_per_day = models.FloatField()
+    
+    # Estatísticas por tipo de anotação
+    annotations_by_type = models.JSONField(default=dict)  # {type: count}
 
     # ❗ A ForeignKey para Project fica aqui, mas definida *tardiamente* por string
     project = models.ForeignKey('projects.Project', on_delete=models.CASCADE)

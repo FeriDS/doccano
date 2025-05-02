@@ -1,11 +1,11 @@
 <template>
-  <v-container>
+  <v-container class="mt-4 pt-16">
     <v-row justify="space-between" align="center" class="mb-4">
       <v-col cols="auto">
-        <h2 class="text-h5">📊 Relatório Histórico de Anotações</h2>
+        <h2 class="text-h5 font-weight-bold">Estatística sobre Histórico de Anotações</h2>
       </v-col>
       <v-col cols="auto">
-        <v-btn color="primary" @click="goToProjects">⬅️ Voltar aos Projetos</v-btn>
+        <v-btn color="primary" @click="goToProjects">Voltar aos Projetos</v-btn>
       </v-col>
     </v-row>
 
@@ -39,9 +39,11 @@
 
       <v-row class="mb-4">
         <v-col>
-          <v-btn color="info" @click="fetchReport">🔍 Aplicar Filtros</v-btn>
+          <v-btn color="info" @click="fetchReport">Aplicar Filtros</v-btn>
           <v-btn class="ml-4" 
-            color="secondary" @click="goToHistory">📚 Ver Relatórios Anteriores</v-btn>
+            color="secondary" @click="goToHistory">Ver Estatísticas Anteriores</v-btn>
+          <v-btn class="ml-4" 
+            color="info" @click="clearFilters">Limpar Filtros</v-btn>
         </v-col>
       </v-row>
 
@@ -64,8 +66,9 @@
 
       <v-row class="mt-4" align="center" justify="space-between">
         <v-col cols="auto">
-          <v-btn color="success" @click="exportReport('csv')">📥 Exportar CSV</v-btn>
-          <v-btn class="ml-2" color="error" @click="exportReport('pdf')">📄 Exportar PDF</v-btn>
+          <v-btn color="success" @click="exportReport('csv')">Exportar CSV</v-btn>
+          <v-btn class="ml-2" color="error" 
+            @click="exportReport('pdf')">Exportar PDF</v-btn>
         </v-col>
         <v-col cols="auto">
           <v-btn text @click="goBack">← Voltar</v-btn>
@@ -126,13 +129,19 @@ export default {
     },
     goToHistory() {
       const projectId = this.$route.params.id
-      this.$router.push(`/projects/${projectId}/reports/history`)
+      this.$router.replace(`/projects/${projectId}/reports/history`)
     },
     goToProjects() {
       this.$router.push('/projects')
     },
     goBack() {
       this.$router.back()
+    },
+    clearFilters() {
+      this.selectedUser = null
+      this.startDate = null
+      this.endDate = null
+      this.fetchReport()
     }
   },
   mounted() {

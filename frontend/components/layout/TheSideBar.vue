@@ -37,7 +37,8 @@ import {
   mdiDatabase,
   mdiHome,
   mdiLabel,
-  mdiPlayCircleOutline
+  mdiPlayCircleOutline,
+  mdiChartPie,
 } from '@mdi/js'
 
 import { getLinkToAnnotationPage } from '~/presenter/linkToAnnotationPage'
@@ -125,8 +126,8 @@ export default {
           isVisible: this.isProjectAdmin
         },
         {
-          icon: mdiChartBar,
-          text: 'Reports',
+          icon: mdiChartPie,
+          text: 'Statistics',
           link: 'reports/reports',
           isVisible: this.isProjectAdmin
         },
