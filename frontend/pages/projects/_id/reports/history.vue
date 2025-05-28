@@ -1,4 +1,3 @@
-
 <template>
     <v-container>
       <v-row justify="space-between" align="center" class="mb-4">
@@ -81,7 +80,7 @@ export default {
     async fetchReports() {
       try {
         const projectId = this.$route.params.id
-        const { data } = await axios.get(`api/reports/historical-report/list/${projectId}/`)
+        const { data } = await axios.get(`api/reports/reports_historicalreport/list/${projectId}/`)
         this.reports = data
       } catch (error) {
         console.error('Erro ao buscar relatórios:', error)

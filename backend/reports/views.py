@@ -51,8 +51,8 @@ class HistoricalAnnotationReportView(APIView):
             spans = spans.filter(created_at__lte=end_date)
 
         total_annotations = spans.count()
-        total_users = User.objects.filter(example__project=project).distinct().count()
-        rules_count = Rule.objects.filter(project=project).count()
+        total_users = User.objects.filter(span__example__project=project).distinct().count()
+        rules_count = Rule.objects.filter(project_links=project).count()
 
         report_obj = HistoricalReport.objects.create(
             project=project,

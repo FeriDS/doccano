@@ -117,7 +117,7 @@ export default {
         format
       }).toString()
 
-      window.open(`/api/reports/historical-report/${projectId}/?${params}`, '_blank')
+      window.open(`/reports/historical-report/${projectId}/?${params}`, '_blank')
     },
     async loadUsers() {
       const projectId = this.$route.params.id
