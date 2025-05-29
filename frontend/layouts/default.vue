@@ -1,17 +1,13 @@
 <template>
   <v-app>
-    <!-- Alerta de falha de ligação -->
-    <v-alert
-      v-if="$store.state.connectionError"
-      type="error"
-      prominent
-      dense
-      border="left"
-      class="text-center"
-    >
-      ⚠️ Falha de ligação, por favor tente mais tarde!
-    </v-alert>
-
+    <v-snackbar v-model="showTechIssue" :timeout="0" top color="error">
+      We are having technical issues, please try again later!
+      <template v-slot:action="{ attrs }">
+        <v-btn color="white" text v-bind="attrs" @click="showTechIssue = false">
+          Ok
+        </v-btn>
+      </template>
+    </v-snackbar>
     <the-header />
     <nuxt />
     <the-footer />
@@ -19,13 +15,26 @@
 </template>
 
 <script>
-import TheFooter from '@/components/layout/TheFooter'
-import TheHeader from '@/components/layout/TheHeader'
+import TheFooter from "@/components/layout/TheFooter";
+import TheHeader from "@/components/layout/TheHeader";
 
 export default {
   components: {
     TheFooter,
-    TheHeader
-  }
-}
+    TheHeader,
+  },
+  data() {
+    return {
+      showTechIssue: false,
+    };
+  },
+  mounted() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "techissue") {
+      this.showTechIssue = true;
+    }
+  },
+};
 </script>
+
+<style scoped></style>
