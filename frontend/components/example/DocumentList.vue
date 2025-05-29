@@ -29,21 +29,25 @@
         filled
       />
     </template>
-    <template #[`item.isConfirmed`]="{ item }">
-      <v-chip :color="item.isConfirmed ? 'success' : 'warning'" text small>
-        {{ item.isConfirmed ? 'Finished' : 'In progress' }}
+    <template #[`item.isConfirmed`]="{ item: statusItem }">
+      <v-chip :color="statusItem.isConfirmed ? 'success' : 'warning'" text small>
+        {{ statusItem.isConfirmed ? 'Finished' : 'In progress' }}
       </v-chip>
     </template>
-    <template #[`item.text`]="{ item }">
-      <span class="d-flex d-sm-none">{{ item.text | truncate(50) }}</span>
-      <span class="d-none d-sm-flex">{{ item.text | truncate(200) }}</span>
+    <template #[`item.text`]="{ item: textItem }">
+      <span class="d-flex d-sm-none">
+        {{ textItem.text.length > 50 ? textItem.text.substring(0, 50) + '...' : textItem.text }}
+      </span>
+      <span class="d-none d-sm-flex">
+        {{ textItem.text.length > 200 ? textItem.text.substring(0, 200) + '...' : textItem.text }}
+      </span>
     </template>
-    <template #[`item.meta`]="{ item }">
-      {{ JSON.stringify(item.meta, null, 4) }}
+    <template #[`item.meta`]="{ item: metaItem }">
+      {{ JSON.stringify(metaItem.meta, null, 4) }}
     </template>
-    <template #[`item.assignee`]="{ item }">
+    <template #[`item.assignee`]="{ item: assigneeItem }">
       <v-combobox
-        :value="toSelected(item)"
+        :value="toSelected(assigneeItem)"
         :items="members"
         item-text="username"
         no-data-text="No one"
@@ -56,7 +60,7 @@
         small-chips
         solo
         style="width: 200px"
-        @change="onAssignOrUnassign(item, $event)"
+        @change="onAssignOrUnassign(assigneeItem, $event)"
       >
         <template #selection="{ attrs, item, parent, selected }">
           <v-chip v-bind="attrs" :input-value="selected" small class="mt-1 mb-1">
@@ -66,11 +70,11 @@
         </template>
       </v-combobox>
     </template>
-    <template #[`item.action`]="{ item }">
-      <v-btn class="me-1" small color="primary text-capitalize" @click="$emit('edit', item)"
+    <template #[`item.action`]="{ item: actionItem }">
+      <v-btn class="me-1" small color="primary text-capitalize" @click="$emit('edit', actionItem)"
         >Edit</v-btn
       >
-      <v-btn small color="primary text-capitalize" @click="toLabeling(item)">
+      <v-btn small color="primary text-capitalize" @click="toLabeling(actionItem)">
         {{ $t('dataset.annotate') }}
       </v-btn>
     </template>

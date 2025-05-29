@@ -29,14 +29,14 @@
         filled
       />
     </template>
-    <template #[`item.isConfirmed`]="{ item }">
-      <v-chip :color="item.isConfirmed ? 'success' : 'warning'" text small>
-        {{ item.isConfirmed ? 'Finished' : 'In progress' }}
+    <template #[`item.isConfirmed`]="{ item: statusItem }">
+      <v-chip :color="statusItem.isConfirmed ? 'success' : 'warning'" text small>
+        {{ statusItem.isConfirmed ? 'Finished' : 'In progress' }}
       </v-chip>
     </template>
-    <template #[`item.url`]="{ item }">
+    <template #[`item.url`]="{ item: imageItem }">
       <v-img
-        :src="item.url"
+        :src="imageItem.url"
         aspect-ratio="1"
         height="150"
         max-height="150"
@@ -44,12 +44,12 @@
         class="grey lighten-2"
       />
     </template>
-    <template #[`item.meta`]="{ item }">
-      {{ JSON.stringify(item.meta, null, 4) }}
+    <template #[`item.meta`]="{ item: metaItem }">
+      {{ JSON.stringify(metaItem.meta, null, 4) }}
     </template>
-    <template #[`item.assignee`]="{ item }">
+    <template #[`item.assignee`]="{ item: assigneeItem }">
       <v-combobox
-        :value="toSelected(item)"
+        :value="toSelected(assigneeItem)"
         :items="members"
         item-text="username"
         no-data-text="No one"
@@ -62,7 +62,7 @@
         small-chips
         solo
         style="width: 200px"
-        @change="onAssignOrUnassign(item, $event)"
+        @change="onAssignOrUnassign(assigneeItem, $event)"
       >
         <template #selection="{ attrs, item, parent, selected }">
           <v-chip v-bind="attrs" :input-value="selected" small class="mt-1 mb-1">
@@ -72,8 +72,8 @@
         </template>
       </v-combobox>
     </template>
-    <template #[`item.action`]="{ item }">
-      <v-btn small color="primary text-capitalize" @click="toLabeling(item)">
+    <template #[`item.action`]="{ item: actionItem }">
+      <v-btn small color="primary text-capitalize" @click="toLabeling(actionItem)">
         {{ $t('dataset.annotate') }}
       </v-btn>
     </template>
