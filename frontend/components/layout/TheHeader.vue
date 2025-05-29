@@ -19,14 +19,7 @@
       <span> {{ currentProject.name }}</span>
     </v-btn>
        <!-- Global Admin Button in the middle -->
-    <v-btn
-      v-if="isAuthenticated && isGlobalAdmin"
-      text
-      style="position: absolute; left: 50%; transform: translateX(-50%); text-transform: none;"
-      @click="$router.push('/admin')"
-    >
-      {{ $t('header.admin') }}
-    </v-btn>
+   
     <div class="flex-grow-1" />
     <the-color-mode-switcher />
     <locale-menu />
@@ -39,7 +32,7 @@
       {{ $t('header.projects') }}
     </v-btn>
     <v-btn
-      v-if="isAuthenticated && isStaff"
+      v-if="isAuthenticated"
       text
       class="text-capitalize"
       @click="$router.push(localePath('/users'))"
@@ -65,11 +58,6 @@
     </v-menu>
     <v-btn v-if="!isAuthenticated" outlined @click="$router.push(localePath('/auth'))">
       {{ $t('user.login') }}
-    </v-btn>
-    <v-btn v-if="isAuthenticated && isStaff"
-        outlined
-        @click="$router.push(localePath('/register'))">
-      {{ $t('user.create') }}
     </v-btn>
     <v-menu v-if="isAuthenticated" offset-y z-index="200">
       <template #activator="{ on }">

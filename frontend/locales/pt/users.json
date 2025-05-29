@@ -1,0 +1,19 @@
+{
+  "title": "Utilizadores",
+  "addUser": "Adicionar Utilizador",
+  "username": "Nome de Utilizador",
+  "email": "Email",
+  "isStaff": "Staff",
+  "isSuperuser": "Superutilizador",
+  "viewProfile": "Ver Perfil",
+  "edit": "Editar",
+  "delete": "Eliminar",
+  "actions": "Ações",
+  "deleteConfirmation": "Eliminar Utilizador",
+  "deleteConfirmationText": "Tem a certeza que pretende eliminar este utilizador? Esta ação não pode ser desfeita.",
+  "errorLoading": "Erro ao carregar utilizadores",
+  "deleteSuccess": "Utilizador eliminado com sucesso",
+  "deleteError": "Erro ao eliminar utilizador",
+  "yes": "Sim",
+  "no": "Não"
+} 
