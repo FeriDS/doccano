@@ -62,13 +62,22 @@
               </template>
               <v-list>
                 <v-list-item @click="viewProfile(item)">
-                  <v-list-item-title>View Profile</v-list-item-title>
+                  <v-list-item-title>Profile</v-list-item-title>
+                  <v-list-item-icon>
+                    <v-icon>{{ mdiAccount }}</v-icon>
+                  </v-list-item-icon>
                 </v-list-item>
                 <v-list-item @click="editUser(item)">
                   <v-list-item-title>Edit</v-list-item-title>
+                  <v-list-item-icon>
+                    <v-icon>{{ mdiPencil }}</v-icon>
+                  </v-list-item-icon>
                 </v-list-item>
                 <v-list-item @click="confirmDelete(item)">
-                  <v-list-item-title>Delete</v-list-item-title>
+                  <v-list-item-title class="error--text">Delete</v-list-item-title>
+                  <v-list-item-icon>
+                    <v-icon color="error">{{ mdiDelete }}</v-icon>
+                  </v-list-item-icon>
                 </v-list-item>
               </v-list>
             </v-menu>
