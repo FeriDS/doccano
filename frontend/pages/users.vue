@@ -7,8 +7,18 @@
     </v-row>
     <v-row>
       <v-col>
+        <v-alert
+          v-model="showAlert"
+          :type="alertType"
+          :color="alertColor"
+          class="mb-4"
+          dismissible
+        >
+          {{ alertMessage }}
+        </v-alert>
         <div class="d-flex justify-space-between align-center mb-4">
           <v-btn
+            v-if="isAdmin"
             color="primary"
             @click="openCreateDialog"
             aria-label="Add User"
@@ -16,8 +26,10 @@
             <v-icon left>{{ mdiAccountPlus }}</v-icon>
             Add User
           </v-btn>
+          
           <v-btn icon @click="$router.back()" aria-label="Back">
             <v-icon>{{ mdiArrowLeft }}</v-icon>
+            Return
           </v-btn>
         </div>
 
@@ -42,7 +54,7 @@
             {{ item.isSuperuser ? 'Yes' : 'No' }}
           </template>
           <template #[`item.actions`]="{ item }">
-            <v-menu>
+            <v-menu v-if="isAdmin">
               <template #activator="{ on, attrs }">
                 <v-btn icon v-bind="attrs" v-on="on" aria-label="Actions">
                   <v-icon>{{ mdiDotsVertical }}</v-icon>
@@ -104,7 +116,12 @@ export default Vue.extend({
       mdiDelete,
       mdiDotsVertical,
       mdiArrowLeft,
-      tableHeaders: [] as any[]
+      tableHeaders: [] as any[],
+      isAdmin: false,
+      showAlert: false,
+      alertMessage: '',
+      alertType: 'success',
+      alertColor: 'success'
     }
   },
 
@@ -112,6 +129,9 @@ export default Vue.extend({
     this.loading = true
     try {
       this.users = await this.$repositories.user.list('')
+      // Get current user profile to check if admin
+      const profile = await this.$repositories.user.getProfile()
+      this.isAdmin = profile.isSuperuser
     } catch (error) {
       this.$store.dispatch('snackbar/show', {
         text: 'Error loading users',
@@ -155,15 +175,15 @@ export default Vue.extend({
       try {
         await this.$repositories.user.deleteUser(this.userToDelete.id)
         this.users = this.users.filter(u => u.id !== this.userToDelete?.id)
-        this.$store.dispatch('snackbar/show', {
-          text: 'User deleted successfully',
-          color: 'success'
-        })
-      } catch (error) {
-        this.$store.dispatch('snackbar/show', {
-          text: 'Error deleting user',
-          color: 'error'
-        })
+        this.alertMessage = `User ${this.userToDelete.username} was successfully deleted`
+        this.alertType = 'success'
+        this.alertColor = 'success'
+        this.showAlert = true
+      } catch (error: any) {
+        this.alertMessage = error.response?.data?.error || 'Error deleting user'
+        this.alertType = 'error'
+        this.alertColor = 'error'
+        this.showAlert = true
       }
       this.deleteDialog = false
       this.userToDelete = null

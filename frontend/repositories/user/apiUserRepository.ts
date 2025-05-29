@@ -2,7 +2,14 @@ import { UserItem } from '@/domain/models/user/user'
 import ApiService from '@/services/api.service'
 
 function toModel(item: { [key: string]: any }): UserItem {
-  return new UserItem(item.id, item.username, item.is_superuser, item.is_staff)
+  return new UserItem(
+    item.id,
+    item.username,
+    item.email,
+    item.is_superuser,
+    item.is_staff,
+    item.is_global_admin
+  )
 }
 
 export class APIUserRepository {

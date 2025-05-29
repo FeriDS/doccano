@@ -104,8 +104,10 @@ export default Vue.extend({
         return {
           id: this.value.user,
           username: this.value.username,
+          email: '',
           isStaff: false,
-          isSuperuser: false
+          isSuperuser: false,
+          isGlobalAdmin: false
         }
       },
       set(val: MemberItem) {

@@ -25,7 +25,7 @@ class Me(APIView):
 class Users(generics.ListAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated & IsProjectAdmin]
+    permission_classes = [IsAuthenticated]
     pagination_class = None
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)
     search_fields = ("username",)
@@ -46,7 +46,7 @@ class UserCreation(generics.CreateAPIView):
         user = serializer.save(self.request)
         return user
     
-class UserRetrieve(APIView):  # New view to get user id by username
+class UserRetrieve(APIView):
     permission_classes = [IsAuthenticated & IsAdminUser]
 
     def get(self, request, username, *args, **kwargs):
