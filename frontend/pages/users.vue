@@ -17,19 +17,36 @@
           {{ alertMessage }}
         </v-alert>
         <div class="d-flex justify-space-between align-center mb-4">
+          <div class="d-flex gap-2">
+            <v-btn
+              v-if="isAdmin"
+              class="mr-2"
+              color="primary"
+              @click="openCreateDialog"
+              aria-label="Add User"
+            >
+              <v-icon left>{{ mdiAccountPlus }}</v-icon>
+              Add User
+            </v-btn>
+
+            <v-btn
+              v-if="isAdmin"
+              color="primary"
+              @click="goToCreateProfile"
+              aria-label="Create Profile"
+            >
+              <v-icon left>{{ mdiAccount }}</v-icon>
+              Create Profile
+            </v-btn>
+          </div>
+
           <v-btn
             v-if="isAdmin"
-            color="primary"
-            @click="openCreateDialog"
-            aria-label="Add User"
+            icon
+            @click="$router.go(-1)"
+            aria-label="Back"
           >
-            <v-icon left>{{ mdiAccountPlus }}</v-icon>
-            Add User
-          </v-btn>
-          
-          <v-btn icon @click="$router.back()" aria-label="Back">
             <v-icon>{{ mdiArrowLeft }}</v-icon>
-            Return
           </v-btn>
         </div>
 
@@ -163,6 +180,10 @@ export default Vue.extend({
     editUser(_user: UserItem) {
       // TODO: Implement edit user
     },
+
+    goToCreateProfile() {
+      this.$router.push('/profiles/create_profile')
+    }, 
 
     confirmDelete(user: UserItem) {
       this.userToDelete = user
