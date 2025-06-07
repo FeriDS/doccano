@@ -1,7 +1,7 @@
 <template>
   <v-app>
     <v-snackbar v-model="showTechIssue" :timeout="0" top color="error">
-      We are having technical issues, please try again later!
+      Database is currently down, please try again later!
       <template v-slot:action="{ attrs }">
         <v-btn color="white" text v-bind="attrs" @click="showTechIssue = false">
           Ok
