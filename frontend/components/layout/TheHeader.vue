@@ -39,6 +39,17 @@
     >
       Utilizadores
     </v-btn>
+     <!-- Novo Botão criar perspectivas-->
+     <v-btn
+      v-if="isAuthenticated" Add commentMore actions
+      text
+      class="text-capitalize"
+      @click="criarPerspetiva"
+    >
+      Perspectivas
+    </v-btn>
+  <!--Fim do botao-->
+    
     <v-menu v-if="!isAuthenticated" open-on-hover offset-y>
       <template #activator="{ on }">
         <v-btn text v-on="on">
