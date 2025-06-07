@@ -1,21 +1,21 @@
 <template>
   <v-card>
-    <v-card-title>{{ isCurrentUser ? 'Editar Perfil' : 'Editar Utilizador' }}</v-card-title>
+    <v-card-title>{{ isCurrentUser ? 'Edit Profile' : 'Edit User' }}</v-card-title>
     <v-card-text>
       <v-form ref="form" v-model="valid">
         <v-text-field
           v-model="formData.username"
           :rules="[rules.required]"
-          label="Nome de Utilizador"
+          label="Username"
           required
         />
         <v-text-field
           v-model="formData.first_name"
-          label="Nome"
+          label="First Name"
         />
         <v-text-field
           v-model="formData.last_name"
-          label="Sobrenome"
+          label="Last Name"
         />
         <v-text-field
           v-model="formData.email"
@@ -26,8 +26,8 @@
         <template v-if="showSuperUserSwitch">
           <v-switch
             v-model="formData.isSuperuser"
-            label="Permissões de Superutilizador"
-            hint="Concede acesso total ao sistema"
+            label="Superuser Permissions"
+            hint="Grants full access to the system"
             persistent-hint
           />
         </template>
@@ -38,7 +38,7 @@
           border="left"
           dense
         >
-          As permissões de superutilizador não podem ser alteradas no seu próprio perfil.
+          Superuser permissions cannot be modified on your own profile.
         </v-alert>
       </v-form>
     </v-card-text>
@@ -49,13 +49,13 @@
         :disabled="!valid"
         @click="save"
       >
-        Guardar
+        Save
       </v-btn>
       <v-btn
         text
         @click="cancel"
       >
-        Cancelar
+        Cancel
       </v-btn>
     </v-card-actions>
   </v-card>
