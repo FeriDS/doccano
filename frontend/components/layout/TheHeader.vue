@@ -37,16 +37,16 @@
       class="text-capitalize"
       @click="$router.push(localePath('/user'))"
     >
-      Utilizadores
+      Users
     </v-btn>
      <!-- Novo Botão criar perspectivas-->
      <v-btn
       v-if="isAuthenticated" Add commentMore actions
       text
       class="text-capitalize"
-      @click="criarPerspetiva"
-    >
-      Perspectivas
+      @click="$router.push(localePath('/perspective/list'))">
+    
+      Perspectives
     </v-btn>
   <!--Fim do botao-->
     

@@ -199,4 +199,10 @@ export default Vue.extend({
     }
   }
 })
-</script> 
+</script>
+
+<style>
+.with-header-offset {
+  margin-top: 0;
+}
+</style> 
