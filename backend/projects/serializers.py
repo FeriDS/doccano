@@ -14,9 +14,6 @@ from .models import (
     Speech2textProject,
     Tag,
     TextClassificationProject,
-    PerspectiveField,
-    ProjectPerspective,
-    UserPerspectiveAnswer,
 )
 
 
@@ -149,93 +146,3 @@ class ProjectPolymorphicSerializer(PolymorphicSerializer):
         Project: ProjectSerializer,
         **{cls.Meta.model: cls for cls in ProjectSerializer.__subclasses__()},
     }
-
-
-class PerspectiveFieldSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PerspectiveField
-        fields = (
-            "id",
-            "name",
-            "description",
-            "field_type",
-            "options",
-            "required",
-            "order",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = ("created_at", "updated_at")
-
-
-class ProjectPerspectiveSerializer(serializers.ModelSerializer):
-    fields = PerspectiveFieldSerializer(many=True)
-
-    class Meta:
-        model = ProjectPerspective
-        fields = (
-            "id",
-            "project",
-            "fields",
-            "is_required",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = ("created_at", "updated_at")
-
-    def create(self, validated_data):
-        fields_data = validated_data.pop('fields', [])
-        perspective = ProjectPerspective.objects.create(**validated_data)
-        
-        for field_data in fields_data:
-            field = PerspectiveField.objects.create(**field_data)
-            perspective.fields.add(field)
-        
-        return perspective
-
-    def update(self, instance, validated_data):
-        fields_data = validated_data.pop('fields', None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        
-        if fields_data is not None:
-            instance.fields.clear()
-            for field_data in fields_data:
-                field = PerspectiveField.objects.create(**field_data)
-                instance.fields.add(field)
-        
-        instance.save()
-        return instance
-
-
-class UserPerspectiveAnswerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserPerspectiveAnswer
-        fields = (
-            "id",
-            "user",
-            "project",
-            "field",
-            "value",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = ("created_at", "updated_at")
-
-    def validate(self, data):
-        field = data['field']
-        value = data['value']
-        
-        try:
-            # Use the model's clean method for validation
-            answer = UserPerspectiveAnswer(
-                user=data['user'],
-                project=data['project'],
-                field=field,
-                value=value
-            )
-            answer.clean()
-        except ValidationError as e:
-            raise serializers.ValidationError(str(e))
-        
-        return data

@@ -1,7 +1,6 @@
 from django.conf import settings
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
-from .models import Member, ProjectPerspective, UserPerspectiveAnswer
 
 
 class RolePermission(BasePermission):
@@ -49,37 +48,6 @@ class IsAnnotationApprover(RolePermission):
     unsafe_methods_check = False
     role_name = settings.ROLE_ANNOTATION_APPROVER
 
-
-class IsAnnotatorAndHasValidPerspective(IsAnnotator):
-    def has_permission(self, request, view):
-        if not super().has_permission(request, view):
-            return False
-
-        project_id = self.get_project_id(request, view)
-        if not project_id:
-            return False
-
-        try:
-            perspective = ProjectPerspective.objects.get(project_id=project_id)
-            if not perspective.is_required:
-                return True
-
-            # Get all required fields
-            required_fields = perspective.fields.filter(required=True)
-            if not required_fields.exists():
-                return True
-
-            # Check if user has answered all required fields
-            answered_fields = UserPerspectiveAnswer.objects.filter(
-                user=request.user,
-                project_id=project_id,
-                field__in=required_fields
-            ).values_list('field_id', flat=True)
-
-            return set(required_fields.values_list('id', flat=True)) <= set(answered_fields)
-
-        except ProjectPerspective.DoesNotExist:
-            return True
 
 
 IsProjectMember = IsAnnotator | IsAnnotationApprover | IsProjectAdmin  # type: ignore

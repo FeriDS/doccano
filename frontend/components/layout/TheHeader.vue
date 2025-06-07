@@ -40,14 +40,7 @@
       Users
     </v-btn>
      <!-- Novo Botão criar perspectivas-->
-     <v-btn
-      v-if="isAuthenticated" Add commentMore actions
-      text
-      class="text-capitalize"
-      @click="$router.push(localePath('/perspective/list'))">
-    
-      Perspectives
-    </v-btn>
+  
   <!--Fim do botao-->
     
     <v-menu v-if="!isAuthenticated" open-on-hover offset-y>
@@ -59,11 +52,18 @@
       </template>
       <v-list>
         <v-list-item
-          v-for="(item, index) in items"
-          :key="index"
-          @click="$router.push('/demo/' + item.link)"
+          v-for="(item, i) in items"
+          :key="i"
+          :to="localePath(item.to)"
+          router
+          exact
         >
-          <v-list-item-title>{{ item.title }}</v-list-item-title>
+          <v-list-item-action>
+            <v-icon>{{ item.icon }}</v-icon>
+          </v-list-item-action>
+          <v-list-item-content>
+            <v-list-item-title v-text="$t(item.title)" />
+          </v-list-item-content>
         </v-list-item>
       </v-list>
     </v-menu>

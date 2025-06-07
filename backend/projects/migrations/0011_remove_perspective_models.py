@@ -4,7 +4,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0010_alter_perspectivefield_id_and_more'),
+        ('projects', '0008_project_allow_member_to_create_label_type_and_more'),
     ]
 
     operations = [
