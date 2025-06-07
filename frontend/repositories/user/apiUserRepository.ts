@@ -6,9 +6,12 @@ function toModel(item: { [key: string]: any }): UserItem {
     item.id,
     item.username,
     item.email,
+    item.first_name || '',
+    item.last_name || '',
     item.is_superuser,
     item.is_staff,
-    item.is_global_admin
+    item.is_global_admin || false,
+    item.created_by
   )
 }
 
@@ -32,6 +35,31 @@ export class APIUserRepository {
     await this.request.delete(url);
   }
   
+  async updateUser(
+    userId: number,
+    data: {
+      username?: string
+      first_name?: string
+      last_name?: string
+      email?: string
+      isStaff?: boolean
+      isSuperuser?: boolean
+    }
+  ): Promise<UserItem> {
+    const url = `/users/update/${userId}`;
+    console.log('Sending update data:', data);
+    const response = await this.request.patch(url, {
+      username: data.username,
+      first_name: data.first_name,
+      last_name: data.last_name,
+      email: data.email,
+      is_staff: data.isStaff,
+      is_superuser: data.isSuperuser
+    });
+    console.log('Update response:', response.data);
+    return toModel(response.data);
+  }
+
   async getIdByUsername(username: string): Promise<number> {
     // Reuse the list method to fetch users matching the query.
     const users = await this.list(username);

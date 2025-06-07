@@ -15,5 +15,15 @@
   "deleteSuccess": "User deleted successfully",
   "deleteError": "Error deleting user",
   "yes": "Yes",
-  "no": "No"
+  "no": "No",
+  "editProfile": "Edit Profile",
+  "editUser": "Edit User",
+  "save": "Save",
+  "cancel": "Cancel",
+  "updateSuccess": "User updated successfully",
+  "updateError": "Error updating user",
+  "required": "This field is required",
+  "emailInvalid": "Email must be valid",
+  "staffStatus": "Staff Status",
+  "superuserStatus": "Superuser Status"
 } 

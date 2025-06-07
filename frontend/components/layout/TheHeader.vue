@@ -35,9 +35,9 @@
       v-if="isAuthenticated"
       text
       class="text-capitalize"
-      @click="$router.push(localePath('/users'))"
+      @click="$router.push(localePath('/user'))"
     >
-      {{ $t('header.users') }}
+      Utilizadores
     </v-btn>
     <v-menu v-if="!isAuthenticated" open-on-hover offset-y>
       <template #activator="{ on }">

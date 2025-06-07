@@ -101,17 +101,19 @@ export default Vue.extend({
   computed: {
     user: {
       get(): UserItem {
-        return {
-          id: this.value.user,
-          username: this.value.username,
-          email: '',
-          isStaff: false,
-          isSuperuser: false,
-          isGlobalAdmin: false
-        }
+        return new UserItem(
+          this.value.user,
+          this.value.username,
+          '',  // email
+          '',  // first_name
+          '',  // last_name
+          false,  // isSuperuser
+          false,  // isStaff
+          false   // isGlobalAdmin
+        )
       },
-      set(val: MemberItem) {
-        if (val === undefined) return
+      set(val: UserItem) {
+        if (!val) return
         const user = { user: val.id, username: val.username }
         this.$emit('input', { ...this.value, ...user })
       }

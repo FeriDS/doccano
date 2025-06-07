@@ -9,6 +9,7 @@ from django.db import transaction, connection
 import logging
 
 from .serializers import UserSerializer
+from .models import UserCreation
 from projects.permissions import IsProjectAdmin
 
 logger = logging.getLogger(__name__)
@@ -43,8 +44,13 @@ class UserCreation(generics.CreateAPIView):
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED, headers=headers)
 
     def perform_create(self, serializer):
-        user = serializer.save(self.request)
-        return user
+        with transaction.atomic():
+            user = serializer.save(self.request)
+            UserCreation.objects.create(
+                user=user,
+                created_by=self.request.user
+            )
+            return user
     
 class UserRetrieve(APIView):
     permission_classes = [IsAuthenticated & IsAdminUser]
@@ -97,13 +103,6 @@ class UserDelete(generics.DestroyAPIView):
                 Example.objects.filter(annotations_approved_by=user).update(annotations_approved_by=None)
                 Comment.objects.filter(user=user).delete()
 
-                # Limpar votos das regras usando SQL direto
-                try:
-                    with connection.cursor() as cursor:
-                        cursor.execute("DELETE FROM rules_rulevote WHERE user_id = %s", [user.id])
-                except Exception as e:
-                    logger.warning(f"Could not clean up rule votes: {e}")
-
                 # Finalmente, apagar o utilizador
                 user.delete()
 
@@ -118,3 +117,38 @@ class UserDelete(generics.DestroyAPIView):
                 {"error": "Failed to delete user. Please try again."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class UserUpdate(generics.UpdateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+
+    def get_object(self):
+        obj = super().get_object()
+        user = self.request.user
+        
+        # Check if user is trying to modify their own data or if they are a superuser
+        if obj.id != user.id and not user.is_superuser:
+            raise PermissionDenied("You don't have permission to modify this user's data")
+        return obj
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        data = serializer.validated_data.copy()
+        obj = self.get_object()
+        
+        # If not superuser, remove is_superuser from data if present
+        if not user.is_superuser and 'is_superuser' in data:
+            data.pop('is_superuser')
+        
+        # Prevent superuser from removing their own superuser status
+        if user.id == obj.id and 'is_superuser' in data and not data['is_superuser']:
+            raise PermissionError("You cannot remove your own superuser status")
+        
+        # If setting is_superuser to True, also set is_staff to True
+        if 'is_superuser' in data and data['is_superuser']:
+            obj.is_staff = True
+            obj.save()
+        
+        serializer.save(**data)
