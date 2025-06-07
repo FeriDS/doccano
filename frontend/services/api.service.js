@@ -7,6 +7,21 @@ class ApiService {
     this.instance = axios.create({
       baseURL: process.env.baseUrl
     })
+
+    // Global interceptor to handle errors related to DB connectivity.
+    this.instance.interceptors.response.use(
+      response => response,
+      error => {
+        // Check if error is due to DB connectivity issues
+        if (
+          error.response ||
+          error.message === 'Network Error'
+        ) {
+          window.location.href = '/?error=techissue'
+        }
+        return Promise.reject(error)
+      }
+    )
   }
 
   request(method, url, data = {}, config = {}) {
