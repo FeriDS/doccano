@@ -37,7 +37,7 @@
       class="text-capitalize"
       @click="$router.push(localePath('/user'))"
     >
-      Utilizadores
+      Users
     </v-btn>
     <v-menu v-if="!isAuthenticated" open-on-hover offset-y>
       <template #activator="{ on }">
