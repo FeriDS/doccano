@@ -27,12 +27,17 @@ from labels.models import (
 )
 from projects.models import Project
 from projects.permissions import IsProjectMember
+from perspectives.permissions import HasCompletePerspective
 
 
 class BaseListAPI(generics.ListCreateAPIView):
     label_class: Type[Label]
     pagination_class = None
-    permission_classes = [IsAuthenticated & IsProjectMember]
+    permission_classes = [
+        IsAuthenticated & 
+        IsProjectMember & 
+        HasCompletePerspective
+    ]
     swagger_schema = None
 
     @property

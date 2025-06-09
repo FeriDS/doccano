@@ -1,10 +1,15 @@
 <template>
   <v-app>
-    <v-snackbar v-model="showTechIssue" :timeout="0" top color="error">
-      Database is currently down, please try again later!
-      <template v-slot:action="{ attrs }">
-        <v-btn color="white" text v-bind="attrs" @click="showTechIssue = false">
-          Ok
+    <v-snackbar
+      v-model="$store.state.snackbar.show"
+      :color="$store.state.snackbar.color"
+      :timeout="$store.state.snackbar.timeout"
+      top
+    >
+      {{ $store.state.snackbar.text }}
+      <template #action="{ attrs }">
+        <v-btn text v-bind="attrs" @click="$store.dispatch('snackbar/hide')">
+          {{ $t('generic.close') }}
         </v-btn>
       </template>
     </v-snackbar>

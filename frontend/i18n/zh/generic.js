@@ -17,5 +17,6 @@ export default {
   export: '导出',
   description: '描述',
   type: '类型',
-  loading: '加载中... 请等待'
+  loading: '加载中... 请等待',
+  error: '发生错误'
 }

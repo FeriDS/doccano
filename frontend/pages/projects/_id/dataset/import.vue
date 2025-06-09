@@ -14,7 +14,7 @@
         label="File format"
         outlined
       />
-      <v-form v-model="valid">
+      <v-form v-model="valid" ref="form">
         <v-text-field
           v-for="(item, key) in textFields"
           :key="key"
@@ -235,6 +235,11 @@ export default {
       }
     },
     async importDataset() {
+      const isFormValid = await this.$refs.form.validate()
+      if (!isFormValid) {
+        this.isImporting = false
+        return
+      }
       this.isImporting = true
       const item = this.catalog.find((item) => item.displayName === this.selected)
       this.taskId = await this.$repositories.parse.analyze(

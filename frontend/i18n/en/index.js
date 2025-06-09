@@ -5,6 +5,7 @@ import rules from './rules'
 import toastui from './toastui'
 import user from './user'
 import vuetify from './vuetify'
+import perspectives from './perspectives'
 import annotation from './projects/annotation'
 import dataset from './projects/dataset'
 import errors from './projects/errors'
@@ -25,6 +26,7 @@ export default {
   toastui,
   user,
   vuetify,
+  perspectives,
   annotation,
   dataset,
   errors,

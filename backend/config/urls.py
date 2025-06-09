@@ -24,6 +24,7 @@ from django.urls import include, path, re_path
 from django.views.static import serve
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
+from django.views.generic import RedirectView
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -67,6 +68,9 @@ urlpatterns += [
     path("v1/projects/<int:project_id>/", include("examples.urls")),
     path("v1/projects/<int:project_id>/", include("labels.urls")),
     path("v1/projects/<int:project_id>/", include("label_types.urls")),
+    path("v1/", include("perspectives.urls")),
     path("swagger/", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),
-    re_path("", TemplateView.as_view(template_name="index.html")),
+    # Catch-all routes should be at the end
+    path('', RedirectView.as_view(url='admin/')),
+    re_path(r'^(?!v1/).*$', TemplateView.as_view(template_name="index.html")),
 ]

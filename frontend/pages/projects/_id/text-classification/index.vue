@@ -68,6 +68,8 @@ export default {
     ToolbarMobile
   },
   layout: 'workspace',
+  
+  middleware: ['check-auth', 'auth', 'check-perspective'],
 
   validate({ params, query }) {
     return /^\d+$/.test(params.id) && /^\d+$/.test(query.page)

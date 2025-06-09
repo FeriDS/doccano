@@ -6,6 +6,12 @@
       </v-icon>
       {{ $t('home.startAnnotation') }}
     </v-btn>
+    <v-btn color="secondary text-capitalize mb-2"
+     nuxt :to="localePath(`/projects/${$route.params.id}/perspectives?
+     from=sidebar&returnPath=${encodeURIComponent($route.path)}`)">
+      <v-icon left>mdi-account</v-icon>
+      {{$t('perspectives.projectPerspective')}}
+    </v-btn>
     <v-list-item-group v-model="selected" mandatory>
       <v-list-item
         v-for="(item, i) in filteredItems"

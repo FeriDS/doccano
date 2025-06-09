@@ -24,6 +24,8 @@ import { APICatalogRepository } from '@/repositories/upload/apiCatalogRepository
 import { APIParseRepository } from '@/repositories/upload/apiParseRepository'
 import { APIUserRepository } from '@/repositories/user/apiUserRepository'
 import { APISegmentationRepository } from '~/repositories/tasks/apiSegmentationRepository'
+import { APIPerspectiveRepository } from '@/repositories/perspectives/apiPerspectiveRepository'
+
 export interface Repositories {
   // User
   auth: APIAuthRepository
@@ -67,6 +69,9 @@ export interface Repositories {
   textLabel: APITextLabelRepository
   boundingBox: APIBoundingBoxRepository
   segmentation: APISegmentationRepository
+
+  // Perspective
+  perspective: APIPerspectiveRepository
 }
 
 declare module 'vue/types/vue' {
@@ -117,7 +122,11 @@ const repositories: Repositories = {
   relation: new APIRelationRepository(),
   textLabel: new APITextLabelRepository(),
   boundingBox: new APIBoundingBoxRepository(),
-  segmentation: new APISegmentationRepository()
+  segmentation: new APISegmentationRepository(),
+
+  // Perspective
+  perspective: new APIPerspectiveRepository()
+
 }
 
 const plugin: Plugin = (_, inject) => {

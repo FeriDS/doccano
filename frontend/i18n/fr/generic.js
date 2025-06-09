@@ -17,5 +17,6 @@ export default {
   export: 'Exporter',
   description: 'Description',
   type: 'Type',
-  loading: 'Chargement... veuillez patienter'
+  loading: 'Chargement... veuillez patienter',
+  error: 'Une erreur est survenue'
 }
