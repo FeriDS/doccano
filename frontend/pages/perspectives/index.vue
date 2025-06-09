@@ -8,10 +8,18 @@
             <v-spacer></v-spacer>
             <v-btn
               color="primary"
-              class="text-capitalize"
+              class="text-capitalize mr-2"
               @click="$router.push(localePath('/perspectives/create'))"
             >
               {{ $t('perspectives.addPerspective') }}
+            </v-btn>
+            <v-btn
+              text
+              @click="$router.back()"
+              aria-label="Return"
+            >
+              <v-icon left>{{ mdiArrowLeft }}</v-icon>
+              {{ $t('return') }}
             </v-btn>
           </v-card-title>
 
@@ -66,7 +74,7 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import { mdiPencil, mdiDelete } from '@mdi/js'
+import { mdiPencil, mdiDelete, mdiArrowLeft } from '@mdi/js'
 import { Perspective } from '@/domain/models/perspectives/perspective'
 
 interface Data {
@@ -80,6 +88,7 @@ interface Data {
   }>
   mdiPencil: any
   mdiDelete: any
+  mdiArrowLeft: any
 }
 
 export default Vue.extend({
@@ -95,6 +104,7 @@ export default Vue.extend({
       perspectiveToDelete: null,
       mdiPencil,
       mdiDelete,
+      mdiArrowLeft,
       headers: [
         {
           text: this.$t('perspectives.name').toString(),

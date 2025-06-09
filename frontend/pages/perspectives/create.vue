@@ -17,7 +17,9 @@
         class="mb-4"
       />
 
-      <h2 class="text-h6 mb-2">Fields</h2>
+      <div class="d-flex align-center mb-4">
+        <h2 class="text-h6 mb-0">Fields</h2>
+      </div>
 
       <div v-for="(field, index) in fields" :key="index" class="mb-4">
         <v-row dense>
@@ -37,32 +39,59 @@
             />
           </v-col>
           <v-col cols="2" class="d-flex align-center">
-            <v-btn icon @click="removeField(index)">
-              <v-icon>mdi-delete</v-icon>
+            <v-btn
+              icon
+              color="error"
+              @click="removeField(index)"
+              aria-label="Delete field"
+            >
+              <v-icon>{{ mdiDelete }}</v-icon>
             </v-btn>
           </v-col>
         </v-row>
       </div>
 
-      <v-btn text color="primary" class="mb-4" @click="addField">
-        <v-icon left>mdi-plus</v-icon> Add Field
-      </v-btn>
+      <div class="d-flex justify-start mb-4">
+        <v-btn
+          color="primary"
+          @click="addField"
+          aria-label="Add Field"
+        >
+          <v-icon left>{{ mdiPlus }}</v-icon>
+          Add Field
+        </v-btn>
+      </div>
 
-      <v-btn color="primary" @click="submit">
-        Create Perspective
-      </v-btn>
+      <div class="d-flex justify-space-between">
+        <v-btn color="success" @click="submit">
+          Create Perspective
+        </v-btn>
+        <v-btn
+          text
+          @click="$router.back()"
+          aria-label="Return"
+        >
+          <v-icon left>{{ mdiArrowLeft }}</v-icon>
+          Return
+        </v-btn>
+      </div>
     </v-form>
   </v-container>
 </template>
 
 <script>
+import { mdiArrowLeft, mdiPlus, mdiDelete } from '@mdi/js'
+
 export default {
   name: 'CreatePerspectivePage',
   data() {
     return {
       name: '',
       description: '',
-      fields: []
+      fields: [],
+      mdiArrowLeft,
+      mdiPlus,
+      mdiDelete
     }
   },
   methods: {
