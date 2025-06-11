@@ -41,6 +41,7 @@ export default {
   fillBeforeAnnotate: 'Please fill in your personal perspective before making annotations.',
   perspectiveRequired: 'Personal Perspective Required',
   returnAfterFill: 'You will be automatically redirected back once complete.',
+  invalidFields: 'Please fill in all required fields and add choices for choice/multiple fields.',
   fieldTypes: {
     text: 'Text',
     number: 'Number',
