@@ -166,11 +166,14 @@ export default {
       
       this.$store.dispatch('perspectives/createPerspective', perspective)
         .then(() => {
-          this.$store.dispatch('snackbar/show', {
-            text: this.$t('perspectives.created').toString(),
-            color: 'success'
+          // Redirect with success message
+          this.$router.push({
+            path: this.localePath('/perspectives'),
+            query: { 
+              message: this.$t('perspectives.created').toString(),
+              type: 'success'
+            }
           })
-          this.$router.push(this.localePath('/perspectives'))
         })
         .catch((error) => {
           let errorMessage = this.$t('generic.error').toString()
@@ -188,7 +191,9 @@ export default {
           }
           this.$store.dispatch('snackbar/show', {
             text: errorMessage,
-            color: 'error'
+            color: 'error',
+            timeout: 5000,
+            closable: true
           })
         })
     }

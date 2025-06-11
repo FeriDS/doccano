@@ -15,11 +15,10 @@
             </v-btn>
             <v-btn
               text
-              @click="$router.back()"
-              aria-label="Return"
+              @click="goBack"
+              aria-label="back"
             >
-              <v-icon left>{{ mdiArrowLeft }}</v-icon>
-              {{ $t('return') }}
+              <v-icon>{{ mdiArrowLeft }}</v-icon>
             </v-btn>
           </v-card-title>
 
@@ -29,6 +28,8 @@
             :loading="loading"
             :items-per-page="10"
             class="elevation-1"
+            show-expand
+            single-expand
           >
             <template #[`item.fields`]="{ item }">
               {{ item.fields ? item.fields.length : 0 }}
@@ -50,6 +51,58 @@
               >
                 {{ mdiDelete }}
               </v-icon>
+            </template>
+            <template #expanded-item="{ headers: tableHeaders, item }">
+              <td :colspan="tableHeaders.length">
+                <v-card flat>
+                  <v-card-text>
+                    <v-list>
+                      <v-list-item
+                        v-for="field in item.fields"
+                        :key="field.id"
+                      >
+                        <v-list-item-content>
+                          <v-list-item-title class="font-weight-bold">
+                            {{ field.name }}
+                          </v-list-item-title>
+                          <v-list-item-subtitle>
+                            {{ field.description }}
+                          </v-list-item-subtitle>
+                          <v-list-item-subtitle class="mt-2">
+                            <v-chip
+                              small
+                              class="mr-2"
+                              :color="getFieldTypeColor(field.field_type)"
+                            >
+                              {{ $t(`perspectives.fieldTypes.${field.field_type}`) }}
+                            </v-chip>
+                            <v-chip
+                              v-if="field.required"
+                              small
+                              color="warning"
+                            >
+                              {{ $t('perspectives.required') }}
+                            </v-chip>
+                            <template 
+                              v-if="field.field_type === 'choice' || 
+                                    field.field_type === 'multiple'"
+                            >
+                              <v-chip
+                                v-for="choice in field.choices"
+                                :key="choice"
+                                small
+                                class="ml-2"
+                              >
+                                {{ choice }}
+                              </v-chip>
+                            </template>
+                          </v-list-item-subtitle>
+                        </v-list-item-content>
+                      </v-list-item>
+                    </v-list>
+                  </v-card-text>
+                </v-card>
+              </td>
             </template>
           </v-data-table>
         </v-card>
@@ -131,6 +184,10 @@ export default Vue.extend({
           text: this.$t('perspectives.actions').toString(),
           value: 'actions',
           sortable: false
+        },
+        {
+          text: '',
+          value: 'data-table-expand'
         }
       ]
     }
@@ -147,6 +204,17 @@ export default Vue.extend({
 
   async created() {
     await this.fetchPerspectives()
+    // Check for message in URL query
+    if (this.$route.query.message) {
+      this.$store.dispatch('snackbar/show', {
+        text: this.$route.query.message.toString(),
+        color: this.$route.query.type || 'success',
+        timeout: 5000,
+        closable: true
+      })
+      // Remove the message from URL
+      this.$router.replace({ query: {} })
+    }
   },
 
   methods: {
@@ -194,6 +262,21 @@ export default Vue.extend({
       } finally {
         this.closeDelete()
       }
+    },
+
+    getFieldTypeColor(type: string): string {
+      const colors: Record<string, string> = {
+        text: 'primary',
+        number: 'info',
+        boolean: 'success',
+        choice: 'warning',
+        multiple: 'error'
+      }
+      return colors[type] || 'grey'
+    },
+
+    goBack() {
+      this.$router.back()
     }
   }
 })
