@@ -2,30 +2,27 @@
   <v-container>
     <v-row>
       <v-col>
-        <h1 class="text-h4 mb-4">Perfis</h1>
+        <h1 class="text-h4 mb-4">Profiles</h1>
       </v-col>
     </v-row>
 
     <v-row>
       <v-col>
-        <v-alert
-          v-model="showAlert"
-          :type="alertType"
-          :color="alertColor"
-          class="mb-4"
-          dismissible
-        >
-          {{ alertMessage }}
-        </v-alert>
-
         <div class="d-flex justify-space-between align-center mb-4">
           <v-btn
             color="primary"
             @click="openCreateDialog"
-            aria-label="Adicionar Perfil"
+            aria-label="Add Profile"
           >
             <v-icon left>{{ mdiAccountPlus }}</v-icon>
-            Adicionar Perfil
+            Add Profile
+          </v-btn>
+          <v-btn
+            icon
+            @click="$router.go(-1)"
+            aria-label="Back"
+          >
+            <v-icon>{{ mdiArrowLeft }}</v-icon>
           </v-btn>
         </div>
 
@@ -38,14 +35,19 @@
           loading-text="A carregar..."
         >
           <template #[`item.permissions`]="{ item }">
-            <v-chip
-              v-for="permission in item.permissions"
-              :key="permission"
-              class="mr-1"
-              small
-            >
-              {{ permission }}
-            </v-chip>
+            <div v-if="item.permissions && item.permissions.length > 0">
+              <v-chip
+                v-for="permission in getPermissionNames(item.permissions)"
+                :key="permission"
+                class="mr-1 mb-1"
+                small
+                color="primary"
+                outlined
+              >
+                {{ permission }}
+              </v-chip>
+            </div>
+            <span v-else class="text-caption grey--text">No permissions</span>
           </template>
 
           <template #[`item.actions`]="{ item }">
@@ -57,10 +59,10 @@
               </template>
               <v-list>
                 <v-list-item @click="editProfile(item)">
-                  <v-list-item-title>Editar</v-list-item-title>
+                  <v-list-item-title>Edit</v-list-item-title>
                 </v-list-item>
                 <v-list-item @click="confirmDelete(item)">
-                  <v-list-item-title>Eliminar</v-list-item-title>
+                  <v-list-item-title>Delete</v-list-item-title>
                 </v-list-item>
               </v-list>
             </v-menu>
@@ -81,7 +83,7 @@
             <v-text-field
               v-model="editedItem.name"
               label="Nome do Perfil"
-              :rules="[v => !!v || 'Nome é obrigatório']"
+              :rules="nameRules"
               required
             ></v-text-field>
 
@@ -94,21 +96,35 @@
             <v-select
               v-model="editedItem.permissions"
               :items="availablePermissions"
+              item-text="name"
+              item-value="id"
               label="Permissões"
               multiple
               chips
-              :rules="[v => v.length > 0 || 'Pelo menos uma permissão é obrigatória']"
-            ></v-select>
+              :rules="permissionRules"
+              :error-messages="permissionError"
+              :loading="loadingPermissions"
+            >
+              <template #no-data>
+                <v-list-item>
+                  <v-list-item-content>
+                    <v-list-item-title>
+                      Loading permissions...
+                    </v-list-item-title>
+                  </v-list-item-content>
+                </v-list-item>
+              </template>
+            </v-select>
           </v-form>
         </v-card-text>
 
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="grey darken-1" text @click="closeDialog">
-            Cancelar
+            Cancel
           </v-btn>
           <v-btn color="primary" text @click="save" :disabled="!valid">
-            Guardar
+            Save
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -117,17 +133,35 @@
     <!-- Delete Confirmation Dialog -->
     <v-dialog v-model="deleteDialog" max-width="500px">
       <v-card>
-        <v-card-title class="text-h5">Eliminar Perfil</v-card-title>
+        <v-card-title class="text-h5">Delete Profile</v-card-title>
         <v-card-text>
-          Tem a certeza que pretende eliminar este perfil? Esta ação não pode ser revertida.
+          Are you certain you want to delete this profile? This action cannot be reverted.
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="grey darken-1" text @click="deleteDialog = false">
-            Cancelar
+            Cancel
           </v-btn>
           <v-btn color="error" text @click="deleteProfile">
-            Eliminar
+            Delete
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Alert Dialog -->
+    <v-dialog v-model="showAlert" max-width="500px">
+      <v-card>
+        <v-card-title class="text-h5 error--text">
+          {{ alertIcon === 'mdi-alert' ? 'Error' : 'Success' }}
+        </v-card-title>
+        <v-card-text>
+          {{ alertMessage }}
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="error" text @click="showAlert = false">
+            Close
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -136,8 +170,9 @@
 </template>
 
 <script lang="ts">
-import { mdiAccountPlus, mdiDotsVertical } from '@mdi/js'
+import { mdiAccountPlus, mdiDotsVertical, mdiArrowLeft } from '@mdi/js'
 import Vue from 'vue'
+import { AxiosInstance } from 'axios'
 
 interface Profile {
   id: number
@@ -146,19 +181,32 @@ interface Profile {
   permissions: number[]
 }
 
+interface FormRef extends Vue {
+  validate(): boolean
+}
+
+interface Permission {
+  id: number
+  name: string
+  codename: string
+  content_type: number
+}
+
 export default Vue.extend({
+  middleware: ['check-auth', 'auth'],
   data() {
     return {
       mdiAccountPlus,
       mdiDotsVertical,
+      mdiArrowLeft,
       loading: false,
+      loadingPermissions: false,
       dialog: false,
       deleteDialog: false,
       valid: false,
       showAlert: false,
       alertMessage: '',
-      alertType: 'success',
-      alertColor: 'success',
+      alertIcon: 'mdi-alert',
       profiles: [] as Profile[],
       editedIndex: -1,
       editedItem: {
@@ -179,20 +227,10 @@ export default Vue.extend({
         { text: 'Permissões', value: 'permissions' },
         { text: 'Ações', value: 'actions', sortable: false }
       ],
-      availablePermissions: [
-        'create_project',
-        'edit_project',
-        'delete_project',
-        'view_project',
-        'create_user',
-        'edit_user',
-        'delete_user',
-        'view_user',
-        'create_annotation',
-        'edit_annotation',
-        'delete_annotation',
-        'view_annotation'
-      ]
+      availablePermissions: [] as Permission[],
+      nameRules: [(v: string) => !!v || 'Nome é obrigatório'],
+      permissionRules: [(v: number[]) => v.length > 0 || 'Pelo menos uma permissão é obrigatória'],
+      permissionError: ''
     }
   },
 
@@ -202,20 +240,42 @@ export default Vue.extend({
     }
   },
 
-  async fetch() {
-    this.loading = true
-    try {
-      this.profiles = await this.$repositories.profile.list()
-    } catch (error) {
-      this.showAlert = true
-      this.alertMessage = 'Erro ao carregar perfis'
-      this.alertType = 'error'
-      this.alertColor = 'error'
-    }
-    this.loading = false
+  async created() {
+    await this.fetchPermissions()
+    await this.fetchProfiles()
   },
 
   methods: {
+    async fetchPermissions() {
+      this.loadingPermissions = true
+      try {
+        const response = await (this.$axios as AxiosInstance).get('/v1/permissions/')
+        this.availablePermissions = response.data
+      } catch (error) {
+        console.error('Error loading permissions:', error)
+        this.showErrorMessage('Error loading permissions')
+      } finally {
+        this.loadingPermissions = false
+      }
+    },
+
+    getPermissionNames(permissionIds: number[]): string[] {
+      return permissionIds
+        .map(id => this.availablePermissions.find(p => p.id === id)?.name)
+        .filter((name): name is string => !!name)
+    },
+
+    async fetchProfiles() {
+      this.loading = true
+      try {
+        this.profiles = await this.$repositories.profile.list()
+      } catch (error) {
+        console.error('Error loading profiles:', error)
+        this.showErrorMessage('Error loading profiles')
+      }
+      this.loading = false
+    },
+
     openCreateDialog() {
       this.editedItem = Object.assign({}, this.defaultItem)
       this.editedIndex = -1
@@ -233,31 +293,39 @@ export default Vue.extend({
       this.$nextTick(() => {
         this.editedItem = Object.assign({}, this.defaultItem)
         this.editedIndex = -1
+        this.permissionError = ''
       })
     },
 
     async save() {
-      if (!this.$refs.form.validate()) return
+      const form = this.$refs.form as FormRef
+      if (!form?.validate()) return
+
+      if (this.editedItem.permissions.length === 0) {
+        this.permissionError = 'At least one permission is required'
+        return
+      }
 
       try {
         if (this.editedIndex > -1) {
           await this.$repositories.profile.update(this.editedItem.id, this.editedItem)
-          Object.assign(this.profiles[this.editedIndex], this.editedItem)
+          this.showSuccessMessage('Profile updated successfully')
         } else {
-          const newProfile = await this.$repositories.profile.create(this.editedItem)
-          this.profiles.push(newProfile)
+          await this.$repositories.profile.create(this.editedItem)
+          this.showSuccessMessage('Profile created successfully')
+          this.$router.push('/profiles')
         }
-        this.showAlert = true
-        this.alertMessage = 'Perfil guardado com sucesso'
-        this.alertType = 'success'
-        this.alertColor = 'success'
-      } catch (error) {
-        this.showAlert = true
-        this.alertMessage = 'Erro ao guardar perfil'
-        this.alertType = 'error'
-        this.alertColor = 'error'
+        this.closeDialog()
+        await this.fetchProfiles()
+      } catch (error: any) {
+        console.error('Error saving profile:', error)
+        let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.name?.[0] || 
+                         error.response?.data?.permissions?.[0] || 
+                         'Error saving profile'
+        errorMessage = errorMessage.replace(/user/i, 'User')
+        this.showErrorMessage(errorMessage)
       }
-      this.closeDialog()
     },
 
     confirmDelete(item: Profile) {
@@ -268,20 +336,29 @@ export default Vue.extend({
     async deleteProfile() {
       try {
         await this.$repositories.profile.delete(this.editedItem.id)
-        const index = this.profiles.indexOf(this.editedItem)
-        this.profiles.splice(index, 1)
-        this.showAlert = true
-        this.alertMessage = 'Perfil eliminado com sucesso'
-        this.alertType = 'success'
-        this.alertColor = 'success'
+        await this.fetchProfiles()
+        this.deleteDialog = false
+        this.showSuccessMessage('Profile deleted successfully')
       } catch (error) {
-        this.showAlert = true
-        this.alertMessage = 'Erro ao eliminar perfil'
-        this.alertType = 'error'
-        this.alertColor = 'error'
+        console.error('Error deleting profile:', error)
+        this.showErrorMessage('Error deleting profile')
       }
-      this.deleteDialog = false
+    },
+
+    showErrorMessage(message: string) {
+      this.alertMessage = message.replace(/user/i, 'User')
+      this.alertIcon = 'mdi-alert'
+      this.showAlert = true
+    },
+
+    showSuccessMessage(message: string) {
+      this.alertMessage = message
+      this.alertIcon = 'mdi-check-circle'
+      this.showAlert = true
     }
   }
 })
-</script> 
+</script>
+
+<style scoped>
+</style> 

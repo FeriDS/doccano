@@ -2,7 +2,7 @@
   <v-container>
     <v-row>
       <v-col>
-        <h1 class="text-h4 mb-4">Criar Perfil de Utilizador</h1>
+        <h1 class="text-h4 mb-4">Create Profile</h1>
       </v-col>
     </v-row>
 
@@ -49,14 +49,14 @@
                 :loading="loading"
                 :disabled="!valid"
               >
-                Criar Perfil
+                Create Profile
               </v-btn>
 
               <v-btn
                 text
                 @click="$router.push('/profiles/index')"
               >
-                Cancelar
+                Cancel
               </v-btn>
             </div>
           </v-form>

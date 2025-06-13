@@ -6,45 +6,42 @@ export const state = () => ({
 })
 
 export const mutations = {
-  setUsername(state, username) {
-    state.username = username
-  },
-  setUserId(state, userId) {
-    state.id = userId
-  },
-  clearUsername(state) {
-    state.username = null
-  },
   setAuthenticated(state, isAuthenticated) {
     state.isAuthenticated = isAuthenticated
   },
+  setUsername(state, username) {
+    state.username = username
+  },
+  setUserId(state, id) {
+    state.id = id
+  },
   setIsStaff(state, isStaff) {
     state.isStaff = isStaff
+  },
+  clearUsername(state) {
+    state.username = null
   }
 }
 
 export const getters = {
-  isAuthenticated(state) {
-    return state.isAuthenticated
-  },
-  getUsername(state) {
-    return state.username
-  },
-  getUserId(state) {
-    return state.id
-  },
-  isStaff(state) {
-    return state.isStaff
-  }
+  isAuthenticated: state => state.isAuthenticated,
+  getUsername: state => state.username,
+  getUserId: state => state.id,
+  isStaff: state => state.isStaff
 }
 
 export const actions = {
   async authenticateUser({ commit }, authData) {
     try {
-      await this.$repositories.auth.login(authData.username, authData.password)
-      commit('setAuthenticated', true)
+      const response = await this.$repositories.auth.login(authData.username, authData.password)
+      if (response && response.data && response.data.key) {
+        localStorage.setItem('token', response.data.key)
+        commit('setAuthenticated', true)
+      } else {
+        throw new Error('Token não recebido')
+      }
     } catch (error) {
-      throw new Error('The credential is invalid')
+      throw new Error('Credenciais inválidas')
     }
   },
   async fetchSocialLink() {
@@ -60,6 +57,7 @@ export const actions = {
     } catch {
       commit('setAuthenticated', false)
       commit('setIsStaff', false)
+      localStorage.removeItem('token')
     }
   },
   async logout({ commit }) {
@@ -67,5 +65,6 @@ export const actions = {
     commit('setAuthenticated', false)
     commit('setIsStaff', false)
     commit('clearUsername')
+    localStorage.removeItem('token')
   }
 }
