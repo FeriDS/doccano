@@ -25,6 +25,12 @@ def update_user_perspective_answer(request, project_id):
         ProjectPerspective,
         project_id=project_id
     )
+    # Block if annotation is closed
+    if not project_perspective.project.is_annotation_open:
+        return Response(
+            {"error": "Annotation is closed for this project. You cannot edit your perspective."},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
     instance, _created = UserPerspectiveAnswer.objects.get_or_create(
         project_perspective=project_perspective,

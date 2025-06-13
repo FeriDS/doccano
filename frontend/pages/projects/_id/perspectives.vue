@@ -1,24 +1,5 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-col cols="12">
-        <v-alert
-          v-if="$route.query.redirected === 'true'"
-          type="warning"
-          class="mb-4"
-          dismissible
-        >
-          <div class="d-flex align-center">
-            <v-icon left>mdi-alert-circle</v-icon>
-            <div>
-              <strong>{{ $t('perspectives.perspectiveRequired') }}</strong><br>
-              {{ $t('perspectives.fillBeforeAnnotate') }}
-              {{ $t('perspectives.returnAfterFill') }}
-            </div>
-          </div>
-        </v-alert>
-      </v-col>
-    </v-row>
+  <v-container class="mt-12">
     <v-row>
       <v-col cols="12">
         <v-card>
@@ -57,14 +38,39 @@
             </template>
 
             <template v-else>
+              <v-alert v-if="!isAnnotationOpen" type="warning" class="mb-4">
+                {{ $t('perspectives.annotationClosed') ||
+                 'Annotation is closed for this project. You cannot edit your perspective.' }}
+              </v-alert>
               <project-perspective-form
                 :perspective="projectPerspective.perspective"
                 :initial-values="userAnswer?.field_values || {}"
+                :disabled="!isAnnotationOpen"
                 @submit="saveValues"
               />
             </template>
           </v-card-text>
         </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- ALERTA: mover para cá, logo após o card -->
+    <v-row v-if="$route.query.redirected === 'true'">
+      <v-col cols="12">
+        <v-alert
+          type="warning"
+          class="mb-4"
+          dismissible
+        >
+          <div class="d-flex align-center">
+            <v-icon left>mdi-alert-circle</v-icon>
+            <div>
+              <strong>{{ $t('perspectives.perspectiveRequired') }}</strong><br>
+              {{ $t('perspectives.fillBeforeAnnotate') }}
+              {{ $t('perspectives.returnAfterFill') }}
+            </div>
+          </div>
+        </v-alert>
       </v-col>
     </v-row>
 
@@ -122,6 +128,7 @@ interface Data {
   availablePerspectives: Perspective[]
   selectedPerspective: number | null
   missingFields: string[]
+  isAnnotationOpen: boolean
 }
 
 export default Vue.extend({
@@ -138,7 +145,8 @@ export default Vue.extend({
       userAnswer: null,
       availablePerspectives: [],
       selectedPerspective: null,
-      missingFields: []
+      missingFields: [],
+      isAnnotationOpen: true
     }
   },
 
@@ -162,10 +170,13 @@ export default Vue.extend({
         try {
           const projectPerspective = await repository.getProjectPerspective(this.projectId)
           this.projectPerspective = projectPerspective
+          this.isAnnotationOpen = projectPerspective.is_annotation_open !== undefined ? 
+          projectPerspective.is_annotation_open : true
         } catch (error) {
           if (error?.response?.status === 404) {
             // No project perspective assigned yet
             this.projectPerspective = null
+            this.isAnnotationOpen = true
           } else {
             throw error
           }
@@ -205,7 +216,11 @@ export default Vue.extend({
         const projectPerspective = await repository.updateProjectPerspective(this.projectId, 
         perspective.id)
         this.projectPerspective = projectPerspective
-        this.$snackbar.success(this.$t('perspectives.assigned').toString())
+        this.$snackbar.show({
+          text: this.$t('perspectives.assigned').toString(),
+          color: 'success',
+          timeout: 5000
+        })
         await this.fetchData()
       } catch (error) {
         let errorMessage = this.$t('generic.error').toString()
@@ -224,75 +239,35 @@ export default Vue.extend({
         const repository = new APIPerspectiveRepository()
         const userAnswer = await repository.updateUserPerspectiveAnswer(this.projectId, values)
         this.userAnswer = userAnswer || null
-        
-        // Check if user was redirected here
-        const wasRedirected = this.$route.query.redirected
-        const fromSidebar = this.$route.query.from === 'sidebar'
-        const returnPath = this.$route.query.returnPath
-        
-        console.log('=== SAVE COMPLETED ===')
-        console.log('wasRedirected:', wasRedirected, 'type:', typeof wasRedirected)
-        console.log('fromSidebar:', fromSidebar, 'returnPath:', returnPath)
-        console.log('Current route:', this.$route.path)
-        console.log('Current route query:', this.$route.query)
-        
-        // Refresh data to get updated completion status
-        console.log('Chamando fetchData...')
         await this.fetchData()
-        console.log('fetchData completado')
-        
-        console.log('isComplete after fetchData:', this.userAnswer?.is_complete)
-        
-        // Determine if we should redirect back
-        let shouldRedirectBack = false
-        
-        if ((wasRedirected === 'true') && this.userAnswer?.is_complete) {
-          // Case 1: Redirected from annotation page
-          shouldRedirectBack = true
-        } else if (fromSidebar && returnPath && this.userAnswer?.is_complete) {
-          // Case 2: Came from sidebar with a return path
-          shouldRedirectBack = true
-        }
-        
-        console.log('shouldRedirectBack:', shouldRedirectBack)
-        
-        if (shouldRedirectBack) {
-          console.log('🔄 CASO: REDIRECIONAMENTO de volta')
-          this.$snackbar.success(this.$t('perspectives.savedRedirecting').toString())
+        // Lógica de redirecionamento conforme origem
+        if (this.$route.query.from === 'sidebar' && this.$route.query.returnPath && this.userAnswer?.is_complete) {
+          this.$snackbar.show({
+            text: this.$t('perspectives.saved').toString(),
+            color: 'success',
+            timeout: 5000
+          })
           setTimeout(() => {
-            try {
-              console.log('Executando redirecionamento...')
-              
-              // Check if we came from sidebar with a specific return path
-              const returnPath = this.$route.query.returnPath
-              if (returnPath) {
-                console.log('Redirecting to specific path:', returnPath)
-                this.$router.push(returnPath.toString())
-                return
-              }
-              
-              // Otherwise use browser history
-              console.log('History length:', window.history.length)
-              if (window.history.length > 1) {
-                this.$router.go(-1)
-              } else {
-                console.log('Fallback: indo para projeto principal')
-                this.$router.push(`/projects/${this.projectId}`)
-              }
-            } catch (error) {
-              console.error('Erro ao redirecionar:', error)
-              this.$router.push(`/projects/${this.projectId}`)
-            }
-          }, 1500)
+            this.$router.push(this.$route.query.returnPath.toString())
+          }, 5000)
+        } else if (this.$route.query.redirected === 'true' && this.userAnswer?.is_complete) {
+          this.$snackbar.show({
+            text: this.$t('perspectives.saved').toString(),
+            color: 'success',
+            timeout: 5000
+          })
+          setTimeout(() => {
+            this.$router.go(-1)
+          }, 5000)
         } else {
-          console.log('✅ CASO: NAVEGAÇÃO DIRETA - NÃO redirecionando')
-          this.$snackbar.success(this.$t('perspectives.saved').toString())
-          console.log('Permanecendo na página atual - FIM')
+          this.$snackbar.show({
+            text: this.$t('perspectives.saved').toString(),
+            color: 'success',
+            timeout: 5000
+          })
         }
       } catch (error) {
         let errorMessage = this.$t('generic.error').toString()
-        
-        // Extract error message from response
         if (error?.response?.data) {
           const errorData = error.response.data
           if (typeof errorData.error === 'string') {
@@ -303,7 +278,6 @@ export default Vue.extend({
             errorMessage = errorData.field_values.join(', ')
           }
         }
-        
         this.$snackbar.error(errorMessage)
         console.error('Error saving perspective values:', error)
       }

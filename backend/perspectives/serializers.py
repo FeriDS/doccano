@@ -33,10 +33,11 @@ class PerspectiveSerializer(serializers.ModelSerializer):
 
 class ProjectPerspectiveSerializer(serializers.ModelSerializer):
     perspective = PerspectiveSerializer(read_only=True)
+    is_annotation_open = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectPerspective
-        fields = ('id', 'project', 'perspective', 'created_by', 'created_at', 'updated_at')
+        fields = ('id', 'project', 'perspective', 'created_by', 'created_at', 'updated_at', 'is_annotation_open')
         read_only_fields = ('created_at', 'updated_at')
 
     def get_perspective_name(self, obj):
@@ -44,6 +45,9 @@ class ProjectPerspectiveSerializer(serializers.ModelSerializer):
 
     def get_perspective_fields(self, obj):
         return PerspectiveFieldSerializer(obj.perspective.fields.all(), many=True).data
+
+    def get_is_annotation_open(self, obj):
+        return obj.project.is_annotation_open
 
 class UserPerspectiveAnswerSerializer(serializers.ModelSerializer):
     class Meta:

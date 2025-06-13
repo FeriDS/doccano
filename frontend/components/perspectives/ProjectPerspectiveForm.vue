@@ -22,6 +22,7 @@
               persistent-hint
               :rules="field.required ? [v => !!v || 'Required'] : []"
               :required="field.required"
+              :disabled="disabled"
             />
 
             <!-- Number Field -->
@@ -35,6 +36,7 @@
               :rules="field.required ? [v => (v !== null && v !== undefined && v !== '') 
               || 'Required'] : []"
               :required="field.required"
+              :disabled="disabled"
             />
 
             <!-- Boolean Field -->
@@ -44,6 +46,7 @@
               :label="field.name"
               :hint="field.description"
               persistent-hint
+              :disabled="disabled"
             />
 
             <!-- Single Choice Field -->
@@ -56,6 +59,7 @@
               persistent-hint
               :rules="field.required ? [v => !!v || 'Required'] : []"
               :required="field.required"
+              :disabled="disabled"
             />
 
             <!-- Multiple Choice Field -->
@@ -70,6 +74,7 @@
               chips
               :rules="field.required ? [v => (Array.isArray(v) && v.length > 0) || 'Required'] : []"
               :required="field.required"
+              :disabled="disabled"
             />
           </v-col>
         </v-row>
@@ -78,7 +83,7 @@
           <v-col cols="12" class="text-right">
             <v-btn
               color="primary"
-              :disabled="!valid"
+              :disabled="!valid || disabled"
               type="submit"
             >
               {{ $t('generic.save') }}
@@ -114,6 +119,10 @@ export default Vue.extend({
     initialValues: {
       type: Object,
       default: () => ({})
+    },
+    disabled: {
+      type: Boolean,
+      default: false
     }
   },
 

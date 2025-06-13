@@ -33,7 +33,7 @@ export default {
   assign: 'Assign Perspective',
   assigned: 'Perspective assigned successfully',
   saved: 'Perspective values saved successfully',
-  savedRedirecting: 'Perspective saved successfully! Redirecting back to annotation...',
+  savedRedirecting: 'Perspective saved successfully! ',
   status: 'Completion Status',
   complete: 'All required fields are filled',
   incomplete: 'Some required fields are missing',
@@ -42,6 +42,7 @@ export default {
   perspectiveRequired: 'Personal Perspective Required',
   returnAfterFill: 'You will be automatically redirected back once complete.',
   invalidFields: 'Please fill in all required fields and add choices for choice/multiple fields.',
+  annotationClosed: 'Annotation is closed for this project. You cannot edit your perspective.',
   fieldTypes: {
     text: 'Text',
     number: 'Number',
