@@ -24,10 +24,13 @@ import { APICatalogRepository } from '@/repositories/upload/apiCatalogRepository
 import { APIParseRepository } from '@/repositories/upload/apiParseRepository'
 import { APIUserRepository } from '@/repositories/user/apiUserRepository'
 import { APISegmentationRepository } from '~/repositories/tasks/apiSegmentationRepository'
+import { APIProfileRepository } from '~/domain/repositories/profile'
+
 export interface Repositories {
   // User
   auth: APIAuthRepository
   user: APIUserRepository
+  profile: APIProfileRepository
 
   // Project
   project: APIProjectRepository
@@ -71,7 +74,7 @@ export interface Repositories {
 
 declare module 'vue/types/vue' {
   interface Vue {
-    readonly $repositories: Repositories
+    $repositories: Repositories
   }
 }
 
@@ -79,6 +82,7 @@ const repositories: Repositories = {
   // User
   auth: new APIAuthRepository(),
   user: new APIUserRepository(),
+  profile: new APIProfileRepository(),
 
   // Project
   project: new APIProjectRepository(),
@@ -124,5 +128,5 @@ const plugin: Plugin = (_, inject) => {
   inject('repositories', repositories)
 }
 
-export default plugin
 export { repositories }
+export default plugin

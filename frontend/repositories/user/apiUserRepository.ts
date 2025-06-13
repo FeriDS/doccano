@@ -1,4 +1,5 @@
 import { UserItem } from '@/domain/models/user/user'
+import { UserRepository } from '@/domain/repositories/index'
 import ApiService from '@/services/api.service'
 
 function toModel(item: { [key: string]: any }): UserItem {
@@ -6,13 +7,13 @@ function toModel(item: { [key: string]: any }): UserItem {
     item.id,
     item.username,
     item.email,
-    item.is_superuser,
     item.is_staff,
-    item.is_global_admin
+    item.is_superuser,
+    item.profiles || []
   )
 }
 
-export class APIUserRepository {
+export class APIUserRepository implements UserRepository {
   constructor(private readonly request = ApiService) {}
 
   async getProfile(): Promise<UserItem> {
@@ -27,19 +28,34 @@ export class APIUserRepository {
     return response.data.map((item: { [key: string]: any }) => toModel(item))
   }
 
-  async deleteUser(userId: number): Promise<void> {
-    const url = `/users/delete/${userId}`;
-    await this.request.delete(url);
+  async createUser(user: {
+    username: string
+    email: string
+    password: string
+    profiles: number[]
+  }): Promise<UserItem> {
+    const url = '/users/'
+    const response = await this.request.post(url, user)
+    return toModel(response.data)
   }
-  
+
+  async updateUser(id: number, user: Partial<UserItem>): Promise<UserItem> {
+    const url = `/users/${id}/`
+    const response = await this.request.put(url, user)
+    return toModel(response.data)
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    const url = `/users/${id}/`
+    await this.request.delete(url)
+  }
+
   async getIdByUsername(username: string): Promise<number> {
-    // Reuse the list method to fetch users matching the query.
-    const users = await this.list(username);
-    // Find the user with the exact username.
-    const foundUser = users.find(user => user.username === username);
+    const users = await this.list(username)
+    const foundUser = users.find(user => user.username === username)
     if (!foundUser) {
-      throw new Error(`User with username ${username} not found.`);
+      throw new Error(`User with username ${username} not found.`)
     }
-    return foundUser.id;
+    return foundUser.id
   }
 }
