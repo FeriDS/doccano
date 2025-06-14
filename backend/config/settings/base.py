@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "projects",
     "metrics",
     "users",
+    "profiles",
     "data_import",
     "data_export",
     "auto_labeling",
