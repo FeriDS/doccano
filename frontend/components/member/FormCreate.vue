@@ -58,15 +58,7 @@ import Vue from 'vue'
 import BaseCard from '@/components/utils/BaseCard.vue'
 import { MemberItem } from '~/domain/models/member/member'
 import { RoleItem } from '~/domain/models/role/role'
-
-interface UserItem {
-  id: number
-  username: string
-  email: string
-  isStaff: boolean
-  isSuperuser: boolean
-  isGlobalAdmin: boolean
-}
+import { UserItem } from '~/domain/models/user/user'
 
 export default Vue.extend({
   components: {

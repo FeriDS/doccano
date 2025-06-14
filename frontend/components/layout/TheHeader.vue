@@ -35,18 +35,22 @@
       v-if="isAuthenticated"
       text
       class="text-capitalize"
-      @click="$router.push(localePath('/users'))"
+      @click="$router.push(localePath('/perspectives'))"
     >
-      {{ $t('header.users') }}
+      Perspectives
     </v-btn>
     <v-btn
       v-if="isAuthenticated"
       text
       class="text-capitalize"
-      @click="$router.push(localePath('/profiles'))"
+      @click="$router.push(localePath('/user'))"
     >
-      {{ $t('profiles') }}
+      Users
     </v-btn>
+     <!-- Novo Botão criar perspectivas-->
+  
+  <!--Fim do botao-->
+    
     <v-menu v-if="!isAuthenticated" open-on-hover offset-y>
       <template #activator="{ on }">
         <v-btn text v-on="on">
@@ -56,11 +60,18 @@
       </template>
       <v-list>
         <v-list-item
-          v-for="(item, index) in items"
-          :key="index"
-          @click="$router.push('/demo/' + item.link)"
+          v-for="(item, i) in items"
+          :key="i"
+          :to="localePath(item.to)"
+          router
+          exact
         >
-          <v-list-item-title>{{ item.title }}</v-list-item-title>
+          <v-list-item-action>
+            <v-icon>{{ item.icon }}</v-icon>
+          </v-list-item-action>
+          <v-list-item-content>
+            <v-list-item-title v-text="item.title" />
+          </v-list-item-content>
         </v-list-item>
       </v-list>
     </v-menu>
