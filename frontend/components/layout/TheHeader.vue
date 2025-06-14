@@ -39,6 +39,14 @@
     >
       {{ $t('header.users') }}
     </v-btn>
+    <v-btn
+      v-if="isAuthenticated"
+      text
+      class="text-capitalize"
+      @click="$router.push(localePath('/profiles'))"
+    >
+      {{ $t('profiles') }}
+    </v-btn>
     <v-menu v-if="!isAuthenticated" open-on-hover offset-y>
       <template #activator="{ on }">
         <v-btn text v-on="on">

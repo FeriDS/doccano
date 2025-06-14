@@ -28,16 +28,6 @@
               <v-icon left>{{ mdiAccountPlus }}</v-icon>
               Add User
             </v-btn>
-
-            <v-btn
-              v-if="isAdmin"
-              color="primary"
-              @click="goToCreateProfile"
-              aria-label="Create Profile"
-            >
-              <v-icon left>{{ mdiAccount }}</v-icon>
-              Create Profile
-            </v-btn>
           </div>
 
           <v-btn
@@ -180,10 +170,6 @@ export default Vue.extend({
     editUser(_user: UserItem) {
       // TODO: Implement edit user
     },
-
-    goToCreateProfile() {
-      this.$router.push('/profiles/create_profile')
-    }, 
 
     confirmDelete(user: UserItem) {
       this.userToDelete = user

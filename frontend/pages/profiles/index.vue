@@ -11,16 +11,16 @@
         <div class="d-flex justify-space-between align-center mb-4">
           <v-btn
             color="primary"
-            @click="openCreateDialog"
             aria-label="Add Profile"
+            @click="openCreateDialog"
           >
             <v-icon left>{{ mdiAccountPlus }}</v-icon>
             Add Profile
           </v-btn>
           <v-btn
             icon
-            @click="$router.go(-1)"
             aria-label="Back"
+            @click="$router.go(-1)"
           >
             <v-icon>{{ mdiArrowLeft }}</v-icon>
           </v-btn>
@@ -53,7 +53,7 @@
           <template #[`item.actions`]="{ item }">
             <v-menu>
               <template #activator="{ on, attrs }">
-                <v-btn icon v-bind="attrs" v-on="on" aria-label="Ações">
+                <v-btn icon v-bind="attrs" aria-label="Ações" v-on="on" >
                   <v-icon>{{ mdiDotsVertical }}</v-icon>
                 </v-btn>
               </template>
@@ -123,7 +123,7 @@
           <v-btn color="grey darken-1" text @click="closeDialog">
             Cancel
           </v-btn>
-          <v-btn color="primary" text @click="save" :disabled="!valid">
+          <v-btn color="primary" text :disabled="!valid" @click="save" >
             Save
           </v-btn>
         </v-card-actions>
@@ -152,7 +152,8 @@
     <!-- Alert Dialog -->
     <v-dialog v-model="showAlert" max-width="500px">
       <v-card>
-        <v-card-title class="text-h5 error--text">
+        <v-card-title class="text-h5" 
+        :class="alertType === 'success' ? 'success--text' : 'error--text'">
           {{ alertIcon === 'mdi-alert' ? 'Error' : 'Success' }}
         </v-card-title>
         <v-card-text>
@@ -160,12 +161,36 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="error" text @click="showAlert = false">
+          <v-btn :color="alertType" text @click="showAlert = false">
             Close
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Alerta de erro discreto -->
+    <v-row v-if="showErrorAlert" justify="center">
+      <v-col cols="12" md="8">
+        <v-alert
+          type="error"
+          class="mb-4 text-center"
+          border="left"
+          prominent
+          dismissible
+          @input="showErrorAlert = false"
+        >
+          <span style="font-size: 1.1rem;">{{ snackbarText }}</span>
+        </v-alert>
+      </v-col>
+    </v-row>
+    <!-- Snackbar de sucesso -->
+    <v-snackbar
+      v-model="showSnackbar"
+      :color="snackbarColor"
+      timeout="3000"
+    >
+      {{ snackbarText }}
+    </v-snackbar>
   </v-container>
 </template>
 
@@ -230,7 +255,12 @@ export default Vue.extend({
       availablePermissions: [] as Permission[],
       nameRules: [(v: string) => !!v || 'Nome é obrigatório'],
       permissionRules: [(v: number[]) => v.length > 0 || 'Pelo menos uma permissão é obrigatória'],
-      permissionError: ''
+      permissionError: '',
+      showSnackbar: false,
+      showErrorAlert: false,
+      snackbarText: '',
+      snackbarColor: 'success',
+      alertType: 'success'
     }
   },
 
@@ -348,13 +378,39 @@ export default Vue.extend({
     showErrorMessage(message: string) {
       this.alertMessage = message.replace(/user/i, 'User')
       this.alertIcon = 'mdi-alert'
+      this.alertType = 'error'
       this.showAlert = true
     },
 
     showSuccessMessage(message: string) {
       this.alertMessage = message
       this.alertIcon = 'mdi-check-circle'
+      this.alertType = 'success'
       this.showAlert = true
+    },
+
+    async submitForm() {
+      const form = this.$refs.form as Vue & { validate: () => boolean }
+      if (!form.validate()) return
+
+      this.loading = true
+      try {
+        console.log('Enviando dados do perfil:', this.form)
+        const response = await this.$repositories.profile.create(this.form)
+        console.log('Resposta do servidor:', response)
+        this.snackbarText = 'Perfil criado com sucesso'
+        this.snackbarColor = 'success'
+        this.showSnackbar = true
+        this.$router.push('/profiles')
+      } catch (error: any) {
+        console.error('Erro ao criar perfil:', error)
+        console.error('Detalhes do erro:', error.response?.data)
+        this.snackbarText = error.response?.data?.detail || error.response?.data?.error || 'Erro ao criar perfil'
+        this.snackbarColor = 'error'
+        this.showErrorAlert = true
+      } finally {
+        this.loading = false
+      }
     }
   }
 })
