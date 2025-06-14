@@ -20,14 +20,15 @@
           <v-btn
             v-if="isAdmin"
             color="primary"
-            @click="openCreateDialog"
             aria-label="Add User"
+            @click="openCreateDialog"
+            
           >
             <v-icon left>{{ mdiAccountPlus }}</v-icon>
             Add User
           </v-btn>
           
-          <v-btn icon @click="$router.back()" aria-label="Back">
+          <v-btn icon aria-label="Back" @click="$router.back()" >
             <v-icon>{{ mdiArrowLeft }}</v-icon>
             Return
           </v-btn>
@@ -56,7 +57,7 @@
           <template #[`item.actions`]="{ item }">
             <v-menu v-if="isAdmin">
               <template #activator="{ on, attrs }">
-                <v-btn icon v-bind="attrs" v-on="on" aria-label="Actions">
+                <v-btn icon v-bind="attrs" aria-label="Actions" v-on="on" >
                   <v-icon>{{ mdiDotsVertical }}</v-icon>
                 </v-btn>
               </template>

@@ -79,6 +79,9 @@ class ExampleSerializer(serializers.ModelSerializer):
             "assignments",
             "has_discrepancy",
             "label_distribution",
+            "annotation_start_date",
+            "annotation_end_date",
+            "is_finished",
         ]
         read_only_fields = ["filename", "is_confirmed", "upload_name", "assignments"]
 

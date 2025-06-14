@@ -71,10 +71,12 @@
       </v-combobox>
     </template>
     <template #[`item.action`]="{ item: actionItem }">
-      <v-btn class="me-1" small color="primary text-capitalize" @click="$emit('edit', actionItem)"
-        >Edit</v-btn
-      >
-      <v-btn small color="primary text-capitalize" @click="toLabeling(actionItem)">
+      <v-btn class="me-1" small color="primary text-capitalize" @click="$emit('edit', actionItem)">
+        Edit
+      </v-btn>
+      <v-btn small color="primary text-capitalize"
+        :disabled="isAnnotationDisabled(actionItem)"
+        @click="toLabeling(actionItem)">
         {{ $t('dataset.annotate') }}
       </v-btn>
     </template>
@@ -94,9 +96,31 @@
       <v-switch
         v-model="item.has_discrepancy"
         :label="$t('dataset.discrepancy') || 'Discrepancy'"
-        @change="onDiscrepancyChange(item)"
         dense
         hide-details
+        @change="onDiscrepancyChange(item)"
+        
+      />
+    </template>
+    <template v-if="isAdmin" #[`item.annotation_start_date`]="{ item }">
+      <v-text-field
+        :value="formatDateForInput(item.annotation_start_date)"
+        type="date"
+        dense
+        hide-details
+        style="max-width: 140px"
+        @change="val => $emit('update-date', item, 'annotation_start_date', val)"
+        
+      />
+    </template>
+    <template v-if="isAdmin" #[`item.annotation_end_date`]="{ item }">
+      <v-text-field
+        :value="formatDateForInput(item.annotation_end_date)"
+        type="date"
+        dense
+        hide-details
+        @change="val => $emit('update-date', item, 'annotation_end_date', val)"
+        style="max-width: 140px"
       />
     </template>
   </v-data-table>
@@ -199,6 +223,11 @@ export default Vue.extend({
             value: 'assignee',
             sortable: false
           },
+          // Adicionar datas para admin
+          ...(this.isAdmin ? [
+            { text: 'Start Date', value: 'annotation_start_date', sortable: false },
+            { text: 'End Date', value: 'annotation_end_date', sortable: false }
+          ] : []),
           {
             text: this.$t('dataset.action'),
             value: 'action',
@@ -270,6 +299,24 @@ export default Vue.extend({
 
     onDiscrepancyChange(item: ExampleItem) {
       this.$emit('discrepancy-change', item)
+    },
+
+    isAnnotationDisabled(item: any) {
+      if (item.is_finished) return true
+      if (item.annotation_end_date) {
+        const now = new Date()
+        const end = new Date(item.annotation_end_date)
+        if (now > end) return true
+      }
+      return false
+    },
+
+    formatDateForInput(date: any) {
+      console.log('formatDateForInput:', date)
+      if (!date) return ''
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date
+      if (date.length >= 10) return date.slice(0, 10)
+      return date
     }
   }
 })

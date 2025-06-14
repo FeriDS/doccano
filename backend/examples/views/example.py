@@ -52,3 +52,7 @@ class ExampleDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ExampleSerializer
     lookup_url_kwarg = "example_id"
     permission_classes = [IsAuthenticated & (IsProjectAdmin | IsProjectStaffAndReadOnly)]
+
+    def update(self, request, *args, **kwargs):
+        print("[DEBUG] PATCH payload:", request.data)
+        return super().update(request, *args, **kwargs)

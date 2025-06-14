@@ -82,6 +82,7 @@
       @edit="editItem"
       @assign="assign"
       @unassign="unassign"
+      @update-date="updateExampleDate"
     />
   </v-card>
 </template>
@@ -229,6 +230,19 @@ export default Vue.extend({
     async resetAssignment() {
       this.dialogReset = false
       await this.$repositories.assignment.reset(this.projectId)
+      this.item = await this.$services.example.list(this.projectId, this.$route.query)
+    },
+
+    async updateExampleDate(item: any, field: any, value: any) {
+      let newValue = value
+      if (field === 'annotation_start_date' || field === 'annotation_end_date') {
+        // Converter para formato ISO completo
+        if (value && value.length === 10) {
+          newValue = value + 'T00:00:00Z'
+        }
+      }
+      const payload = { id: item.id, [field]: newValue }
+      await this.$services.example.update(this.projectId, payload)
       this.item = await this.$services.example.list(this.projectId, this.$route.query)
     }
   }

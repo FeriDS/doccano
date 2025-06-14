@@ -14,7 +14,10 @@ function toModel(item: { [key: string]: any }): ExampleItem {
     item.upload_name,
     item.assignments,
     item.has_discrepancy,
-    item.label_distribution
+    item.label_distribution,
+    item.annotation_start_date,
+    item.annotation_end_date,
+    item.is_finished
   )
 }
 

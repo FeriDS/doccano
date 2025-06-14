@@ -54,9 +54,8 @@ export default Vue.extend({
     try {
       const projectId = this.$route.params.id
       const result = await this.$services.example.list(projectId, {})
-      // Filtrar e converter apenas para discrepâncias
       this.examples = result.items
-        .filter((item: any) => item.isConfirmed)
+        .filter((item: any) => item.is_finished)
         .map((item: any) => ({
           ...item,
           label_distribution: Object.fromEntries(
@@ -64,10 +63,8 @@ export default Vue.extend({
               ([label, value]) => {
                 const percent = Number(value)
                 if (percent > 1) {
-                  // já está em percentagem
                   return [label, percent.toFixed(2)]
                 } else {
-                  // está em fração
                   return [label, (percent * 100).toFixed(2)]
                 }
               }
@@ -75,8 +72,7 @@ export default Vue.extend({
           )
         }))
       this.total = this.examples.length
-      // Ajuste o nome do serviço de membros conforme seu projeto
-      this.members = [] // ou this.$services.members.list(projectId)
+      this.members = []
     } finally {
       this.loading = false
     }
@@ -93,7 +89,7 @@ export default Vue.extend({
       await this.$services.example.update(projectId, { ...payload, id: example.id })
       const result = await this.$services.example.list(projectId, {})
       this.examples = result.items
-        .filter((item: any) => item.isConfirmed)
+        .filter((item: any) => item.is_finished)
         .map((item: any) => ({
           ...item,
           label_distribution: Object.fromEntries(
@@ -114,7 +110,6 @@ export default Vue.extend({
       this.pendingDiscrepancy = null
     },
     cancelDiscrepancyChange() {
-      // Reverter o valor do switch visualmente
       if (this.pendingDiscrepancy) {
         this.pendingDiscrepancy.has_discrepancy = !this.pendingDiscrepancy.has_discrepancy
       }

@@ -1,4 +1,5 @@
 import uuid
+from django.utils import timezone
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -23,6 +24,9 @@ class Example(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     has_discrepancy = models.BooleanField(default=False, help_text="Admin flag for annotation discrepancy.")
+    annotation_start_date = models.DateTimeField(null=True, blank=True)
+    annotation_end_date = models.DateTimeField(null=True, blank=True)
+    is_finished = models.BooleanField(default=False)
 
     @property
     def comment_count(self):
@@ -34,6 +38,17 @@ class Example(models.Model):
             return self.text
         else:
             return str(self.filename)
+
+    def save(self, *args, **kwargs):
+        print(f"[DEBUG] Salvando Example id={self.id} | start={self.annotation_start_date} | end={self.annotation_end_date} | finished={self.is_finished}")
+        if self.annotation_end_date and timezone.now() > self.annotation_end_date:
+            self.is_finished = True
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def finish_expired_examples(cls):
+        now = timezone.now()
+        cls.objects.filter(annotation_end_date__isnull=False, annotation_end_date__lt=now, is_finished=False).update(is_finished=True)
 
     class Meta:
         ordering = ["created_at"]

@@ -14,6 +14,9 @@ export class ExampleDTO {
   assignments: Assignment[]
   label_distribution: { [label: string]: number }
   has_discrepancy: boolean
+  annotation_start_date: string | null
+  annotation_end_date: string | null
+  is_finished: boolean
 
   constructor(item: ExampleItem) {
     this.id = item.id
@@ -29,6 +32,9 @@ export class ExampleDTO {
     this.assignments = item.assignments
     this.label_distribution = item.label_distribution
     this.has_discrepancy = item.has_discrepancy
+    this.annotation_start_date = item.annotation_start_date
+    this.annotation_end_date = item.annotation_end_date
+    this.is_finished = item.is_finished
   }
 }
 

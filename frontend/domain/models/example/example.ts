@@ -16,7 +16,10 @@ export class ExampleItem {
     readonly filename: string,
     readonly assignments: Assignment[],
     readonly has_discrepancy: boolean,
-    readonly label_distribution: { [label: string]: number }
+    readonly label_distribution: { [label: string]: number },
+    readonly annotation_start_date: string | null,
+    readonly annotation_end_date: string | null,
+    readonly is_finished: boolean
   ) {}
 
   get url() {

@@ -18,8 +18,9 @@
             </div>
             <v-btn
               text
-              @click="$router.back()"
               aria-label="Return"
+              @click="$router.back()"
+              
             >
               <v-icon left>{{ mdiArrowLeft }}</v-icon>
               Return
@@ -64,8 +65,9 @@
                     </v-list-item>
                     <v-list-item 
                       v-if="isAdmin && currentUserId !== item.id" 
-                      @click="confirmDelete(item)"
                       class="error--text"
+                      @click="confirmDelete(item)"
+                      
                     >
                       <v-list-item-icon>
                         <v-icon color="error">{{ mdiDelete }}</v-icon>
