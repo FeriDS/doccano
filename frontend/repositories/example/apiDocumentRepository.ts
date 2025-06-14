@@ -27,7 +27,9 @@ function toPayload(item: ExampleItem): { [key: string]: any } {
     text: item.text,
     meta: item.meta,
     annotation_approver: item.annotationApprover,
-    comment_count: item.commentCount
+    comment_count: item.commentCount,
+    annotation_start_date: item.annotation_start_date,
+    annotation_end_date: item.annotation_end_date
   }
 }
 
@@ -105,7 +107,23 @@ export class APIExampleRepository implements ExampleRepository {
 
   async update(projectId: string, item: any): Promise<ExampleItem> {
     const url = `/projects/${projectId}/examples/${item.id}`
-    const payload = ('has_discrepancy' in item && Object.keys(item).length <= 2) ? item as { [key: string]: any } : toPayload(item)
+    let payload: { [key: string]: any }
+    if ('has_discrepancy' in item && Object.keys(item).length <= 2) {
+      payload = item
+    } else if (item instanceof ExampleItem) {
+      payload = toPayload(item)
+    } else {
+      payload = {
+        id: item.id,
+        text: item.text,
+        meta: item.meta,
+        annotation_approver: item.annotationApprover,
+        comment_count: item.commentCount,
+        annotation_start_date: item.annotation_start_date,
+        annotation_end_date: item.annotation_end_date,
+        has_discrepancy: item.has_discrepancy
+      }
+    }
     const response = await this.request.patch(url, payload)
     return toModel(response.data)
   }

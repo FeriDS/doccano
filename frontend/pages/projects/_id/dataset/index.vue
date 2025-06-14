@@ -238,7 +238,7 @@ export default Vue.extend({
       if (field === 'annotation_start_date' || field === 'annotation_end_date') {
         // Converter para formato ISO completo
         if (value && value.length === 10) {
-          newValue = value + 'T00:00:00Z'
+          newValue = value + 'T00:00:00.000Z'
         }
       }
       const payload = { id: item.id, [field]: newValue }
