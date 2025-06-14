@@ -24,6 +24,7 @@ class Example(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     has_discrepancy = models.BooleanField(default=False, help_text="Admin flag for annotation discrepancy.")
+    has_discrepancies_automatica = models.BooleanField(default=False, help_text="Automatic flag for annotation discrepancy.")
     annotation_start_date = models.DateTimeField(null=True, blank=True)
     annotation_end_date = models.DateTimeField(null=True, blank=True)
     is_finished = models.BooleanField(default=False)
