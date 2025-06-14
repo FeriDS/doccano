@@ -45,7 +45,7 @@
               <project-perspective-form
                 :perspective="projectPerspective.perspective"
                 :initial-values="userAnswer?.field_values || {}"
-                :disabled="!isAnnotationOpen"
+                :disabled="!isAnnotationOpen || isFinished"
                 @submit="saveValues"
               />
             </template>
@@ -129,6 +129,7 @@ interface Data {
   selectedPerspective: number | null
   missingFields: string[]
   isAnnotationOpen: boolean
+  example: any
 }
 
 export default Vue.extend({
@@ -146,18 +147,23 @@ export default Vue.extend({
       availablePerspectives: [],
       selectedPerspective: null,
       missingFields: [],
-      isAnnotationOpen: true
+      isAnnotationOpen: true,
+      example: null
     }
   },
 
   computed: {
     projectId(): string {
       return this.$route.params.id
+    },
+    isFinished(): boolean {
+      return this.example && this.example.is_finished
     }
   },
 
   async created() {
     await this.fetchData()
+    await this.fetchExample()
   },
 
   methods: {
@@ -204,6 +210,16 @@ export default Vue.extend({
         console.error(error)
       } finally {
         this.loading = false
+      }
+    },
+
+    async fetchExample() {
+      // Busca o primeiro exemplo do projeto para verificar is_finished
+      try {
+        const result = await this.$services.example.list(this.projectId, { limit: 1 })
+        this.example = result.items && result.items.length > 0 ? result.items[0] : null
+      } catch (error) {
+        this.example = null
       }
     },
 

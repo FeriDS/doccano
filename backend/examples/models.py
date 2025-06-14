@@ -41,8 +41,10 @@ class Example(models.Model):
 
     def save(self, *args, **kwargs):
         print(f"[DEBUG] Salvando Example id={self.id} | start={self.annotation_start_date} | end={self.annotation_end_date} | finished={self.is_finished}")
-        if self.annotation_end_date and timezone.now() > self.annotation_end_date:
-            self.is_finished = True
+        if self.annotation_end_date:
+            self.is_finished = timezone.now() > self.annotation_end_date
+        else:
+            self.is_finished = False
         super().save(*args, **kwargs)
 
     @classmethod

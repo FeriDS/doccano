@@ -302,12 +302,12 @@ export default Vue.extend({
     },
 
     isAnnotationDisabled(item: any) {
-      if (item.is_finished) return true
+      const now = new Date()
       if (item.annotation_end_date) {
-        const now = new Date()
         const end = new Date(item.annotation_end_date)
         if (now > end) return true
       }
+      if (item.is_finished) return true
       return false
     },
 

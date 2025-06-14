@@ -1,5 +1,5 @@
 <template>
-  <v-container>
+  <v-container class="mt-12">
     <v-card>
       <v-card-title>
         Sinalizar Discrepâncias
