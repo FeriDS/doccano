@@ -34,8 +34,11 @@
             <template #[`item.fields`]="{ item }">
               {{ item.fields ? item.fields.length : 0 }}
             </template>
-            <template #[`item.createdAt`]="{ item }">
-              {{ new Date(item.createdAt).toLocaleDateString() }}
+            <template #[`item.created_at`]="{ item }">
+              {{ new Date(item.created_at).toLocaleDateString() }}
+            </template>
+            <template #[`item.created_by_username`]="{ item }">
+              {{ item.created_by_username }}
             </template>
             <template #[`item.actions`]="{ item }">
               <v-icon
@@ -75,13 +78,6 @@
                               :color="getFieldTypeColor(field.field_type)"
                             >
                               {{ $t(`perspectives.fieldTypes.${field.field_type}`) }}
-                            </v-chip>
-                            <v-chip
-                              v-if="field.required"
-                              small
-                              color="warning"
-                            >
-                              {{ $t('perspectives.required') }}
                             </v-chip>
                             <template 
                               v-if="field.field_type === 'choice' || 
@@ -174,11 +170,11 @@ export default Vue.extend({
         },
         { 
           text: this.$t('perspectives.createdBy').toString(),
-          value: 'createdBy'
+          value: 'created_by_username'
         },
         { 
           text: this.$t('perspectives.createdAt').toString(),
-          value: 'createdAt'
+          value: 'created_at'
         },
         { 
           text: this.$t('perspectives.actions').toString(),
