@@ -12,6 +12,8 @@ export class ExampleDTO {
   url: string
   isConfirmed: boolean
   assignments: Assignment[]
+  label_distribution: { [label: string]: number }
+  has_discrepancy: boolean
 
   constructor(item: ExampleItem) {
     this.id = item.id
@@ -25,6 +27,8 @@ export class ExampleDTO {
     this.url = item.url
     this.isConfirmed = item.isConfirmed
     this.assignments = item.assignments
+    this.label_distribution = item.label_distribution
+    this.has_discrepancy = item.has_discrepancy
   }
 }
 

@@ -2,6 +2,11 @@
   <v-card>
     <v-card-title>
       {{ $t('projectHome.welcome') }}
+      <v-spacer />
+      <v-btn v-if="user.isProjectAdmin" color="warning" class="ml-4" 
+      @click="$router.push(`/projects/${$route.params.id}/discrepancies`)">
+        Signal Discrepancies
+      </v-btn>
     </v-card-title>
     <v-stepper v-model="e6" vertical non-linear>
       <div v-for="(item, index) in items" :key="index">
@@ -37,6 +42,7 @@ export default {
   data() {
     return {
       e6: 1,
+      user: {},
       items: [
         { title: this.$t('projectHome.importData'), videoId: 'dA4ID1DSxCE' },
         { title: this.$t('projectHome.createLabels'), videoId: '1bSML270quU' },
@@ -65,6 +71,11 @@ export default {
     prev() {
       this.e6 = Math.max(1, this.e6 - 1)
     }
+  },
+
+  async created() {
+    // Buscar papel do usuário
+    this.user = await this.$repositories.member.fetchMyRole(this.$route.params.id)
   }
 }
 </script>

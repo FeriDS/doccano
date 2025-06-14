@@ -12,7 +12,9 @@ function toModel(item: { [key: string]: any }): ExampleItem {
     item.filename,
     item.is_confirmed,
     item.upload_name,
-    item.assignments
+    item.assignments,
+    item.has_discrepancy,
+    item.label_distribution
   )
 }
 
@@ -82,11 +84,12 @@ export class APIExampleRepository implements ExampleRepository {
     const params = buildQueryParams(limit, offset, q, isChecked, ordering)
     const url = `/projects/${projectId}/examples?${params}`
     const response = await this.request.get(url)
+    const data = response.data || response;
     return new ExampleItemList(
-      response.data.count,
-      response.data.next,
-      response.data.previous,
-      response.data.results.map((item: { [key: string]: any }) => toModel(item))
+      data.count,
+      data.next,
+      data.previous,
+      (data.results || []).map((item: { [key: string]: any }) => toModel(item))
     )
   }
 
@@ -97,9 +100,9 @@ export class APIExampleRepository implements ExampleRepository {
     return toModel(response.data)
   }
 
-  async update(projectId: string, item: ExampleItem): Promise<ExampleItem> {
+  async update(projectId: string, item: any): Promise<ExampleItem> {
     const url = `/projects/${projectId}/examples/${item.id}`
-    const payload = toPayload(item)
+    const payload = ('has_discrepancy' in item && Object.keys(item).length <= 2) ? item as { [key: string]: any } : toPayload(item)
     const response = await this.request.patch(url, payload)
     return toModel(response.data)
   }

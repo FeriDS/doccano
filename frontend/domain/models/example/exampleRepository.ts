@@ -7,7 +7,7 @@ export interface ExampleRepository {
 
   create(projectId: string, item: ExampleItem): Promise<ExampleItem>
 
-  update(projectId: string, item: ExampleItem): Promise<ExampleItem>
+  update(projectId: string, item: ExampleItem | { [key: string]: any }): Promise<ExampleItem>
 
   bulkDelete(projectId: string, ids: number[]): Promise<void>
 

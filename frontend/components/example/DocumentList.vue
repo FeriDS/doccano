@@ -78,6 +78,27 @@
         {{ $t('dataset.annotate') }}
       </v-btn>
     </template>
+    <template v-if="mode === 'discrepancias'" #[`item.label_distribution`]="{ item }">
+      <div>
+        <v-chip
+          v-for="(percent, label) in item.label_distribution"
+          :key="label"
+          small
+          class="ma-1"
+        >
+          {{ label }}: {{ percent }}%
+        </v-chip>
+      </div>
+    </template>
+    <template v-if="mode === 'discrepancias' && isAdmin" #[`item.has_discrepancy`]="{ item }">
+      <v-switch
+        v-model="item.has_discrepancy"
+        :label="$t('dataset.discrepancy') || 'Discrepancy'"
+        @change="onDiscrepancyChange(item)"
+        dense
+        hide-details
+      />
+    </template>
   </v-data-table>
 </template>
 
@@ -87,6 +108,7 @@ import type { PropType } from 'vue'
 import Vue from 'vue'
 import { DataOptions } from 'vuetify/types'
 import { ExampleDTO } from '~/services/application/example/exampleData'
+import { ExampleItem } from '~/domain/models/example/example'
 import { MemberItem } from '~/domain/models/member/member'
 
 export default Vue.extend({
@@ -119,6 +141,10 @@ export default Vue.extend({
     isAdmin: {
       type: Boolean,
       default: false
+    },
+    mode: {
+      type: String,
+      default: 'dataset'
     }
   },
 
@@ -132,36 +158,55 @@ export default Vue.extend({
 
   computed: {
     headers() {
-      const headers = [
-        {
-          text: 'Status',
-          value: 'isConfirmed',
-          sortable: false
-        },
-        {
-          text: this.$t('dataset.text'),
-          value: 'text',
-          sortable: false
-        },
-        {
-          text: this.$t('dataset.metadata'),
-          value: 'meta',
-          sortable: false
-        },
-        {
-          text: this.$t('dataset.action'),
-          value: 'action',
-          sortable: false
-        }
-      ]
-      if (this.isAdmin) {
-        headers.splice(3, 0, {
-          text: 'Assignee',
-          value: 'assignee',
-          sortable: false
-        })
+      if (this.mode === 'discrepancias') {
+        return [
+          {
+            text: this.$t('dataset.text'),
+            value: 'text',
+            sortable: false
+          },
+          {
+            text: this.$t('dataset.labelDistribution') || 'Label Distribution',
+            value: 'label_distribution',
+            sortable: false
+          },
+          {
+            text: this.$t('dataset.discrepancy') || 'Discrepancy',
+            value: 'has_discrepancy',
+            sortable: false
+          }
+        ]
+      } else {
+        // dataset padrão
+        const headers = [
+          {
+            text: 'Status',
+            value: 'isConfirmed',
+            sortable: false
+          },
+          {
+            text: this.$t('dataset.text'),
+            value: 'text',
+            sortable: false
+          },
+          {
+            text: this.$t('dataset.metadata'),
+            value: 'meta',
+            sortable: false
+          },
+          {
+            text: 'Assignee',
+            value: 'assignee',
+            sortable: false
+          },
+          {
+            text: this.$t('dataset.action'),
+            value: 'action',
+            sortable: false
+          }
+        ]
+        return headers
       }
-      return headers
     }
   },
 
@@ -221,6 +266,10 @@ export default Vue.extend({
           }
         }
       }
+    },
+
+    onDiscrepancyChange(item: ExampleItem) {
+      this.$emit('discrepancy-change', item)
     }
   }
 })

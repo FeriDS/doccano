@@ -14,7 +14,9 @@ export class ExampleItem {
     readonly fileUrl: string,
     readonly isConfirmed: boolean,
     readonly filename: string,
-    readonly assignments: Assignment[]
+    readonly assignments: Assignment[],
+    readonly has_discrepancy: boolean,
+    readonly label_distribution: { [label: string]: number }
   ) {}
 
   get url() {

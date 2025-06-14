@@ -22,6 +22,7 @@ class Example(models.Model):
     score = models.FloatField(default=100)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
+    has_discrepancy = models.BooleanField(default=False, help_text="Admin flag for annotation discrepancy.")
 
     @property
     def comment_count(self):

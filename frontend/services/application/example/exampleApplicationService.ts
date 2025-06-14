@@ -43,10 +43,9 @@ export class ExampleApplicationService {
     }
   }
 
-  public async update(projectId: string, item: ExampleDTO): Promise<void> {
+  public async update(projectId: string, item: ExampleDTO | { [key: string]: any }): Promise<void> {
     try {
-      const doc = this.toModel(item)
-      await this.repository.update(projectId, doc)
+      await this.repository.update(projectId, item)
     } catch (e: any) {
       throw new Error(e.response.data.detail)
     }

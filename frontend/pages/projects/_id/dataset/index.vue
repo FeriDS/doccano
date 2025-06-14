@@ -76,6 +76,7 @@
       :is-loading="isLoading"
       :members="members"
       :total="item.count"
+      :mode="'dataset'"
       @update:query="updateQuery"
       @click:labeling="movePage"
       @edit="editItem"

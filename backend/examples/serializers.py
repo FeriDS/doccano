@@ -28,6 +28,7 @@ class ExampleSerializer(serializers.ModelSerializer):
     annotation_approver = serializers.SerializerMethodField()
     is_confirmed = serializers.SerializerMethodField()
     assignments = serializers.SerializerMethodField()
+    label_distribution = serializers.SerializerMethodField()
 
     @classmethod
     def get_annotation_approver(cls, instance):
@@ -52,6 +53,17 @@ class ExampleSerializer(serializers.ModelSerializer):
             for assignment in instance.assignments.all()
         ]
 
+    def get_label_distribution(self, obj):
+        # Import here to avoid circular import
+        from labels.models import Category
+        labels = Category.objects.filter(example=obj)
+        total = labels.count()
+        if total == 0:
+            return {}
+        from collections import Counter
+        counter = Counter(label.label.text for label in labels if hasattr(label, 'label') and label.label)
+        return {k: round(v / total * 100, 2) for k, v in counter.items()}
+
     class Meta:
         model = Example
         fields = [
@@ -65,6 +77,8 @@ class ExampleSerializer(serializers.ModelSerializer):
             "upload_name",
             "score",
             "assignments",
+            "has_discrepancy",
+            "label_distribution",
         ]
         read_only_fields = ["filename", "is_confirmed", "upload_name", "assignments"]
 
