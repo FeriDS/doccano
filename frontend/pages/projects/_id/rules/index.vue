@@ -34,17 +34,17 @@
           <template #[`item.action`]="{ item }">
             <v-btn
               icon
-              color="green"
-              :disabled="item.user_has_voted || !item.is_open"
-              @click="onVote(item.id, true)"
+              :color="votes[item.rule.id] === true ? 'success' : 'grey lighten-1'"
+              :disabled="!item.is_open"
+              @click="setVote(item.rule.id, true)"
             >
               👍
             </v-btn>
             <v-btn
               icon
-              color="red"
-              :disabled="item.user_has_voted || !item.is_open"
-              @click="onVote(item.id, false)"
+              :color="votes[item.rule.id] === false ? 'error' : 'grey lighten-1'"
+              :disabled="!item.is_open"
+              @click="setVote(item.rule.id, false)"
             >
               👎
             </v-btn>
@@ -60,6 +60,26 @@
         <v-snackbar v-model="snackbar" top :color="snackbarColor" :timeout="3000">
           {{ snackbarMessage }}
         </v-snackbar>
+
+        <div class="vote-actions">
+          <v-btn
+            color="primary"
+            class="mt-4 mr-2"
+            :loading="loading"
+            :disabled="!canSubmitVotes"
+            @click="submitVotes"
+          >
+            Submeter Votos ({{ Object.keys(votes).length }}/{{ openRulesCount }})
+          </v-btn>
+          <v-btn
+            color="secondary"
+            class="mt-4"
+            :disabled="loading || Object.keys(votes).length === 0"
+            @click="clearVotes"
+          >
+            Cancelar
+          </v-btn>
+        </div>
       </v-card-text>
     </v-card>
   </v-container>
@@ -67,8 +87,9 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import { useRuleVoting } from '@/composables/useRuleVoting'
-import type { RuleDTO, VoteResultDTO } from '@/repositories/rule/apiRuleRepository'
+import { useRuleVoting } from '~/composables/useRuleVoting'
+import type { RuleDTO } from '@/repositories/rule/apiRuleRepository'
+
 export default Vue.extend({
   data() {
     return {
@@ -78,12 +99,24 @@ export default Vue.extend({
       snackbar: false as boolean,
       snackbarMessage: '' as string,
       snackbarColor: 'success' as 'success' | 'error',
+      votes: {} as Record<number, boolean>,
       headers: [
         { text: 'Regra', value: 'rule.text' },
         { text: 'Sim', value: 'votes_yes' },
         { text: 'Não', value: 'votes_no' },
         { text: 'Ação', value: 'action', sortable: false }
       ]
+    }
+  },
+  computed: {
+    openRulesCount(): number {
+      return this.rules.filter(rule => rule.is_open).length
+    },
+    canSubmitVotes(): boolean {
+      const openRuleIds = this.rules
+        .filter(rule => rule.is_open)
+        .map(rule => rule.rule.id)
+      return openRuleIds.every(id => this.votes[id] !== undefined)
     }
   },
   created() {
@@ -98,51 +131,76 @@ export default Vue.extend({
       }
       this.loading = true
       this.error = ''
-      // extrai da composable
       const { fetchRules } = useRuleVoting()
       try {
         this.rules = await fetchRules(projectId)
       } catch (err: any) {
-        this.error =
-          err.response?.data?.error ||
-          'Falha ao carregar regras. Por favor, tente mais tarde.'
+        this.error = err.response?.data?.error || 'Falha ao carregar regras. Por favor, tente mais tarde.'
+        this.snackbarMessage = this.error
+        this.snackbarColor = 'error'
+        this.snackbar = true
       } finally {
         this.loading = false
       }
     },
-    async onVote(ruleId: number, choice: boolean) {
+    setVote(ruleId: number, vote: boolean) {
+      console.log('Setting vote:', { ruleId, vote, currentVotes: this.votes })
+      if (this.votes[ruleId] === vote) {
+        this.$delete(this.votes, ruleId)
+      } else {
+        this.$set(this.votes, ruleId, vote)
+      }
+      console.log('Votes after update:', this.votes)
+    },
+    async submitVotes() {
+      if (!this.canSubmitVotes) {
+        this.snackbarMessage = 'Por favor, vote em todas as regras abertas antes de submeter.'
+        this.snackbarColor = 'error'
+        this.snackbar = true
+        return
+      }
+
       const projectId = parseInt(this.$route.params.id, 10)
       if (isNaN(projectId)) {
         this.error = 'ID de projeto inválido.'
         return
       }
-      // extrai da composable
+      this.loading = true
+      this.error = ''
       const { voteRule } = useRuleVoting()
       try {
-        const result: VoteResultDTO = await voteRule(
-          projectId,
-          ruleId,
-          choice
-        )
-        // atualiza somente o item votado
-        const idx = this.rules.findIndex(r => r.id === ruleId)
-        if (idx !== -1) {
-          this.rules.splice(idx, 1, { ...this.rules[idx], ...result })
-        }
-        this.snackbarMessage = 'Voto registado com sucesso.'
+        const voteData = Object.entries(this.votes).map(([ruleId, vote]) => ({
+          rule_id: parseInt(ruleId),
+          vote
+        }))
+        await voteRule(projectId, voteData)
+        this.snackbarMessage = 'Votos enviados com sucesso!'
         this.snackbarColor = 'success'
-      } catch (err: any) {
-        this.snackbarMessage =
-          err.response?.data?.error || 'Erro ao votar. Tente novamente.'
-        this.snackbarColor = 'error'
-      } finally {
         this.snackbar = true
+        this.votes = {}
+        await this.fetchRules()
+      } catch (err: any) {
+        this.error = err.response?.data?.error || 'Falha ao enviar votos. Por favor, tente mais tarde.'
+        this.snackbarMessage = this.error
+        this.snackbarColor = 'error'
+        this.snackbar = true
+      } finally {
+        this.loading = false
       }
+    },
+    clearVotes() {
+      this.votes = {}
     }
   }
 })
 </script>
 
 <style scoped>
-/* ajuste qualquer estilo extra aqui */
+.vote-actions {
+  display: flex;
+  align-items: center;
+}
+.v-btn {
+  margin: 0 2px;
+}
 </style>

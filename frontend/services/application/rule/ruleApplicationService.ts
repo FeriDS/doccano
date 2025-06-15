@@ -20,10 +20,9 @@ export class RuleApplicationService {
   
   voteRule(
     projectId: number,
-    ruleId: number,
-    vote: boolean
+    votes: { rule_id: number; vote: boolean }[]
   ): Promise<VoteResultDTO> {
-    return this.repository.voteRule(projectId, ruleId, vote)
+    return this.repository.voteRule(projectId, votes)
   }
 
   closeVoting(projectId: number, ruleId: number): Promise<any> {

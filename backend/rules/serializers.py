@@ -47,5 +47,8 @@ class ProjectRuleSerializer(serializers.ModelSerializer):
                 return vote_obj.vote  # True ou False
         return None  # Não votou ainda
 
+    def get_votes_count(self, obj):
+        return obj.votes.count()
+
 class VoteInputSerializer(serializers.Serializer):
     vote = serializers.BooleanField()

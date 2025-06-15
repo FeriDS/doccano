@@ -12,17 +12,18 @@ export function useRuleVoting() {
     // resp é { count, next, previous, results: RuleDTO[] }
     return (resp as any).results
   }
+
+  
   async function fetchClosedRules(projectId: number): Promise<RuleDTO[]> {
     const resp = await service.fetchRules(projectId, { is_open: false })
     return (resp as any).results
   
   }
-  function voteRule(
+  const voteRule = (
     projectId: number,
-    ruleId: number,
-    vote: boolean
-  ): Promise<VoteResultDTO> {
-    return service.voteRule(projectId, ruleId, vote)
+    votes: { rule_id: number; vote: boolean }[]
+  ): Promise<VoteResultDTO> => {
+    return service.voteRule(projectId, votes)
   }
   
   function closeVoting(projectId: number, ruleId: number): Promise<any> {

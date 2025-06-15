@@ -60,6 +60,28 @@ class RuleVoteView(APIView):
             "is_open": pr.is_open
         }, status=status.HTTP_201_CREATED)
 
+class ProjectBulkRuleVoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, project_id):
+        votes = request.data.get("votes", [])
+        user = request.user
+        results = []
+        for item in votes:
+            rule_id = item.get("rule_id")
+            vote_val = item.get("vote")
+            pr = ProjectRule.objects.filter(project_id=project_id, rule_id=rule_id).first()
+            if not pr or not pr.is_open:
+                results.append({"rule_id": rule_id, "status": "error", "message": "Regra não encontrada ou votação encerrada."})
+                continue
+            vote_obj, created = RuleVote.objects.update_or_create(
+                project_rule=pr,
+                user=user,
+                defaults={"vote": vote_val}
+            )
+            results.append({"rule_id": rule_id, "status": "ok" if created else "updated"})
+        return Response({"results": results}, status=status.HTTP_201_CREATED)
+        
 class ProjectRuleUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
