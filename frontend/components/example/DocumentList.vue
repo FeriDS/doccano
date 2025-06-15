@@ -112,7 +112,12 @@
     <!-- DISCREPÂNCIA --------------------------------------------------- -->
     <template v-if="mode === 'discrepancias' && isAdmin" #[`item.has_discrepancy`]="{ item }">
       <template v-if="displayDiscrepancyAsText">
-        {{ item.has_discrepancy ? 'true' : 'false' }}
+        <v-icon :color="item.has_discrepancy ? 'success' : 'error'" small>
+          {{ item.has_discrepancy ? mdiCheck : mdiClose }}
+        </v-icon>
+        <span class="ml-1" :class="item.has_discrepancy ? 'success--text' : 'error--text'">
+          {{ item.has_discrepancy ? 'Yes' : 'No' }}
+        </span>
       </template>
       <template v-else>
         <v-switch
@@ -152,7 +157,7 @@
 </template>
 
 <script lang="ts">
-import { mdiMagnify } from '@mdi/js'
+import { mdiMagnify, mdiCheck, mdiClose } from '@mdi/js'
 import Vue from 'vue'
 import type { PropType } from 'vue'
 import { DataOptions } from 'vuetify/types'
@@ -162,12 +167,12 @@ import { MemberItem } from '~/domain/models/member/member'
 
 export default Vue.extend({
   props: {
-    isLoading: { type: Boolean, default: false },
+    isLoading: Boolean,
     items: { type: Array as PropType<ExampleDTO[]>, default: () => [] },
     value: { type: Array as PropType<ExampleDTO[]>, default: () => [] },
-    total: { type: Number, default: 0 },
+    total: Number,
     members: { type: Array as PropType<MemberItem[]>, default: () => [] },
-    isAdmin: { type: Boolean, default: false },
+    isAdmin: Boolean,
     mode: { type: String, default: 'dataset' },
     displayDiscrepancyAsText: { type: Boolean, default: false }
   },
@@ -176,7 +181,9 @@ export default Vue.extend({
     return {
       search: this.$route.query.q,
       options: {} as DataOptions,
-      mdiMagnify
+      mdiMagnify,
+      mdiCheck,
+      mdiClose
     }
   },
 
@@ -235,14 +242,14 @@ export default Vue.extend({
   },
 
   methods: {
-    /* ---------- navegação ----------- */
+    /* Navegar para página de anotação */
     toLabeling(item: ExampleDTO) {
       const idx = this.items.indexOf(item)
       const offset = (this.options.page - 1) * this.options.itemsPerPage
       this.$emit('click:labeling', { page: (offset + idx + 1).toString(), q: this.search })
     },
 
-    /* ---------- assignee helpers ----- */
+    /* Helpers de assignee */
     toSelected(item: ExampleDTO) {
       const ids = item.assignments.map(a => a.assignee_id)
       return this.members.filter(m => ids.includes(m.user))
@@ -252,25 +259,23 @@ export default Vue.extend({
       const newIds = newAssignees.map(a => a.user)
       const oldIds = item.assignments.map(a => a.assignee_id)
 
-      // unassign
       oldIds
         .filter(id => !newIds.includes(id))
         .forEach(id =>
           this.$emit('unassign', item.assignments.find(a => a.assignee_id === id)?.id)
         )
 
-      // assign
       newIds
         .filter(id => !oldIds.includes(id))
         .forEach(id => this.$emit('assign', item.id, id))
     },
 
-    /* ---------- discrepância -------- */
+    /* Discrepância */
     onDiscrepancyChange(item: ExampleItem) {
       this.$emit('discrepancy-change', item)
     },
 
-    /* ---------- utilidades ---------- */
+    /* Utilidades */
     isAnnotationDisabled(item: any) {
       const now = new Date()
       if (item.annotation_end_date && now > new Date(item.annotation_end_date)) return true
