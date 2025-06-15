@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ProjectRuleListView, RuleVoteView, ProjectBulkRuleVoteView
+from .views import ProjectRuleListView, RuleVoteView, ProjectBulkRuleVoteView, ProjectRuleListView
 
 urlpatterns = [
     path(

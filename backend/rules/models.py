@@ -34,7 +34,9 @@ class ProjectRule(models.Model):
         yes = self.votes.filter(vote=True).count()
         no  = self.votes.filter(vote=False).count()
         return yes, no
-
+    def is_voting_closed(self):
+        return not self.is_open
+        
 class RuleVote(models.Model):
     project_rule = models.ForeignKey(
         ProjectRule,
