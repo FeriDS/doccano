@@ -10,10 +10,24 @@
         </v-btn>
       </v-card-title>
 
-      <v-btn color="success" class="ma-4" @click="closeAllOpenRules">
+      <v-btn color="success" class="ma-4" @click="confirmCloseAllRules">
         <v-icon left>{{ mdiStopCircleOutline }}</v-icon>
         Close All Open Rules
       </v-btn>
+
+      <v-dialog v-model="confirmDialog" max-width="400">
+        <v-card>
+          <v-card-title>Confirmar Encerramento</v-card-title>
+          <v-card-text>
+            Tem certeza que deseja encerrar todas as regras abertas?
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn text @click="confirmDialog = false">Cancelar</v-btn>
+            <v-btn color="success" @click="closeAllOpenRules">Confirmar</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
       <v-alert v-if="error" type="error" dense class="mb-4">{{ error }}</v-alert>
       <v-progress-circular v-if="loading" indeterminate class="ma-4" />
@@ -89,6 +103,7 @@ export default Vue.extend({
       snackbarMessage: '',
       snackbarColor: 'success' as 'success' | 'error' | 'info',
       votes: {} as Record<number, boolean>,
+      confirmDialog: false,
 
       headers: [
         { text: 'Regra', value: 'rule.text' },
@@ -165,13 +180,17 @@ export default Vue.extend({
     clearVotes() { this.votes = {} },
 
     /* ---------- encerrar ---------- */
+    confirmCloseAllRules() {
+      this.confirmDialog = true
+    },
+
     async closeAllOpenRules() {
+      this.confirmDialog = false
       const projectId = Number(this.$route.params.id)
       if (!projectId) return
       const { closeVoting } = useRuleVoting()
       this.loading = true
 
-      /* corrigido para regras ESLint: declarações separadas */
       let successCount = 0
       let failCount = 0
 
