@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ProjectRuleListView, RuleVoteView, ProjectBulkRuleVoteView, ProjectRuleListView
+from .views import ProjectRuleListView, RuleVoteView, ProjectBulkRuleVoteView, ProjectRuleUpdateView
 
 urlpatterns = [
     path(
@@ -16,5 +16,10 @@ urlpatterns = [
         "projects/<int:project_id>/rules/vote/",
         ProjectBulkRuleVoteView.as_view(),
         name="project-bulk-rule-vote"
+    ),
+    path(
+        "projects/<int:project_id>/rules/<int:rule_id>/",
+        ProjectRuleUpdateView.as_view(),
+        name="project-rule-update"
     ),
 ]

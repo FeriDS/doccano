@@ -4,6 +4,9 @@
       <v-card-title class="d-flex align-center">
         <span>Sinalizar Discrepâncias Automáticas</span>
         <v-spacer />
+        <v-btn color="primary" class="mr-2" @click="onShowAnnotation">
+          Show Annotation
+        </v-btn>
         <v-btn text aria-label="Return" @click="$router.back()">
           <v-icon left>{{ mdiArrowLeft }}</v-icon>
           Return
@@ -23,7 +26,7 @@
         />
       </v-card-text>
 
-      <!-- limiar -->
+      <!-- Threshold -->
       <v-text-field
         v-model.number="threshold"
         label="Threshold"
@@ -58,23 +61,25 @@ export default Vue.extend({
     }
   },
   watch: {
-    threshold(newThreshold: number) {
+    threshold(newVal: number) {
+      if (process.client) localStorage.setItem('discrepancyThreshold', newVal.toString())
       this.loadExamples()
-      if (process.client) {
-        localStorage.setItem('discrepancyThreshold', newThreshold.toString())
-      }
     }
   },
   async created() {
     if (process.client) {
-      const savedThreshold = localStorage.getItem('discrepancyThreshold')
-      if (savedThreshold) {
-        this.threshold = Number(savedThreshold)
-      }
+      const saved = localStorage.getItem('discrepancyThreshold')
+      if (saved) this.threshold = Number(saved)
     }
     await this.loadExamples()
   },
   methods: {
+    /* rota SEM query selected */
+    onShowAnnotation() {
+      const link = this.localePath(`/projects/${this.$route.params.id}/annotations`)
+      this.$router.push(link)
+    },
+
     async loadExamples() {
       this.loading = true
       try {
@@ -83,22 +88,31 @@ export default Vue.extend({
         this.examples = items
           .filter((ex: any) => ex.is_finished)
           .map((ex: any) => {
-            // converter distribuição para %
+            /* converter valores para % */
+            const rawEntries = Object.entries(ex.label_distribution || {})
             const dist = Object.fromEntries(
-              Object.entries(ex.label_distribution || {}).map(([l, v]) => {
-                const p = Number(v)
-                return [l, (p > 1 ? p : p * 100).toFixed(2)]
+              rawEntries.map(([label, value]) => {
+                const p = Number(value)
+                return [label, (p > 1 ? p : p * 100).toFixed(2)]
               })
             )
-            // discrepância automática
-            const hasDiscrepancy = Object.values(dist)
-              .map(Number)
-              .some(percent => percent >= this.threshold && percent <= 100)
+
+            /* discrepância automática:
+               - deve existir distribuição
+               - TODOS os percentuais ≥ threshold e < 100                 */
+            const auto =
+              rawEntries.length > 0 &&
+              rawEntries
+                .map(([, value]) => {
+                  const p = Number(value)
+                  return p > 1 ? p : p * 100
+                })
+                .every(p => p >= this.threshold && p <= 100)
 
             return {
               ...ex,
               label_distribution: dist,
-              has_discrepancy: hasDiscrepancy
+              has_discrepancy: auto
             }
           })
         this.total = this.examples.length
