@@ -11,10 +11,7 @@
         class="text-capitalize ms-2"
         color="secondary"
         aria-label="Signal discrepancies automatically"
-        @click="$router.push({
-          name: 'projects-id-discrepancy_automatic',
-          params: { id: $route.params.id }
-        })"
+        @click="$router.push(`/projects/${$route.params.id}/discrepancy_automatic`)"
       >
         Discrepância Automática
       </v-btn>
