@@ -61,15 +61,25 @@
           {{ snackbarMessage }}
         </v-snackbar>
 
-        <v-btn
-          color="primary"
-          class="mt-4"
-          :loading="loading"
-          :disabled="!canSubmitVotes"
-          @click="submitVotes"
-        >
-          Submeter Votos ({{ Object.keys(votes).length }}/{{ openRulesCount }})
-        </v-btn>
+        <div class="vote-actions">
+          <v-btn
+            color="primary"
+            class="mt-4 mr-2"
+            :loading="loading"
+            :disabled="!canSubmitVotes"
+            @click="submitVotes"
+          >
+            Submeter Votos ({{ Object.keys(votes).length }}/{{ openRulesCount }})
+          </v-btn>
+          <v-btn
+            color="secondary"
+            class="mt-4"
+            :disabled="loading || Object.keys(votes).length === 0"
+            @click="clearVotes"
+          >
+            Cancelar
+          </v-btn>
+        </div>
       </v-card-text>
     </v-card>
   </v-container>
@@ -177,12 +187,19 @@ export default Vue.extend({
       } finally {
         this.loading = false
       }
+    },
+    clearVotes() {
+      this.votes = {}
     }
   }
 })
 </script>
 
 <style scoped>
+.vote-actions {
+  display: flex;
+  align-items: center;
+}
 .v-btn {
   margin: 0 2px;
 }
