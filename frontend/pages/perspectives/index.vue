@@ -3,7 +3,7 @@
     <v-row>
       <v-col cols="12">
         <v-card>
-          <v-card-title>
+          <v-card-title class="d-flex align-center">
             <h2>{{ $t('perspectives.title') }}</h2>
             <v-spacer></v-spacer>
             <v-btn
@@ -18,7 +18,8 @@
               @click="goBack"
               aria-label="back"
             >
-              <v-icon>{{ mdiArrowLeft }}</v-icon>
+              <v-icon left>{{ mdiArrowLeft }}</v-icon>
+              Return
             </v-btn>
           </v-card-title>
 

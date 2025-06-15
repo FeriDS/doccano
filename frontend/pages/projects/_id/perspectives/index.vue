@@ -132,6 +132,16 @@ interface Data {
   example: any
 }
 
+interface ErrorResponse {
+  response?: {
+    status?: number
+    data?: {
+      error?: string
+      message?: string
+    }
+  }
+}
+
 export default Vue.extend({
   name: 'ProjectPerspectivesPage',
 
@@ -177,9 +187,10 @@ export default Vue.extend({
           const projectPerspective = await repository.getProjectPerspective(this.projectId)
           this.projectPerspective = projectPerspective
           this.isAnnotationOpen = projectPerspective.is_annotation_open !== undefined ? 
-          projectPerspective.is_annotation_open : true
-        } catch (error) {
-          if (error?.response?.status === 404) {
+            projectPerspective.is_annotation_open : true
+        } catch (error: unknown) {
+          const err = error as ErrorResponse
+          if (err?.response?.status === 404) {
             // No project perspective assigned yet
             this.projectPerspective = null
             this.isAnnotationOpen = true
@@ -216,7 +227,7 @@ export default Vue.extend({
     async fetchExample() {
       // Busca o primeiro exemplo do projeto para verificar is_finished
       try {
-        const result = await this.$services.example.list(this.projectId, { limit: 1 })
+        const result = await this.$services.example.list(String(this.projectId), { limit: '1' })
         this.example = result.items && result.items.length > 0 ? result.items[0] : null
       } catch (error) {
         this.example = null
@@ -230,7 +241,7 @@ export default Vue.extend({
         const repository = new APIPerspectiveRepository()
         const perspective = await repository.findById(this.selectedPerspective)
         const projectPerspective = await repository.updateProjectPerspective(this.projectId, 
-        perspective.id)
+          perspective.id)
         this.projectPerspective = projectPerspective
         this.$snackbar.show({
           text: this.$t('perspectives.assigned').toString(),
@@ -238,12 +249,13 @@ export default Vue.extend({
           timeout: 5000
         })
         await this.fetchData()
-      } catch (error) {
+      } catch (error: unknown) {
+        const err = error as ErrorResponse
         let errorMessage = this.$t('generic.error').toString()
-        if (error?.response?.data?.error) {
-          errorMessage = error.response.data.error
-        } else if (error?.response?.data?.message) {
-          errorMessage = error.response.data.message
+        if (err?.response?.data?.error) {
+          errorMessage = err.response.data.error
+        } else if (err?.response?.data?.message) {
+          errorMessage = err.response.data.message
         }
         this.$snackbar.error(errorMessage)
         console.error('Error assigning perspective:', error)
