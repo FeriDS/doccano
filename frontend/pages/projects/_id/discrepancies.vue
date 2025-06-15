@@ -124,7 +124,6 @@ export default Vue.extend({
       }
       this.confirmDialog = false
       this.pendingDiscrepancy = null
-    }
     },
     onShowAnnotation() {
       this.$router.push(`/projects/${this.$route.params.id}/annotations`)
