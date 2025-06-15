@@ -191,6 +191,12 @@ export default {
           text: this.$t('settings.title'),
           link: 'settings',
           isVisible: this.isProjectAdmin
+        },
+        {
+          icon: mdiChartBar,
+          text: 'Annotation Statistics',
+          link: 'annotation-statistics',
+          isVisible: this.isProjectAdmin
         }
       ]
       return items.filter((item) => item.isVisible)

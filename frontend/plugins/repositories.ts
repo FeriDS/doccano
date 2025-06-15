@@ -26,6 +26,7 @@ import { APIUserRepository } from '@/repositories/user/apiUserRepository'
 import { APISegmentationRepository } from '~/repositories/tasks/apiSegmentationRepository'
 import { APIPerspectiveRepository } from '@/repositories/perspectives/apiPerspectiveRepository'
 import { APIRuleRepository } from '@/repositories/rule/apiRuleRepository'
+import { APIStatisticsRepository } from '@/repositories/statistics/apiStatisticsRepository'
 
 export interface Repositories {
   // User
@@ -76,6 +77,7 @@ export interface Repositories {
 
   // Rule
   rule: APIRuleRepository
+  statistics: APIStatisticsRepository
 }
 
 declare module 'vue/types/vue' {
@@ -132,7 +134,8 @@ const repositories: Repositories = {
   perspective: new APIPerspectiveRepository(),
 
   // Rule
-  rule: new APIRuleRepository()
+  rule: new APIRuleRepository(),
+  statistics: new APIStatisticsRepository()
 }
 
 const plugin: Plugin = (_, inject) => {
