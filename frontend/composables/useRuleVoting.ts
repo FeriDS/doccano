@@ -13,12 +13,11 @@ export function useRuleVoting() {
     return (resp as any).results
   }
 
-  function voteRule(
+  const voteRule = (
     projectId: number,
-    ruleId: number,
-    vote: boolean
-  ): Promise<VoteResultDTO> {
-    return service.voteRule(projectId, ruleId, vote)
+    votes: { rule_id: number; vote: boolean }[]
+  ): Promise<VoteResultDTO> => {
+    return service.voteRule(projectId, votes)
   }
 
   return { fetchRules, voteRule }

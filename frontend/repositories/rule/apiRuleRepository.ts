@@ -28,11 +28,10 @@ export class APIRuleRepository {
 
   async voteRule(
     projectId: number,
-    ruleId: number,
-    vote: boolean
+    votes: { rule_id: number; vote: boolean }[]
   ): Promise<VoteResultDTO> {
-    const url = `/projects/${projectId}/rules/${ruleId}/vote/`
-    const response = await this.request.post(url, { vote })
+    const url = `/projects/${projectId}/rules/vote/`
+    const response = await this.request.post(url, { votes })
     return response.data as VoteResultDTO
   }
 }
