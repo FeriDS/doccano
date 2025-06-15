@@ -216,7 +216,7 @@ export default Vue.extend({
     async fetchExample() {
       // Busca o primeiro exemplo do projeto para verificar is_finished
       try {
-        const result = await this.$services.example.list(this.projectId, { limit: 1 })
+        const result = await this.$services.example.list(this.projectId, { limit: '1' })
         this.example = result.items && result.items.length > 0 ? result.items[0] : null
       } catch (error) {
         this.example = null

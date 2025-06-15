@@ -38,5 +38,15 @@ export default {
   passwordRules: {
     passwordRequired: 'Password is required',
     passwordLessThan30Chars: 'Password must be less than 30 characters'
-  }
+  },
+  // Project Rules
+  title: 'Project Rules',
+  create: 'Create Rule',
+  agree: 'Agree',
+  neutral: 'Neutral',
+  disagree: 'Disagree',
+  titleRequired: 'Rule title is required',
+  descriptionRequired: 'Rule description is required',
+  voteError: 'Error voting on rule',
+  createError: 'Error creating rule'
 }

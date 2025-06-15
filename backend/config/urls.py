@@ -69,8 +69,10 @@ urlpatterns += [
     path("v1/projects/<int:project_id>/", include("labels.urls")),
     path("v1/projects/<int:project_id>/", include("label_types.urls")),
     path("v1/", include("perspectives.urls")),
+    path("v1/", include("rules.urls")),
     path("swagger/", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),
     # Catch-all routes should be at the end
     path('', RedirectView.as_view(url='admin/')),
     re_path(r'^(?!v1/).*$', TemplateView.as_view(template_name="index.html")),
+    
 ]
