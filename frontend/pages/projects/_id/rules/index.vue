@@ -1,7 +1,18 @@
 <template>
   <v-container class="pa-5 mt-16">
     <v-card>
-      <v-card-title>Votação de Regras de Anotação</v-card-title>
+      <v-card-title>
+        Votação de Regras de Anotação
+        <v-spacer />
+        <v-btn
+          aria-label="Voltar"
+          text
+          @click="$router.back()"
+        >
+          <v-icon left>{{ mdiArrowLeft }}</v-icon>
+          Return
+        </v-btn>
+      </v-card-title>
 
       <v-card-text>
         <!-- Erro ao carregar -->
@@ -87,6 +98,13 @@
 
 <script lang="ts">
 import Vue from 'vue'
+import {
+  mdiPlayCircleOutline,
+  mdiMenuDown,
+  mdiPlus,
+  mdiClipboardListOutline,
+  mdiArrowLeft
+} from '@mdi/js'
 import { useRuleVoting } from '~/composables/useRuleVoting'
 import type { RuleDTO } from '@/repositories/rule/apiRuleRepository'
 
@@ -105,7 +123,12 @@ export default Vue.extend({
         { text: 'Sim', value: 'votes_yes' },
         { text: 'Não', value: 'votes_no' },
         { text: 'Ação', value: 'action', sortable: false }
-      ]
+      ],
+      mdiArrowLeft,
+      mdiPlayCircleOutline,
+      mdiMenuDown,
+      mdiPlus,
+      mdiClipboardListOutline
     }
   },
   computed: {
