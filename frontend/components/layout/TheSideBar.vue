@@ -29,6 +29,63 @@
           </v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+
+      <v-menu
+        v-if="isProjectAdmin"
+        offset-y
+        tile
+        class="rounded-0"
+      >
+        <template #activator="{ on, attrs }">
+          <v-list-item
+            v-bind="attrs"
+            v-on="on"
+          >
+            <v-list-item-action>
+              <v-icon>
+                {{ mdiClipboardListOutline }}
+              </v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title>
+                Rules
+              </v-list-item-title>
+            </v-list-item-content>
+            <v-list-item-action>
+              <v-icon>
+                {{ mdiMenuDown }}
+              </v-icon>
+            </v-list-item-action>
+          </v-list-item>
+        </template>
+
+        <v-list>
+          <v-list-item >
+            <v-list-item-action>
+              <v-icon>
+                {{ mdiPlus }}
+              </v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title>
+                Create Rule
+              </v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+          <v-list-item @click="$router.push(localePath(`/projects/${$route.params.id}/rules`))">
+            <v-list-item-action>
+              <v-icon>
+                mdi-check-all
+              </v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title>
+                Vote Rules
+              </v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+        </v-list>
+      </v-menu>
     </v-list-item-group>
   </v-list>
 </template>
@@ -43,7 +100,10 @@ import {
   mdiDatabase,
   mdiHome,
   mdiLabel,
-  mdiPlayCircleOutline
+  mdiPlayCircleOutline,
+  mdiMenuDown,
+  mdiPlus,
+  mdiClipboardListOutline
 } from '@mdi/js'
 import { getLinkToAnnotationPage } from '~/presenter/linkToAnnotationPage'
 
@@ -64,7 +124,10 @@ export default {
   data() {
     return {
       selected: 0,
-      mdiPlayCircleOutline
+      mdiPlayCircleOutline,
+      mdiMenuDown,
+      mdiPlus,
+      mdiClipboardListOutline
     }
   },
 

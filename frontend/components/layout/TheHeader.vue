@@ -39,14 +39,7 @@
     >
       Perspectives
     </v-btn>
-    <v-btn
-      v-if="isAuthenticated && currentProject && $route.params.id"
-      text
-      class="text-capitalize"
-      @click="$router.push(localePath(`/projects/${$route.params.id}/rules`))"
-    >
-      {{ $t('rules.title') }}
-    </v-btn>
+    
     <v-btn
       v-if="isAuthenticated"
       text

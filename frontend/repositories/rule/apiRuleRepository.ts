@@ -8,6 +8,7 @@ export interface RuleDTO {
   votes_no: number
   user_has_voted: boolean
   is_open: boolean
+  vote?: boolean | null
 }
 
 export interface VoteResultDTO {
