@@ -18,8 +18,8 @@
           :total="total"
           :members="members"
           :value="selected"
-          :mode="'discrepancias'"
-          :display-discrepancy-as-text="true"   
+          mode="discrepancias"
+          display-discrepancy-as-text
         />
       </v-card-text>
 
@@ -58,11 +58,20 @@ export default Vue.extend({
     }
   },
   watch: {
-    threshold() {
+    threshold(newThreshold: number) {
       this.loadExamples()
+      if (process.client) {
+        localStorage.setItem('discrepancyThreshold', newThreshold.toString())
+      }
     }
   },
   async created() {
+    if (process.client) {
+      const savedThreshold = localStorage.getItem('discrepancyThreshold')
+      if (savedThreshold) {
+        this.threshold = Number(savedThreshold)
+      }
+    }
     await this.loadExamples()
   },
   methods: {
@@ -74,18 +83,22 @@ export default Vue.extend({
         this.examples = items
           .filter((ex: any) => ex.is_finished)
           .map((ex: any) => {
+            // converter distribuição para %
             const dist = Object.fromEntries(
               Object.entries(ex.label_distribution || {}).map(([l, v]) => {
                 const p = Number(v)
                 return [l, (p > 1 ? p : p * 100).toFixed(2)]
               })
             )
-            const max = Math.max(...Object.values(dist).map(Number), 0)
-            const auto = max < 100 && max > this.threshold
+            // discrepância automática
+            const hasDiscrepancy = Object.values(dist)
+              .map(Number)
+              .some(percent => percent >= this.threshold && percent <= 100)
+
             return {
               ...ex,
               label_distribution: dist,
-              has_discrepancy: auto              // usado no DocumentList
+              has_discrepancy: hasDiscrepancy
             }
           })
         this.total = this.examples.length
