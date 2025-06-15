@@ -3,12 +3,16 @@
     <v-card>
       <v-card-title class="d-flex align-center">
         <span>Sinalizar Discrepâncias</span>
-        <v-spacer />
-        <v-btn text aria-label="Return" @click="$router.back()">
-          <v-icon left>{{ mdiArrowLeft }}</v-icon>
-          Return
+        <v-spacer></v-spacer>
+        <!-- Botão sempre ativo -->
+        <v-btn
+          color="primary"
+          @click="onShowAnnotation"
+        >
+          Show Annotation
         </v-btn>
       </v-card-title>
+
       <v-card-text>
         <document-list
           :items="examples"
@@ -38,7 +42,6 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import { mdiArrowLeft } from '@mdi/js'
 import DocumentList from '@/components/example/DocumentList.vue'
 import { ExampleDTO } from '~/services/application/example/exampleData'
 
@@ -52,8 +55,7 @@ export default Vue.extend({
       members: [],
       selected: [],
       confirmDialog: false,
-      pendingDiscrepancy: null as any,
-      mdiArrowLeft
+      pendingDiscrepancy: null as any
     }
   },
   async created() {
@@ -122,7 +124,10 @@ export default Vue.extend({
       }
       this.confirmDialog = false
       this.pendingDiscrepancy = null
-    }
+    },
+    onShowAnnotation() {
+      this.$router.push(`/projects/${this.$route.params.id}/annotations`)
+    },
   }
 })
 </script> 
