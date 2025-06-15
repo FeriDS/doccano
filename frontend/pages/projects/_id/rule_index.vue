@@ -20,7 +20,7 @@
           aria-label="Voltar"
         >
           <v-icon left>{{ mdiArrowLeft }}</v-icon>
-          Voltar
+          Return
         </v-btn>
       </v-card-title>
 

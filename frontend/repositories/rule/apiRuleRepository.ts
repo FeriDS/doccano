@@ -6,6 +6,7 @@ export interface RuleDTO {
   rule: { id: number; text: string }
   votes_yes: number
   votes_no: number
+  votes_count: number
   user_has_voted: boolean
   is_open: boolean
   vote?: boolean | null
