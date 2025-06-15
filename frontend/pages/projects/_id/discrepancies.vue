@@ -1,9 +1,18 @@
 <template>
   <v-container class="mt-12">
     <v-card>
-      <v-card-title>
-        Sinalizar Discrepâncias
+      <v-card-title class="d-flex align-center">
+        <span>Sinalizar Discrepâncias</span>
+        <v-spacer></v-spacer>
+        <!-- Botão sempre ativo -->
+        <v-btn
+          color="primary"
+          @click="onShowAnnotation"
+        >
+          Show Annotation
+        </v-btn>
       </v-card-title>
+
       <v-card-text>
         <document-list
           :items="examples"
@@ -116,6 +125,10 @@ export default Vue.extend({
       this.confirmDialog = false
       this.pendingDiscrepancy = null
     }
+    },
+    onShowAnnotation() {
+      this.$router.push(`/projects/${this.$route.params.id}/annotations`)
+    },
   }
 })
 </script> 
