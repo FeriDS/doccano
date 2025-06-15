@@ -4,7 +4,8 @@
       <v-card-title class="d-flex align-center">
         <span>Sinalizar Discrepâncias</span>
         <v-spacer />
-        <v-btn color="primary" class="mr-2" @click="onShowAnnotation">
+        <v-btn color="primary" class="mr-2" @click="onShowAnnotation"
+        :disabled="!canShowAnnotation">
           Show Annotation
         </v-btn>
         <v-btn text aria-label="Return" @click="$router.back()">
@@ -15,12 +16,12 @@
 
       <v-card-text>
         <document-list
+          v-model="selected"
           :items="examples"
           :is-loading="loading"
           :is-admin="true"
           :total="total"
           :members="members"
-          :value="selected"
           mode="discrepancias"
           @discrepancy-change="onDiscrepancyChange"
         />
@@ -66,12 +67,31 @@ export default Vue.extend({
   async created() {
     await this.fetchExamples()
   },
+  computed: {
+  canShowAnnotation(): boolean {
+    if (!Array.isArray(this.selected) || this.selected.length === 0) return false
+
+    // Se selected contém objetos completos
+    if (typeof this.selected[0] === 'object') {
+      return this.selected.some((ex: any) => ex.has_discrepancy)
+    }
+
+    // Se selected contém apenas IDs
+    return this.selected
+      .map((id: any) => this.examples.find((ex: any) => ex.id === id))
+      .some((ex: any) => ex && ex.has_discrepancy)
+  }
+},
   methods: {
-    /* rota SEM query selected */
-    onShowAnnotation() {
-      const link = this.localePath(`/projects/${this.$route.params.id}/annotations`)
-      this.$router.push(link)
-    },
+   onShowAnnotation() {
+  // Supondo que só um exemplo pode ser selecionado:
+  const selectedId = Array.isArray(this.selected) ? this.selected[0] : this.selected
+  const link = this.localePath({
+    path: `/projects/${this.$route.params.id}/annotations`,
+    query: { example: selectedId }
+  })
+  this.$router.push(link)
+},
 
     /* ---------- dados ---------- */
     async fetchExamples() {
