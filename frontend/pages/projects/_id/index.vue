@@ -7,6 +7,18 @@
       @click="$router.push(`/projects/${$route.params.id}/discrepancies`)">
         Signal Discrepancies
       </v-btn>
+      <v-btn
+        class="text-capitalize ms-2"
+        color="secondary"
+        aria-label="Signal discrepancies automatically"
+        @click="$router.push({
+          name: 'projects-id-discrepancy_automatic',
+          params: { id: $route.params.id }
+        })"
+      >
+        Discrepância Automática
+      </v-btn>
+
     </v-card-title>
     <v-stepper v-model="e6" vertical non-linear>
       <div v-for="(item, index) in items" :key="index">
