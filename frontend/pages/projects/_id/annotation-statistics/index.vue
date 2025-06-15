@@ -121,6 +121,17 @@
                   clearable
                 ></v-select>
               </v-col>
+
+              <v-col cols="12" md="3">
+                <v-select
+                  v-model="filters.example"
+                  :items="examples"
+                  item-text="text"
+                  item-value="id"
+                  label="Texto/Example"
+                  clearable
+                />
+              </v-col>
             </v-row>
           </v-card-text>
         </v-card>
@@ -227,6 +238,14 @@
               >
                 View Details
               </v-btn>
+              <v-btn
+                small
+                color="success"
+                @click="resolveDisagreement(item)"
+                v-if="item.status !== 'resolved'"
+              >
+                Resolver
+              </v-btn>
             </template>
           </v-data-table>
         </v-card>
@@ -307,6 +326,7 @@ export default {
         perspective: null,
         label: null,
         resolved: null,
+        example: null,
         startDateMenu: false,
         endDateMenu: false
       },
@@ -344,7 +364,8 @@ export default {
         { text: 'Total', value: 'total' },
         { text: 'Desacordos', value: 'disagreements' },
         { text: 'Acordos', value: 'agreements' }
-      ]
+      ],
+      examples: []
     }
   },
 
@@ -367,6 +388,7 @@ export default {
     await this.fetchAnnotators()
     await this.fetchPerspectives()
     await this.fetchCategories()
+    await this.fetchExamples()
     await this.fetchStatistics()
   },
 
@@ -402,6 +424,15 @@ export default {
       }
     },
 
+    async fetchExamples() {
+      try {
+        const response = await this.$services.example.list(this.projectId, {})
+        this.examples = response.items
+      } catch (error) {
+        console.error('Erro ao buscar exemplos:', error)
+      }
+    },
+
     async fetchStatistics() {
       this.loading = true
       try {
@@ -412,6 +443,7 @@ export default {
         if (this.filters.perspective) params.perspective = this.filters.perspective
         if (this.filters.label) params.label = this.filters.label
         if (this.filters.resolved !== null) params.resolved = this.filters.resolved
+        if (this.filters.example) params.example_id = this.filters.example
 
         if (!this.$repositories || !this.$repositories.statistics) {
           throw new Error('Repositório de estatísticas não está disponível.')
@@ -420,10 +452,10 @@ export default {
           this.projectId,
           params
         )
-        this.statistics = response.data.statistics
-        this.disagreements = response.data.disagreements
-        this.perspectivePatterns = response.data.perspectivePatterns || []
-        this.updateCharts(response.data)
+        this.statistics = response.statistics
+        this.disagreements = response.disagreements
+        this.perspectivePatterns = response.perspectivePatterns || []
+        this.updateCharts(response)
       } catch (error) {
         console.error('Error fetching statistics:', error)
       } finally {
@@ -530,6 +562,17 @@ export default {
     viewDisagreement(item) {
       this.selectedDisagreement = item
       this.dialog = true
+    },
+
+    async resolveDisagreement(item) {
+      try {
+        await this.$services.example.resolve(this.projectId, item.id)
+        this.$toast && this.$toast.success('Desacordo resolvido!')
+        await this.fetchStatistics()
+      } catch (error) {
+        this.$toast && this.$toast.error('Erro ao resolver desacordo')
+        console.error('Erro ao resolver desacordo:', error)
+      }
     }
   }
 }

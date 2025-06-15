@@ -28,6 +28,7 @@ class Example(models.Model):
     annotation_start_date = models.DateTimeField(null=True, blank=True)
     annotation_end_date = models.DateTimeField(null=True, blank=True)
     is_finished = models.BooleanField(default=False)
+    is_resolved = models.BooleanField(default=False)
 
     @property
     def comment_count(self):

@@ -3,6 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from examples.filters import ExampleFilter
 from examples.models import Example
@@ -56,3 +57,14 @@ class ExampleDetail(generics.RetrieveUpdateDestroyAPIView):
     def update(self, request, *args, **kwargs):
         print("[DEBUG] PATCH payload:", request.data)
         return super().update(request, *args, **kwargs)
+
+
+class ExampleResolveAPI(APIView):
+    def post(self, request, project_id, example_id):
+        try:
+            example = Example.objects.get(pk=example_id, project_id=project_id)
+            example.is_resolved = True
+            example.save()
+            return Response({'status': 'resolved'}, status=status.HTTP_200_OK)
+        except Example.DoesNotExist:
+            return Response({'error': 'Example not found'}, status=status.HTTP_404_NOT_FOUND)
