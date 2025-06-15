@@ -1,8 +1,13 @@
 <template>
   <v-container class="mt-12">
     <v-card>
-      <v-card-title>
-        Sinalizar Discrepâncias
+      <v-card-title class="d-flex align-center">
+        <span>Sinalizar Discrepâncias</span>
+        <v-spacer />
+        <v-btn text aria-label="Return" @click="$router.back()">
+          <v-icon left>{{ mdiArrowLeft }}</v-icon>
+          Return
+        </v-btn>
       </v-card-title>
       <v-card-text>
         <document-list
@@ -33,6 +38,7 @@
 
 <script lang="ts">
 import Vue from 'vue'
+import { mdiArrowLeft } from '@mdi/js'
 import DocumentList from '@/components/example/DocumentList.vue'
 import { ExampleDTO } from '~/services/application/example/exampleData'
 
@@ -46,7 +52,8 @@ export default Vue.extend({
       members: [],
       selected: [],
       confirmDialog: false,
-      pendingDiscrepancy: null as any
+      pendingDiscrepancy: null as any,
+      mdiArrowLeft
     }
   },
   async created() {

@@ -73,18 +73,19 @@ export default {
     }
   },
 
+  async created() {
+    // Buscar papel do usuário
+    this.user = await this.$repositories.member.fetchMyRole(this.$route.params.id)
+  },
+
   methods: {
     next() {
       this.e6 = Math.max(1, (this.e6 + 1) % (this.items.length + 1))
     },
+
     prev() {
       this.e6 = Math.max(1, this.e6 - 1)
     }
-  },
-
-  async created() {
-    // Buscar papel do usuário
-    this.user = await this.$repositories.member.fetchMyRole(this.$route.params.id)
   }
 }
 </script>
