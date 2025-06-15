@@ -23,11 +23,14 @@ class AnnotationStatisticsAPI(APIView):
         perspective = request.query_params.get('perspective')
         label = request.query_params.get('label')
         resolved = request.query_params.get('resolved')
+        example_id = request.query_params.get('example_id')
 
         # Base queryset
         examples = Example.objects.filter(project=project_id)
         
         # Apply filters
+        if example_id:
+            examples = examples.filter(id=example_id)
         if start_date and end_date:
             examples = examples.filter(created_at__range=[start_date, end_date])
         if annotator_id:

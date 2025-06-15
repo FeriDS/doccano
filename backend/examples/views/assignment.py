@@ -86,3 +86,12 @@ class BulkAssignment(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(status=status.HTTP_201_CREATED)
+
+
+class ExampleResolveAPI(APIView):
+    def post(self, request, project_id, example_id):
+        # sua lógica aqui
+        example = Example.objects.get(pk=example_id, project_id=project_id)
+        example.is_resolved = True
+        example.save()
+        return Response({'status': 'resolved'}, status=status.HTTP_200_OK)
