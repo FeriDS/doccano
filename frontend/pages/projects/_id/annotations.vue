@@ -45,13 +45,6 @@ export default Vue.extend({
       annotation: null as any
     }
   },
-  async created() {
-    const projectId = this.$route.query.id
-    const exampleId = this.$route.query.example
-    if (projectId && exampleId) {
-      this.annotation = await this.$services.example.get(projectId, exampleId)
-    }
-  }
 })
 </script>
 
