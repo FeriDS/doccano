@@ -31,7 +31,6 @@
       </v-list-item>
 
       <v-menu
-        v-if="isProjectAdmin"
         offset-y
         tile
         class="rounded-0"
@@ -61,14 +60,14 @@
 
         <v-list>
           <v-list-item
-            v-if="isAdmin"
-            :to="localePath(`/projects/${$route.params.id}/rules/create`)"
+            v-if="isSuperUser"
+            :to="localePath(`/projects/${projectId}/rules/create`)"
             exact
           >
             <v-list-item-icon>
               <v-icon>{{ mdiPlusCircleOutline }}</v-icon>
             </v-list-item-icon>
-            <v-list-item-title>
+            <v-list-item-title >
               Create Rule
             </v-list-item-title>
           </v-list-item>
@@ -129,7 +128,6 @@ export default {
       mdiMenuDown,
       mdiPlus,
       mdiClipboardListOutline,
-      isAdmin: false,
       mdiPlusCircleOutline
     }
   },
@@ -203,6 +201,9 @@ export default {
         }
       ]
       return items.filter((item) => item.isVisible)
+    },
+    isSuperUser() {
+      return this.$store.getters['auth/isSuperuser']
     }
   },
 
@@ -214,16 +215,6 @@ export default {
         path: this.localePath(link),
         query
       })
-    }
-  },
-
-  async created() {
-    try {
-      const userRole = await this.$repositories.member.fetchMyRole(this.$route.params.id)
-      this.isAdmin = userRole.isProjectAdmin
-    } catch (err) {
-      console.error('Erro ao buscar o papel do usuário:', err)
-      this.isAdmin = false
     }
   }
 }

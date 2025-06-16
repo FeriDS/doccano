@@ -10,7 +10,7 @@
         </v-btn>
       </v-card-title>
 
-      <v-btn color="success" class="ma-4" @click="confirmCloseAllRules">
+      <v-btn v-if="isSuperuser" color="success" class="ma-4" @click="confirmCloseAllRules">
         <v-icon left>{{ mdiStopCircleOutline }}</v-icon>
         Close All Open Rules
       </v-btn>
@@ -104,6 +104,7 @@ export default Vue.extend({
       snackbarColor: 'success' as 'success' | 'error' | 'info',
       votes: {} as Record<number, boolean>,
       confirmDialog: false,
+      isSuperuser: false,
 
       headers: [
         { text: 'Regra', value: 'rule.text' },
@@ -127,8 +128,16 @@ export default Vue.extend({
     }
   },
 
-  created() {
-    this.fetchRules()
+  async created() {
+    // Buscar o perfil do usuário para definir isSuperuser
+    try {
+      const profile = await this.$repositories.user.getProfile()
+      this.isSuperuser = profile.isSuperuser
+    } catch (err) {
+      console.error('Erro ao buscar o perfil do usuário:', err)
+      this.isSuperuser = false
+    }
+    await this.fetchRules()
   },
 
   methods: {
