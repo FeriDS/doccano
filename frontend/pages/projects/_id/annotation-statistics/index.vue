@@ -1,8 +1,18 @@
 <template>
   <v-container fluid>
     <v-row>
-      <v-col cols="12">
+      <v-col cols="12" class="d-flex align-center justify-space-between">
         <h1 class="text-h4 mb-4">Annotation Statistics</h1>
+        <v-btn
+          class="return-btn"
+          @click="$router.back()"
+          title="Return"
+          outlined
+          color="black"
+        >
+          <v-icon left color="black">mdi-arrow-left</v-icon>
+          <span style="font-weight: 600; letter-spacing: 1px;">RETURN</span>
+        </v-btn>
       </v-col>
     </v-row>
 
@@ -22,7 +32,7 @@
             >
               <v-icon color="black" size="32">mdi-close</v-icon>
               <span
-                style="color: #222; font-weight: 500; margin-left: 8px; font-size: 16px;"
+                style="color: #222; font-weight: 500; margin-left: 1px; font-size: 12px;"
               >
                 Cancel
               </span>
@@ -275,6 +285,7 @@
 
 <script>
 import Chart from 'chart.js'
+import { mdiArrowLeft } from '@mdi/js'
 
 export default {
   name: 'AnnotationStatistics',
@@ -296,7 +307,8 @@ export default {
         finished: null,
         startDateMenu: false,
         endDateMenu: false,
-        perspectiveValues: {}
+        perspectiveValues: {},
+        mdiArrowLeft
       },
       statistics: {
         disagreementRate: 0,
@@ -581,5 +593,13 @@ export default {
   box-shadow: none;
   border-radius: 6px !important;
   margin-right: 8px;
+}
+
+.return-btn {
+  text-transform: uppercase;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-left: 16px;
 }
 </style> 

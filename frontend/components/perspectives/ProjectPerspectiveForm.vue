@@ -2,9 +2,18 @@
   <v-form ref="form" v-model="valid" @submit.prevent="submit">
     <v-container>
       <v-row>
-        <v-col cols="12">
+        <v-col cols="12" class="d-flex align-center justify-space-between">
           <h2>{{ perspective.name }}</h2>
-          <p class="text--secondary">{{ perspective.description }}</p>
+          <v-btn
+            outlined
+            color="black"
+            class="ml-auto"
+            title="Return"
+            @click="goBack"
+          >
+            <v-icon left color="black">mdi-arrow-left</v-icon>
+            <span style="font-weight: 600; letter-spacing: 1px;">RETURN</span>
+          </v-btn>
         </v-col>
       </v-row>
 
@@ -80,13 +89,22 @@
         </v-row>
 
         <v-row>
-          <v-col cols="12" class="text-right">
+          <v-col cols="12" class="text-right d-flex justify-end align-center">
             <v-btn
               color="primary"
               :disabled="!valid || disabled"
               type="submit"
+              class="mr-2"
             >
               {{ $t('generic.save') }}
+            </v-btn>
+            <v-btn
+              color="grey darken-1"
+              text
+              @click="handleCancel"
+            >
+              <v-icon left>mdi-close</v-icon>
+              Cancel
             </v-btn>
           </v-col>
         </v-row>
@@ -148,6 +166,13 @@ export default Vue.extend({
         await this.$nextTick()
         this.$emit('submit', this.fieldValues)
       }
+    },
+    handleCancel() {
+      this.fieldValues = {}
+      this.$emit('cancel')
+    },
+    goBack() {
+      this.$router.push(`/projects/${this.$route.params.id}`)
     }
   }
 })
