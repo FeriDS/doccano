@@ -60,17 +60,17 @@
         </template>
 
         <v-list>
-          <v-list-item >
-            <v-list-item-action>
-              <v-icon>
-                {{ mdiPlus }}
-              </v-icon>
-            </v-list-item-action>
-            <v-list-item-content>
-              <v-list-item-title>
-                Create Rule
-              </v-list-item-title>
-            </v-list-item-content>
+          <v-list-item
+            v-if="isAdmin"
+            :to="localePath(`/projects/${$route.params.id}/rules/create`)"
+            exact
+          >
+            <v-list-item-icon>
+              <v-icon>{{ mdiPlusCircleOutline }}</v-icon>
+            </v-list-item-icon>
+            <v-list-item-title>
+              Create Rule
+            </v-list-item-title>
           </v-list-item>
           <v-list-item @click="$router.push(localePath(`/projects/${$route.params.id}/rules`))">
             <v-list-item-action>
@@ -103,7 +103,8 @@ import {
   mdiPlayCircleOutline,
   mdiMenuDown,
   mdiPlus,
-  mdiClipboardListOutline
+  mdiClipboardListOutline,
+  mdiPlusCircleOutline
 } from '@mdi/js'
 import { getLinkToAnnotationPage } from '~/presenter/linkToAnnotationPage'
 
@@ -127,7 +128,9 @@ export default {
       mdiPlayCircleOutline,
       mdiMenuDown,
       mdiPlus,
-      mdiClipboardListOutline
+      mdiClipboardListOutline,
+      isAdmin: false,
+      mdiPlusCircleOutline
     }
   },
 
@@ -211,6 +214,16 @@ export default {
         path: this.localePath(link),
         query
       })
+    }
+  },
+
+  async created() {
+    try {
+      const userRole = await this.$repositories.member.fetchMyRole(this.$route.params.id)
+      this.isAdmin = userRole.isProjectAdmin
+    } catch (err) {
+      console.error('Erro ao buscar o papel do usuário:', err)
+      this.isAdmin = false
     }
   }
 }
