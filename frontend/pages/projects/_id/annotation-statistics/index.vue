@@ -84,22 +84,14 @@
 
               <v-col cols="12" md="3">
                 <v-select
-                  v-model="filters.annotator"
-                  :items="annotators"
-                  item-text="username"
-                  item-value="id"
-                  label="Annotator"
-                  clearable
-                ></v-select>
-              </v-col>
-
-              <v-col cols="12" md="3">
-                <v-select
-                  v-model="filters.perspective"
+                  v-model="filters.selectedPerspective"
                   :items="perspectives"
-                  label="Perspective"
+                  item-text="name"
+                  item-value="name"
+                  label="Perspectiva"
                   clearable
-                ></v-select>
+                  @change="onPerspectiveChange"
+                />
               </v-col>
 
               <v-col cols="12" md="3">
@@ -132,40 +124,38 @@
                   clearable
                 />
               </v-col>
+
+              <v-col cols="12" md="3">
+                <v-select
+                  v-model="filters.finished"
+                  :items="[
+                    { text: 'Todos', value: null },
+                    { text: 'Fechados', value: 'true' },
+                    { text: 'Abertos', value: 'false' }
+                  ]"
+                  label="Status de Fechamento"
+                  clearable
+                />
+              </v-col>
+
+              <v-col v-for="field in choicePerspectiveFields" :key="field.name" cols="12" md="3">
+                <v-select
+                  v-model="filters.perspective"
+                  :items="field.choices"
+                  :label="field.name"
+                  clearable
+                />
+              </v-col>
+
+              <v-col v-for="field in numberPerspectiveFields" :key="field.name" cols="12" md="3">
+                <v-text-field
+                  v-model="filters.perspectiveValues[field.name]"
+                  :label="field.name"
+                  type="number"
+                  clearable
+                />
+              </v-col>
             </v-row>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Statistics Overview -->
-    <v-row>
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>Disagreement Rate</v-card-title>
-          <v-card-text>
-            <div class="text-h4">{{ statistics.disagreementRate }}%</div>
-            <div class="text-subtitle-2">Percentage of annotations with disagreements</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>Perspective Diversity</v-card-title>
-          <v-card-text>
-            <div class="text-h4">{{ statistics.perspectiveCount }}</div>
-            <div class="text-subtitle-2">Unique perspectives used</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>Resolution Rate</v-card-title>
-          <v-card-text>
-            <div class="text-h4">{{ statistics.resolutionRate }}%</div>
-            <div class="text-subtitle-2">Disagreements resolved</div>
           </v-card-text>
         </v-card>
       </v-col>
@@ -173,15 +163,6 @@
 
     <!-- Detailed Statistics -->
     <v-row>
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>Tempo médio de anotação</v-card-title>
-          <v-card-text>
-            <div class="text-h4">{{ statistics.averageAnnotationTime }}s</div>
-            <div class="text-subtitle-2">Tempo médio entre início e conclusão das anotações</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
       <v-col cols="12" md="8">
         <v-card>
           <v-card-title>Distribuição de Labels</v-card-title>
@@ -322,13 +303,15 @@ export default {
       filters: {
         startDate: null,
         endDate: null,
-        annotator: null,
+        selectedPerspective: null,
         perspective: null,
         label: null,
         resolved: null,
         example: null,
+        finished: null,
         startDateMenu: false,
-        endDateMenu: false
+        endDateMenu: false,
+        perspectiveValues: {}
       },
       statistics: {
         disagreementRate: 0,
@@ -350,8 +333,8 @@ export default {
         { text: 'Status', value: 'status' },
         { text: 'Actions', value: 'actions', sortable: false }
       ],
-      annotators: [],
       perspectives: [],
+      projectPerspective: null,
       categories: [],
       statusOptions: [
         { text: 'Todos', value: null },
@@ -365,13 +348,21 @@ export default {
         { text: 'Desacordos', value: 'disagreements' },
         { text: 'Acordos', value: 'agreements' }
       ],
-      examples: []
+      examples: [],
+      perspectiveFields: [],
+      perspectiveChoices: []
     }
   },
 
   computed: {
     projectId() {
       return this.$route.params.id
+    },
+    choicePerspectiveFields() {
+      return this.perspectiveFields.filter(f => f.field_type === 'choice')
+    },
+    numberPerspectiveFields() {
+      return this.perspectiveFields.filter(f => f.field_type === 'number')
     }
   },
 
@@ -385,8 +376,7 @@ export default {
   },
 
   async created() {
-    await this.fetchAnnotators()
-    await this.fetchPerspectives()
+    await this.fetchProjectPerspective()
     await this.fetchCategories()
     await this.fetchExamples()
     await this.fetchStatistics()
@@ -397,21 +387,20 @@ export default {
   },
 
   methods: {
-    async fetchAnnotators() {
+    async fetchProjectPerspective() {
       try {
-        const response = await this.$repositories.user.list(this.projectId)
-        this.annotators = response.data
-      } catch (error) {
-        console.error('Error fetching annotators:', error)
-      }
-    },
-
-    async fetchPerspectives() {
-      try {
-        const response = await this.$repositories.perspective.list(this.projectId)
-        this.perspectives = response.data
-      } catch (error) {
-        console.error('Error fetching perspectives:', error)
+        const response = await this.$repositories.perspective.getProjectPerspective(this.projectId)
+        if (response && response.perspective) {
+          this.projectPerspective = response.perspective
+          this.perspectiveFields = response.perspective.fields || []
+          this.perspectives = [response.perspective]
+        } else {
+          this.perspectiveFields = []
+          this.perspectives = []
+        }
+      } catch (e) {
+        this.perspectiveFields = []
+        this.perspectives = []
       }
     },
 
@@ -439,11 +428,14 @@ export default {
         const params = {}
         if (this.filters.startDate) params.start_date = this.filters.startDate
         if (this.filters.endDate) params.end_date = this.filters.endDate
-        if (this.filters.annotator) params.annotator = this.filters.annotator
         if (this.filters.perspective) params.perspective = this.filters.perspective
         if (this.filters.label) params.label = this.filters.label
         if (this.filters.resolved !== null) params.resolved = this.filters.resolved
         if (this.filters.example) params.example_id = this.filters.example
+        if (this.filters.finished !== null) params.finished = this.filters.finished
+        Object.entries(this.filters.perspectiveValues).forEach(([key, value]) => {
+          if (value) params[`perspective_${key}`] = value
+        })
 
         if (!this.$repositories || !this.$repositories.statistics) {
           throw new Error('Repositório de estatísticas não está disponível.')
@@ -573,6 +565,10 @@ export default {
         this.$toast && this.$toast.error('Erro ao resolver desacordo')
         console.error('Erro ao resolver desacordo:', error)
       }
+    },
+
+    onPerspectiveChange() {
+      this.filters.perspective = null
     }
   }
 }
