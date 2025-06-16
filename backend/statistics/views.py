@@ -26,14 +26,19 @@ class AnnotationStatisticsAPI(APIView):
         finished = request.query_params.get('finished')
         example_id = request.query_params.get('example_id')
 
+        annotation_date_filter = {}
+        if start_date and end_date:
+            annotation_date_filter = {
+                'annotation_start_date__gte': start_date,
+                'annotation_end_date__lte': end_date
+            }
+        
         # Base queryset
         examples = Example.objects.filter(project=project_id)
         
-        # Apply filters
+        # Filtros de data aplicados nas anotações
         if example_id:
             examples = examples.filter(id=example_id)
-        if start_date and end_date:
-            examples = examples.filter(created_at__range=[start_date, end_date])
         if annotator_id:
             examples = examples.filter(categories__user_id=annotator_id)
         if label:
@@ -52,27 +57,35 @@ class AnnotationStatisticsAPI(APIView):
             filtered_examples = set()
             for ex in examples:
                 found = False
-                for cat in ex.categories.all():
+                for cat in ex.categories.filter(**annotation_date_filter):
                     if self.get_user_perspective(ex.project, cat.user) == perspective:
                         filtered_examples.add(ex.id)
                         found = True
                         break
                 if not found:
-                    for span in ex.spans.all():
+                    for span in ex.spans.filter(**annotation_date_filter):
                         if self.get_user_perspective(ex.project, span.user) == perspective:
                             filtered_examples.add(ex.id)
                             found = True
                             break
                 if not found:
-                    for rel in ex.relations.all():
+                    for rel in ex.relations.filter(**annotation_date_filter):
                         if self.get_user_perspective(ex.project, rel.user) == perspective:
                             filtered_examples.add(ex.id)
                             break
             examples = Example.objects.filter(id__in=filtered_examples)
+        elif annotation_date_filter:
+            filtered_examples = set()
+            for ex in examples:
+                if ex.categories.filter(**annotation_date_filter).exists() or \
+                   ex.spans.filter(**annotation_date_filter).exists() or \
+                   ex.relations.filter(**annotation_date_filter).exists():
+                    filtered_examples.add(ex.id)
+            examples = Example.objects.filter(id__in=filtered_examples)
 
         # Calculate statistics
         total_examples = examples.count()
-        disagreements = self._find_disagreements(examples, perspective)
+        disagreements = self._find_disagreements(examples, perspective, annotation_date_filter)
         disagreement_count = len(disagreements)
         disagreement_rate = (disagreement_count / total_examples * 100) if total_examples > 0 else 0
         resolved_disagreements = len([d for d in disagreements if d['status'] == 'resolved'])
@@ -87,9 +100,9 @@ class AnnotationStatisticsAPI(APIView):
             },
             'disagreements': disagreements,
             'disagreementByCategory': self._get_disagreement_by_category(disagreements),
-            'perspectiveDistribution': self._get_perspective_distribution(examples, perspective),
-            'labelDistribution': self._get_label_distribution(examples, perspective),
-            'perspectivePatterns': self._get_perspective_patterns(examples, disagreements, perspective)
+            'perspectiveDistribution': self._get_perspective_distribution(examples, perspective, annotation_date_filter),
+            'labelDistribution': self._get_label_distribution(examples, perspective, annotation_date_filter),
+            'perspectivePatterns': self._get_perspective_patterns(examples, disagreements, perspective, annotation_date_filter)
         }
 
         return Response(data=statistics, status=status.HTTP_200_OK)
@@ -107,13 +120,12 @@ class AnnotationStatisticsAPI(APIView):
             pass
         return 'Default'
 
-    def _find_disagreements(self, examples, perspective=None):
+    def _find_disagreements(self, examples, perspective=None, annotation_date_filter=None):
         disagreements = []
         for example in examples:
-            # Get all annotations for this example
-            categories = Category.objects.filter(example=example)
-            spans = Span.objects.filter(example=example)
-            relations = Relation.objects.filter(example=example)
+            categories = Category.objects.filter(example=example, **(annotation_date_filter or {}))
+            spans = Span.objects.filter(example=example, **(annotation_date_filter or {}))
+            relations = Relation.objects.filter(example=example, **(annotation_date_filter or {}))
 
             # Filtrar anotações pelo role/perspective se necessário
             if perspective:
@@ -203,17 +215,17 @@ class AnnotationStatisticsAPI(APIView):
         
         return [{'category': k, 'count': v} for k, v in category_counts.items()]
 
-    def _get_perspective_distribution(self, examples, perspective=None):
+    def _get_perspective_distribution(self, examples, perspective=None, annotation_date_filter=None):
         from collections import Counter
         perspectives = []
         for ex in examples:
-            for cat in ex.categories.all():
+            for cat in ex.categories.filter(**(annotation_date_filter or {})):
                 if not perspective or self.get_user_perspective(ex.project, cat.user) == perspective:
                     perspectives.append(self.get_user_perspective(ex.project, cat.user))
-            for span in ex.spans.all():
+            for span in ex.spans.filter(**(annotation_date_filter or {})):
                 if not perspective or self.get_user_perspective(ex.project, span.user) == perspective:
                     perspectives.append(self.get_user_perspective(ex.project, span.user))
-            for rel in ex.relations.all():
+            for rel in ex.relations.filter(**(annotation_date_filter or {})):
                 if not perspective or self.get_user_perspective(ex.project, rel.user) == perspective:
                     perspectives.append(self.get_user_perspective(ex.project, rel.user))
         counter = Counter(perspectives)
@@ -223,11 +235,11 @@ class AnnotationStatisticsAPI(APIView):
         # This would need to be implemented based on your discussion model
         return []
 
-    def _get_label_distribution(self, examples, perspective=None):
+    def _get_label_distribution(self, examples, perspective=None, annotation_date_filter=None):
         from collections import Counter
         labels = []
         for ex in examples:
-            for cat in ex.categories.all():
+            for cat in ex.categories.filter(**(annotation_date_filter or {})):
                 if not perspective or self.get_user_perspective(ex.project, cat.user) == perspective:
                     labels.append(cat.label.text)
             # Repita para spans e relations se necessário
@@ -246,19 +258,19 @@ class AnnotationStatisticsAPI(APIView):
             return round(sum(times) / len(times), 2)
         return 0
 
-    def _get_perspective_patterns(self, examples, disagreements, perspective=None):
+    def _get_perspective_patterns(self, examples, disagreements, perspective=None, annotation_date_filter=None):
         from collections import defaultdict
         patterns = defaultdict(lambda: {'total': 0, 'disagreements': 0, 'agreements': 0})
         for ex in examples:
-            for cat in ex.categories.all():
+            for cat in ex.categories.filter(**(annotation_date_filter or {})):
                 if not perspective or self.get_user_perspective(ex.project, cat.user) == perspective:
                     p = self.get_user_perspective(ex.project, cat.user)
                     patterns[p]['total'] += 1
-            for span in ex.spans.all():
+            for span in ex.spans.filter(**(annotation_date_filter or {})):
                 if not perspective or self.get_user_perspective(ex.project, span.user) == perspective:
                     p = self.get_user_perspective(ex.project, span.user)
                     patterns[p]['total'] += 1
-            for rel in ex.relations.all():
+            for rel in ex.relations.filter(**(annotation_date_filter or {})):
                 if not perspective or self.get_user_perspective(ex.project, rel.user) == perspective:
                     p = self.get_user_perspective(ex.project, rel.user)
                     patterns[p]['total'] += 1

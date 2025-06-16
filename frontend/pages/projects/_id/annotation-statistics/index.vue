@@ -3,23 +3,6 @@
     <v-row>
       <v-col cols="12">
         <h1 class="text-h4 mb-4">Annotation Statistics</h1>
-        <v-alert type="info" outlined class="mb-4">
-          <div class="text-body-1 font-weight-bold mb-1">Sobre estas estatísticas</div>
-          <div>
-            Esta página apresenta estatísticas detalhadas sobre as anotações do projeto, incluindo:
-            <ul>
-              <li><b>Taxa de desacordo entre anotadores</b>: 
-              identifica casos em que diferentes anotadores discordam sobre a mesma anotação.</li>
-              <li><b>Diversidade de perspetivas</b>: 
-              mostra quantas perspetivas diferentes foram registradas nas anotações.</li>
-              <li><b>Taxa de resolução de desacordos</b>: 
-              indica quantos desacordos já foram resolvidos colaborativamente.</li>
-            </ul>
-            Utilize os filtros para refinar a análise por período,
-             anotador ou perspetiva. Os gráficos e tabelas ajudam a identificar padrões,
-              promover discussões e melhorar a qualidade das anotações.
-          </div>
-        </v-alert>
       </v-col>
     </v-row>
 
@@ -27,7 +10,24 @@
     <v-row>
       <v-col cols="12">
         <v-card>
-          <v-card-title>Filters</v-card-title>
+          <v-card-title>
+            Filters
+            <v-spacer></v-spacer>
+            <v-btn
+              icon
+              title="Clear all filters"
+              class="clear-filters-btn"
+              style="display: flex; align-items: center;"
+              @click="clearFilters"
+            >
+              <v-icon color="black" size="32">mdi-close</v-icon>
+              <span
+                style="color: #222; font-weight: 500; margin-left: 8px; font-size: 16px;"
+              >
+                Cancel
+              </span>
+            </v-btn>
+          </v-card-title>
           <v-card-text>
             <v-row>
               <v-col cols="12" md="3">
@@ -165,25 +165,9 @@
     <v-row>
       <v-col cols="12" md="8">
         <v-card>
-          <v-card-title>Distribuição de Labels</v-card-title>
+          <v-card-title>Label Distribution</v-card-title>
           <v-card-text>
             <canvas ref="labelDistChart"></canvas>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col cols="12">
-        <v-card>
-          <v-card-title>Padrões por Perspetiva</v-card-title>
-          <v-card-text>
-            <v-data-table
-              :headers="perspectiveHeaders"
-              :items="perspectivePatterns"
-              class="elevation-1"
-              disable-pagination
-              hide-default-footer
-            />
           </v-card-text>
         </v-card>
       </v-col>
@@ -220,10 +204,11 @@
                 View Details
               </v-btn>
               <v-btn
+                v-if="item.status !== 'resolved'"
                 small
                 color="success"
                 @click="resolveDisagreement(item)"
-                v-if="item.status !== 'resolved'"
+                
               >
                 Resolver
               </v-btn>
@@ -569,7 +554,32 @@ export default {
 
     onPerspectiveChange() {
       this.filters.perspective = null
+    },
+
+    clearFilters() {
+      this.filters = {
+        startDate: null,
+        endDate: null,
+        selectedPerspective: null,
+        perspective: null,
+        label: null,
+        resolved: null,
+        example: null,
+        finished: null,
+        startDateMenu: false,
+        endDateMenu: false,
+      }
     }
   }
 }
-</script> 
+</script>
+
+<style scoped>
+.clear-filters-btn {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none;
+  border-radius: 6px !important;
+  margin-right: 8px;
+}
+</style> 
