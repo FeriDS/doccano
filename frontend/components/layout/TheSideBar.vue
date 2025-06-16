@@ -133,6 +133,9 @@ export default {
   },
 
   computed: {
+    projectId() {
+      return this.project?.id || this.$route.params.id
+    },
     filteredItems() {
       const items = [
         {

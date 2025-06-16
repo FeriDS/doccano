@@ -3,16 +3,38 @@
     <v-row>
       <v-col cols="12" class="d-flex align-center justify-space-between">
         <h1 class="text-h4 mb-4">Annotation Statistics</h1>
-        <v-btn
-          class="return-btn"
-          @click="$router.back()"
-          title="Return"
-          outlined
-          color="black"
-        >
-          <v-icon left color="black">mdi-arrow-left</v-icon>
-          <span style="font-weight: 600; letter-spacing: 1px;">RETURN</span>
-        </v-btn>
+        <div class="d-flex align-center">
+          <v-btn
+            class="export-btn mr-2"
+            @click="exportToCSV"
+            title="Export to CSV"
+            outlined
+            color="primary"
+          >
+            <v-icon left>mdi-file-excel</v-icon>
+            <span>CSV</span>
+          </v-btn>
+          <v-btn
+            class="export-btn mr-2"
+            @click="exportToPDF"
+            title="Export to PDF"
+            outlined
+            color="primary"
+          >
+            <v-icon left>mdi-file-pdf-box</v-icon>
+            <span>PDF</span>
+          </v-btn>
+          <v-btn
+            class="return-btn"
+            @click="$router.back()"
+            title="Return"
+            outlined
+            color="black"
+          >
+            <v-icon left color="black">mdi-arrow-left</v-icon>
+            <span style="font-weight: 600; letter-spacing: 1px;">RETURN</span>
+          </v-btn>
+        </div>
       </v-col>
     </v-row>
 
@@ -581,6 +603,86 @@ export default {
         startDateMenu: false,
         endDateMenu: false,
       }
+    },
+
+    async exportToCSV() {
+      try {
+        const params = this.getExportParams()
+        params.export_format = 'csv'
+        const response = await this.$repositories.statistics.fetchAnnotationStatistics(
+          this.projectId,
+          params
+        )
+        
+        // Create a download link
+        const blob = new Blob([response], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', `annotation-statistics-${this.projectId}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+        
+        this.$toast && this.$toast.success('CSV export successful!')
+      } catch (error) {
+        console.error('Error exporting to CSV:', error)
+        this.$toast && this.$toast.error('Error exporting to CSV')
+      }
+    },
+
+    async exportToPDF() {
+      try {
+        const params = this.getExportParams();
+        params.export_format = 'pdf';
+
+        // Get the chart image as base64
+        const chart = this.$refs.labelDistChart;
+        let chartImage = null;
+        if (chart) {
+          chartImage = chart.toDataURL('image/png');
+        }
+        params.chartImage = chartImage;
+
+        // Send as POST (since GET is not suitable for large payloads)
+        const response = await this.$axios.$post(
+          `/v1/projects/${this.projectId}/statistics/annotations`,
+          params,
+          { responseType: 'arraybuffer' }
+        );
+
+        // Download the PDF
+        const blob = new Blob([response], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `annotation-statistics-${this.projectId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        this.$toast && this.$toast.success('PDF export successful!');
+      } catch (error) {
+        console.error('Error exporting to PDF:', error);
+        this.$toast && this.$toast.error('Error exporting to PDF');
+      }
+    },
+
+    getExportParams() {
+      const params = {}
+      if (this.filters.startDate) params.start_date = this.filters.startDate
+      if (this.filters.endDate) params.end_date = this.filters.endDate
+      if (this.filters.perspective) params.perspective = this.filters.perspective
+      if (this.filters.label) params.label = this.filters.label
+      if (this.filters.resolved !== null) params.resolved = this.filters.resolved
+      if (this.filters.example) params.example_id = this.filters.example
+      if (this.filters.finished !== null) params.finished = this.filters.finished
+      Object.entries(this.filters.perspectiveValues).forEach(([key, value]) => {
+        if (value) params[`perspective_${key}`] = value
+      })
+      return params
     }
   }
 }
@@ -601,5 +703,13 @@ export default {
   font-weight: 600;
   letter-spacing: 1px;
   margin-left: 16px;
+}
+
+.export-btn {
+  text-transform: uppercase;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-right: 8px;
 }
 </style> 

@@ -4,6 +4,15 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+import pandas as pd
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import base64
+from django.http import HttpResponse
 
 from examples.models import Example
 from labels.models import Category, Span, Relation
@@ -16,6 +25,13 @@ class AnnotationStatisticsAPI(APIView):
     permission_classes = [IsAuthenticated & (IsProjectAdmin | IsProjectStaffAndReadOnly)]
 
     def get(self, request, *args, **kwargs):
+        export_format = request.query_params.get('export_format')
+        if export_format:
+            return self.export_statistics(request, export_format)
+        
+        return self.get_statistics(request)
+
+    def get_statistics(self, request):
         project_id = self.kwargs["project_id"]
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
@@ -298,3 +314,127 @@ class AnnotationStatisticsAPI(APIView):
                 'discordaram': total - count
             })
         return result
+
+    def post(self, request, *args, **kwargs):
+        export_format = request.data.get('export_format')
+        if export_format == 'pdf':
+            return self.export_statistics(request, export_format, is_post=True)
+        return Response({"error": "Unsupported export format"}, status=status.HTTP_400_BAD_REQUEST)
+
+    def export_statistics(self, request, export_format, is_post=False):
+        project_id = self.kwargs["project_id"]
+        if is_post:
+            chart_image = request.data.get('chartImage')
+        else:
+            chart_image = request.query_params.get('chartImage')
+        statistics_data = self.get_statistics(request).data
+        if export_format == 'csv':
+            return self.export_to_csv(statistics_data)
+        elif export_format == 'pdf':
+            return self.export_to_pdf(statistics_data, chart_image)
+        else:
+            return Response({"error": "Unsupported export format"}, status=status.HTTP_400_BAD_REQUEST)
+
+    def export_to_csv(self, statistics_data):
+        buffer = io.StringIO()
+        # Remove metrics table: do not write stats_df
+        # Label Distribution (Pie Chart Data)
+        total_labels = sum(statistics_data['labelDistribution'].values())
+        label_dist_df = pd.DataFrame({
+            'Label': list(statistics_data['labelDistribution'].keys()),
+            'Count': list(statistics_data['labelDistribution'].values()),
+            'Percentage': [f"{(count/total_labels*100):.2f}%" for count in statistics_data['labelDistribution'].values()]
+        })
+        perspective_dist_df = pd.DataFrame(statistics_data['perspectiveDistribution'])
+        if not perspective_dist_df.empty:
+            perspective_dist_df['Percentage'] = perspective_dist_df['count'].apply(
+                lambda x: f"{(x/perspective_dist_df['count'].sum()*100):.2f}%"
+            )
+        disagreement_cat_df = pd.DataFrame(statistics_data['disagreementByCategory'])
+        if not disagreement_cat_df.empty:
+            total_disagreements = disagreement_cat_df['count'].sum()
+            disagreement_cat_df['Percentage'] = disagreement_cat_df['count'].apply(
+                lambda x: f"{(x/total_disagreements*100):.2f}%"
+            )
+        perspective_patterns_df = pd.DataFrame(statistics_data['perspectivePatterns'])
+        if not perspective_patterns_df.empty:
+            perspective_patterns_df['Agreement Rate'] = perspective_patterns_df.apply(
+                lambda x: f"{(x['agreements']/x['total']*100):.2f}%" if x['total'] > 0 else "0%",
+                axis=1
+            )
+            perspective_patterns_df['Disagreement Rate'] = perspective_patterns_df.apply(
+                lambda x: f"{(x['disagreements']/x['total']*100):.2f}%" if x['total'] > 0 else "0%",
+                axis=1
+            )
+        buffer.write('=== Label Distribution (Pie Chart) ===\n')
+        label_dist_df.to_csv(buffer, index=False)
+        if not perspective_dist_df.empty:
+            buffer.write('\n=== Perspective Distribution ===\n')
+            perspective_dist_df.to_csv(buffer, index=False)
+        if not disagreement_cat_df.empty:
+            buffer.write('\n=== Disagreement by Category ===\n')
+            disagreement_cat_df.to_csv(buffer, index=False)
+        if not perspective_patterns_df.empty:
+            buffer.write('\n=== Perspective Patterns ===\n')
+            perspective_patterns_df.to_csv(buffer, index=False)
+        response = Response(
+            buffer.getvalue(),
+            content_type='text/csv'
+        )
+        response['Content-Disposition'] = 'attachment; filename=annotation_statistics.csv'
+        return response
+
+    def export_to_pdf(self, statistics_data, chart_image=None):
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        elements = []
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, spaceAfter=30)
+        elements.append(Paragraph("Annotation Statistics Report", title_style))
+        elements.append(Spacer(1, 20))
+        # Add the chart image if provided
+        if chart_image:
+            if chart_image.startswith('data:image/png;base64,'):
+                chart_image = chart_image.split(',')[1]
+            imgdata = base64.b64decode(chart_image)
+            img_buffer = io.BytesIO(imgdata)
+            img = RLImage(img_buffer, width=300, height=300)
+            elements.append(Paragraph("Label Distribution (Pie Chart)", styles['Heading2']))
+            elements.append(img)
+            elements.append(Spacer(1, 20))
+        # Remove metrics table (do not add statistics table)
+        # Add disagreements table if there are any
+        if statistics_data['disagreements']:
+            elements.append(Paragraph("Disagreements", styles['Heading2']))
+            elements.append(Spacer(1, 10))
+            disagreements_data = [['Text ID', 'Category', 'Type', 'Status']]
+            for d in statistics_data['disagreements']:
+                disagreements_data.append([
+                    d['textId'],
+                    d['category'],
+                    d['type'],
+                    d['status']
+                ])
+            disagreements_table = Table(disagreements_data, colWidths=[1.5*inch, 2*inch, 2*inch, 1.5*inch])
+            disagreements_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            elements.append(disagreements_table)
+        doc.build(elements)
+        buffer.seek(0)
+        response = HttpResponse(
+            buffer,
+            content_type='application/pdf'
+        )
+        response['Content-Disposition'] = 'attachment; filename=annotation_statistics.pdf'
+        return response
