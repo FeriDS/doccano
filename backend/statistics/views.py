@@ -23,6 +23,7 @@ class AnnotationStatisticsAPI(APIView):
         perspective = request.query_params.get('perspective')
         label = request.query_params.get('label')
         resolved = request.query_params.get('resolved')
+        finished = request.query_params.get('finished')
         example_id = request.query_params.get('example_id')
 
         # Base queryset
@@ -34,36 +35,61 @@ class AnnotationStatisticsAPI(APIView):
         if start_date and end_date:
             examples = examples.filter(created_at__range=[start_date, end_date])
         if annotator_id:
-            examples = examples.filter(annotations__user=annotator_id)
-        if perspective:
-            examples = examples.filter(annotations__perspective=perspective)
+            examples = examples.filter(categories__user_id=annotator_id)
         if label:
             examples = examples.filter(categories__label__text=label)
         if resolved is not None:
             if resolved.lower() == 'true':
-                examples = examples.filter(is_confirmed=True)
+                examples = examples.filter(is_resolved=True)
             elif resolved.lower() == 'false':
-                examples = examples.filter(is_confirmed=False)
+                examples = examples.filter(is_resolved=False)
+        if finished is not None:
+            if finished.lower() == 'true':
+                examples = examples.filter(is_finished=True)
+            elif finished.lower() == 'false':
+                examples = examples.filter(is_finished=False)
+        if perspective:
+            filtered_examples = set()
+            for ex in examples:
+                found = False
+                for cat in ex.categories.all():
+                    if self.get_user_perspective(ex.project, cat.user) == perspective:
+                        filtered_examples.add(ex.id)
+                        found = True
+                        break
+                if not found:
+                    for span in ex.spans.all():
+                        if self.get_user_perspective(ex.project, span.user) == perspective:
+                            filtered_examples.add(ex.id)
+                            found = True
+                            break
+                if not found:
+                    for rel in ex.relations.all():
+                        if self.get_user_perspective(ex.project, rel.user) == perspective:
+                            filtered_examples.add(ex.id)
+                            break
+            examples = Example.objects.filter(id__in=filtered_examples)
 
         # Calculate statistics
-        total_annotations = examples.count()
-        disagreements = self._find_disagreements(examples)
+        total_examples = examples.count()
+        disagreements = self._find_disagreements(examples, perspective)
         disagreement_count = len(disagreements)
+        disagreement_rate = (disagreement_count / total_examples * 100) if total_examples > 0 else 0
         resolved_disagreements = len([d for d in disagreements if d['status'] == 'resolved'])
         unique_perspectives = 1
 
         statistics = {
             'statistics': {
-                'disagreementRate': (disagreement_count / total_annotations * 100) if total_annotations > 0 else 0,
+                'disagreementRate': disagreement_rate,
                 'perspectiveCount': unique_perspectives,
                 'resolutionRate': (resolved_disagreements / disagreement_count * 100) if disagreement_count > 0 else 0,
                 'averageAnnotationTime': self._calculate_avg_annotation_time(examples),
             },
             'disagreements': disagreements,
             'disagreementByCategory': self._get_disagreement_by_category(disagreements),
-            'perspectiveDistribution': self._get_perspective_distribution(examples),
-            'labelDistribution': self._get_label_distribution(examples),
-            'perspectivePatterns': self._get_perspective_patterns(examples, disagreements)
+            'perspectiveDistribution': self._get_perspective_distribution(examples, perspective),
+            'labelDistribution': self._get_label_distribution(examples, perspective),
+            'perspectivePatterns': self._get_perspective_patterns(examples, disagreements, perspective)
         }
 
         return Response(data=statistics, status=status.HTTP_200_OK)
@@ -76,32 +102,36 @@ class AnnotationStatisticsAPI(APIView):
                 user=user
             ).first()
             if user_perspective:
-                # Ajuste conforme o campo real do modelo
-                return str(user_perspective)
+                return user_perspective.field_values.get('role', 'Default')
         except ProjectPerspective.DoesNotExist:
             pass
         return 'Default'
 
-    def _find_disagreements(self, examples):
+    def _find_disagreements(self, examples, perspective=None):
         disagreements = []
-        
         for example in examples:
             # Get all annotations for this example
             categories = Category.objects.filter(example=example)
             spans = Span.objects.filter(example=example)
             relations = Relation.objects.filter(example=example)
 
+            # Filtrar anotações pelo role/perspective se necessário
+            if perspective:
+                categories = [cat for cat in categories if self.get_user_perspective(example.project, cat.user) == perspective]
+                spans = [span for span in spans if self.get_user_perspective(example.project, span.user) == perspective]
+                relations = [rel for rel in relations if self.get_user_perspective(example.project, rel.user) == perspective]
+
             # Check for disagreements in categories
-            if categories.count() > 1:
-                category_labels = categories.values_list('label__text', flat=True).distinct()
+            if len(categories) > 1:
+                category_labels = set([cat.label.text for cat in categories])
                 if len(category_labels) > 1:
                     disagreements.append({
                         'id': example.id,
                         'textId': str(example.id),
                         'category': 'Category',
                         'type': 'Label Disagreement',
-                        'annotators': list(categories.values_list('user__username', flat=True)),
-                        'status': 'resolved' if example.states.exists() else 'pending',
+                        'annotators': [cat.user.username for cat in categories],
+                        'status': 'resolved' if example.is_resolved else 'pending',
                         'text': example.text,
                         'annotations': [
                             {
@@ -111,19 +141,20 @@ class AnnotationStatisticsAPI(APIView):
                                 'perspective': self.get_user_perspective(example.project, cat.user)
                             } for cat in categories
                         ],
-                        'discussion': self._get_discussion(example)
+                        'discussion': self._get_discussion(example),
+                        'labelsAgreement': self.get_label_agreement([{ 'label__text': cat.label.text, 'user__username': cat.user.username } for cat in categories])
                     })
 
             # Check for disagreements in spans
-            if spans.count() > 1:
-                span_labels = spans.values_list('label__text', flat=True).distinct()
+            if len(spans) > 1:
+                span_labels = set([span.label.text for span in spans])
                 if len(span_labels) > 1:
                     disagreements.append({
                         'id': example.id,
                         'textId': str(example.id),
                         'category': 'Span',
                         'type': 'Label Disagreement',
-                        'annotators': list(spans.values_list('user__username', flat=True)),
+                        'annotators': [span.user.username for span in spans],
                         'status': 'resolved' if example.states.exists() else 'pending',
                         'text': example.text,
                         'annotations': [
@@ -134,19 +165,20 @@ class AnnotationStatisticsAPI(APIView):
                                 'perspective': self.get_user_perspective(example.project, span.user)
                             } for span in spans
                         ],
-                        'discussion': self._get_discussion(example)
+                        'discussion': self._get_discussion(example),
+                        'labelsAgreement': self.get_label_agreement([{ 'label__text': span.label.text, 'user__username': span.user.username } for span in spans])
                     })
 
             # Check for disagreements in relations
-            if relations.count() > 1:
-                relation_types = relations.values_list('type__text', flat=True).distinct()
+            if len(relations) > 1:
+                relation_types = set([rel.type.text for rel in relations])
                 if len(relation_types) > 1:
                     disagreements.append({
                         'id': example.id,
                         'textId': str(example.id),
                         'category': 'Relation',
                         'type': 'Type Disagreement',
-                        'annotators': list(relations.values_list('user__username', flat=True)),
+                        'annotators': [rel.user.username for rel in relations],
                         'status': 'resolved' if example.states.exists() else 'pending',
                         'text': example.text,
                         'annotations': [
@@ -157,7 +189,8 @@ class AnnotationStatisticsAPI(APIView):
                                 'perspective': self.get_user_perspective(example.project, rel.user)
                             } for rel in relations
                         ],
-                        'discussion': self._get_discussion(example)
+                        'discussion': self._get_discussion(example),
+                        'labelsAgreement': self.get_label_agreement([{ 'label__text': rel.type.text, 'user__username': rel.user.username } for rel in relations])
                     })
 
         return disagreements
@@ -170,16 +203,19 @@ class AnnotationStatisticsAPI(APIView):
         
         return [{'category': k, 'count': v} for k, v in category_counts.items()]
 
-    def _get_perspective_distribution(self, examples):
+    def _get_perspective_distribution(self, examples, perspective=None):
         from collections import Counter
         perspectives = []
         for ex in examples:
             for cat in ex.categories.all():
-                perspectives.append(self.get_user_perspective(ex.project, cat.user))
+                if not perspective or self.get_user_perspective(ex.project, cat.user) == perspective:
+                    perspectives.append(self.get_user_perspective(ex.project, cat.user))
             for span in ex.spans.all():
-                perspectives.append(self.get_user_perspective(ex.project, span.user))
+                if not perspective or self.get_user_perspective(ex.project, span.user) == perspective:
+                    perspectives.append(self.get_user_perspective(ex.project, span.user))
             for rel in ex.relations.all():
-                perspectives.append(self.get_user_perspective(ex.project, rel.user))
+                if not perspective or self.get_user_perspective(ex.project, rel.user) == perspective:
+                    perspectives.append(self.get_user_perspective(ex.project, rel.user))
         counter = Counter(perspectives)
         return [{'perspective': k, 'count': v} for k, v in counter.items()]
 
@@ -187,13 +223,15 @@ class AnnotationStatisticsAPI(APIView):
         # This would need to be implemented based on your discussion model
         return []
 
-    def _get_label_distribution(self, examples):
-        # Conta a frequência de cada label nas categorias
+    def _get_label_distribution(self, examples, perspective=None):
         from collections import Counter
         labels = []
         for ex in examples:
-            labels += list(ex.categories.values_list('label__text', flat=True))
-        return dict(Counter(labels))
+            for cat in ex.categories.all():
+                if not perspective or self.get_user_perspective(ex.project, cat.user) == perspective:
+                    labels.append(cat.label.text)
+            # Repita para spans e relations se necessário
+        return Counter(labels)
 
     def _calculate_avg_annotation_time(self, examples):
         # Exemplo: diferença média entre created_at e updated_at das anotações
@@ -208,18 +246,43 @@ class AnnotationStatisticsAPI(APIView):
             return round(sum(times) / len(times), 2)
         return 0
 
-    def _get_perspective_patterns(self, examples, disagreements):
-        # Conta total, desacordos e acordos por perspetiva
+    def _get_perspective_patterns(self, examples, disagreements, perspective=None):
         from collections import defaultdict
         patterns = defaultdict(lambda: {'total': 0, 'disagreements': 0, 'agreements': 0})
         for ex in examples:
             for cat in ex.categories.all():
-                p = getattr(cat, 'perspective', None) or 'Default'
-                patterns[p]['total'] += 1
+                if not perspective or self.get_user_perspective(ex.project, cat.user) == perspective:
+                    p = self.get_user_perspective(ex.project, cat.user)
+                    patterns[p]['total'] += 1
+            for span in ex.spans.all():
+                if not perspective or self.get_user_perspective(ex.project, span.user) == perspective:
+                    p = self.get_user_perspective(ex.project, span.user)
+                    patterns[p]['total'] += 1
+            for rel in ex.relations.all():
+                if not perspective or self.get_user_perspective(ex.project, rel.user) == perspective:
+                    p = self.get_user_perspective(ex.project, rel.user)
+                    patterns[p]['total'] += 1
         for d in disagreements:
             for ann in d['annotations']:
                 p = ann.get('perspective', 'Default')
                 patterns[p]['disagreements'] += 1
-        for p in patterns:
-            patterns[p]['agreements'] = patterns[p]['total'] - patterns[p]['disagreements']
-        return [ {'perspective': p, **v} for p, v in patterns.items() ] 
+        result = []
+        for p, v in patterns.items():
+            agreements = v['total'] - v['disagreements']
+            v['agreements'] = agreements if agreements >= 0 else 0
+            if v['total'] > 0 or v['disagreements'] > 0:
+                result.append({'perspective': p, **v})
+        return result
+
+    def get_label_agreement(self, annotations):
+        from collections import Counter
+        total = len(annotations)
+        label_counts = Counter([a['label__text'] for a in annotations])
+        result = []
+        for label, count in label_counts.items():
+            result.append({
+                'label': label,
+                'concordaram': count,
+                'discordaram': total - count
+            })
+        return result
