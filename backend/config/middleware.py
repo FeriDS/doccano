@@ -11,7 +11,7 @@ class CheckDBConnectionMiddleware:
             connections['default'].cursor()
         except OperationalError:
             return JsonResponse(
-                {"error": "Falha de ligação, por favor tente mais tarde!"},
+                {"error": "Database is down, please try again later !"},
                 status=503
             )
         return self.get_response(request)

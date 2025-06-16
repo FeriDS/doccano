@@ -39,8 +39,8 @@
         item-key="id"
         class="elevation-1 mt-4"
       >
-        <template #[`item.votes_yes`]="{ item }">{{ item.votes_yes }}</template>
-        <template #[`item.votes_no`]="{ item }">{{ item.votes_no }}</template>
+        <template #[`item.votes_yes`]="{ item }">{{ item.vote === true ? 1 : 0 }}</template>
+        <template #[`item.votes_no`]="{ item }">{{ item.vote === false ? 1 : 0 }}</template>
 
         <template #[`item.action`]="{ item }">
           <v-btn
