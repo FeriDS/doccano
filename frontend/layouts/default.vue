@@ -13,6 +13,19 @@
         </v-btn>
       </template>
     </v-snackbar>
+    <v-snackbar
+      v-model="showTechIssue"
+      :timeout="0"
+      top
+      color="error"
+    >
+      {{ techIssueMessage }}
+      <template v-slot:action="{ attrs }">
+        <v-btn color="white" text v-bind="attrs" @click="showTechIssue = false">
+          Ok
+        </v-btn>
+      </template>
+    </v-snackbar>
     <the-header />
     <nuxt />
     <the-footer />
@@ -32,6 +45,14 @@ export default {
     return {
       showTechIssue: false,
     };
+  },
+  computed: {
+    techIssueMessage() {
+      if (this.showTechIssue) {
+        return 'Database connection is down. Please try again later.';
+      }
+      return '';
+    },
   },
   mounted() {
     const params = new URLSearchParams(window.location.search);
