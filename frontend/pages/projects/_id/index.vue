@@ -8,13 +8,12 @@
         Signal Discrepancies
       </v-btn>
       <v-btn
-        v-if="user.isProjectAdmin"
-        class="ml-4"
-        color="primary"
+        class="text-capitalize ms-2"
+        color="secondary"
         aria-label="Signal discrepancies automatically"
         @click="$router.push(`/projects/${$route.params.id}/discrepancy_automatic`)"
       >
-        Automatic Discrepancies
+        Discrepância Automática
       </v-btn>
 
     </v-card-title>
