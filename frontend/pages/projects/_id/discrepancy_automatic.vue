@@ -99,7 +99,8 @@ export default Vue.extend({
 
             /* discrepância automática:
                - deve existir distribuição
-               - TODOS os percentuais ≥ threshold e < 100                 */
+               - TODOS os percentuais <= threshold
+            */
             const auto =
               rawEntries.length > 0 &&
               rawEntries
@@ -107,12 +108,21 @@ export default Vue.extend({
                   const p = Number(value)
                   return p > 1 ? p : p * 100
                 })
-                .every(p => p >= this.threshold && p <= 100)
+                .every(p => p <= this.threshold)
+
+            let mainLabel = ''
+            if (!auto && rawEntries.length > 0) {
+              const [label] = rawEntries.reduce((max, current) => {
+                return Number(current[1]) > Number(max[1]) ? current : max
+              }, rawEntries[0])
+              mainLabel = label
+            }
 
             return {
               ...ex,
               label_distribution: dist,
-              has_discrepancy: auto
+              has_discrepancy: auto,
+              main_label: mainLabel
             }
           })
         this.total = this.examples.length
