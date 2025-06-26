@@ -3,17 +3,18 @@
     <v-card-title>
       {{ $t('projectHome.welcome') }}
       <v-spacer />
-      <v-btn v-if="user.isProjectAdmin" color="warning" class="ml-4" 
+      <v-btn v-if="this.isAdmin" color="warning" class="ml-4" 
       @click="$router.push(`/projects/${$route.params.id}/discrepancies`)">
         Signal Discrepancies
       </v-btn>
       <v-btn
-        class="text-capitalize ms-2"
+        v-if="this.isAdmin"
+        class="ml-4"
         color="secondary"
         aria-label="Signal discrepancies automatically"
         @click="$router.push(`/projects/${$route.params.id}/discrepancy_automatic`)"
       >
-        Discrepância Automática
+        Automatic Discrepancies
       </v-btn>
 
     </v-card-title>
@@ -69,13 +70,16 @@ export default {
           videoId: 'kfRpa0mNQMY'
         },
         { title: this.$t('projectHome.exportDataset'), videoId: 'Pfy_QcHEeQ4' }
-      ]
+      ],
+      isAdmin: false,
     }
   },
 
   async created() {
     // Buscar papel do usuário
     this.user = await this.$repositories.member.fetchMyRole(this.$route.params.id)
+    const profile = await this.$repositories.user.getProfile()
+    this.isAdmin=profile.isSuperuser
   },
 
   methods: {
