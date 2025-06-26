@@ -46,7 +46,7 @@
       v-if="project.isImageProject"
       v-model="selected"
       :items="item.items"
-      :is-admin="user.isProjectAdmin"
+      :is-admin="isProjectAdmin"
       :is-loading="isLoading"
       :members="members"
       :total="item.count"
@@ -59,7 +59,7 @@
       v-else-if="project.isAudioProject"
       v-model="selected"
       :items="item.items"
-      :is-admin="user.isProjectAdmin"
+      :is-admin="isProjectAdmin"
       :is-loading="isLoading"
       :members="members"
       :total="item.count"
@@ -72,7 +72,7 @@
       v-else
       v-model="selected"
       :items="item.items"
-      :is-admin="user.isProjectAdmin"
+      :is-admin="isProjectAdmin"
       :is-loading="isLoading"
       :members="members"
       :total="item.count"
@@ -143,7 +143,10 @@ export default Vue.extend({
     this.isLoading = true
     this.item = await this.$services.example.list(this.projectId, this.$route.query)
     this.user = await this.$repositories.member.fetchMyRole(this.projectId)
-    if (this.user.isProjectAdmin) {
+    const profile = await this.$repositories.user.getProfile()
+    this.isProjectAdmin = profile.isSuperuser
+    
+    if (this.isProjectAdmin) {
       this.members = await this.$repositories.member.list(this.projectId)
     }
     this.isLoading = false
@@ -177,8 +180,7 @@ export default Vue.extend({
   },
 
   async created() {
-    const member = await this.$repositories.member.fetchMyRole(this.projectId)
-    this.isProjectAdmin = member.isProjectAdmin
+    // Removido: definição redundante de isProjectAdmin
   },
 
   methods: {

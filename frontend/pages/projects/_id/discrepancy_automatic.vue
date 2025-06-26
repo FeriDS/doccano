@@ -1,8 +1,10 @@
+<!-- eslint-disable vue/valid-v-slot -->
 <template>
   <v-container class="mt-12">
     <v-card>
+      <!-- ───────────── Header ───────────── -->
       <v-card-title class="d-flex align-center">
-        <span>Sinalizar Discrepâncias Automáticas</span>
+        <span>Automatic Discrepancies</span>
         <v-spacer />
         <v-btn color="primary" class="mr-2" @click="onShowAnnotation">
           Show Annotation
@@ -13,59 +15,141 @@
         </v-btn>
       </v-card-title>
 
-      <v-card-text>
-        <document-list
-          :items="examples"
-          :is-loading="loading"
-          :is-admin="true"
-          :total="total"
-          :members="members"
-          :value="selected"
-          mode="discrepancias"
-          display-discrepancy-as-text
-        />
+      <!-- ───────────── Threshold ────────── -->
+      <v-card-text class="mb-0 pb-0">
+        <div class="threshold-section">
+          <div class="threshold-label mb-2">
+            Insert the value of the threshold for discrepancies bellow:
+          </div>
+          <v-row align="center" no-gutters>
+            <v-col cols="auto">
+              <v-text-field
+                v-model.number="threshold"
+                type="number"
+                min="0"
+                max="100"
+                dense
+                suffix="%"
+                class="mr-6"
+                style="max-width: 150px;"
+              />
+            </v-col>
+            <v-col cols="auto">
+              <v-btn color="primary" @click="onUpdateDiscrepancies">
+                Update Discrepancies
+              </v-btn>
+            </v-col>
+          </v-row>
+        </div>
       </v-card-text>
 
-      <!-- Threshold -->
-      <v-text-field
-        v-model.number="threshold"
-        label="Threshold"
-        type="number"
-        min="0"
-        max="100"
-        dense
-        suffix="%"
-        class="threshold-input-bottom-left"
-      />
+      <!-- ───────────── Table ────────────── -->
+      <v-card-text>
+        <v-data-table
+          :items="examples"
+          :headers="headers"
+          :loading="loading"
+          item-key="id"
+          :footer-props="{ 'items-per-page-options': [10, 50, 100] }"
+        >
+          <!-- TEXT --------------------------------------------------- -->
+          <template #[`item.text`]="{ item }">
+            <span class="d-flex d-sm-none">
+              {{ item.text.length > 50 ? item.text.slice(0, 50) + '…' : item.text }}
+            </span>
+            <span class="d-none d-sm-flex">
+              {{ item.text.length > 200 ? item.text.slice(0, 200) + '…' : item.text }}
+            </span>
+          </template>
+
+          <!-- LABEL DISTRIBUTION ------------------------------------ -->
+          <template #[`item.label_distribution`]="{ item }">
+            <div>
+              <v-chip
+                v-for="(percent, label) in item.label_distribution"
+                :key="'dist-' + label"
+                small
+                class="ma-1"
+              >
+                {{ label }}: {{ percent }}%
+              </v-chip>
+            </div>
+          </template>
+
+          <!-- DISCREPANCY STATUS ------------------------------------ -->
+          <template #[`item.has_discrepancy`]="{ item }">
+            <!-- TRUE  ⇒ cruz vermelha -->
+            <template v-if="item.has_discrepancy">
+              <v-icon color="error" small>{{ mdiClose }}</v-icon>
+              <span class="ml-1 error--text">Has Discrepancy</span>
+            </template>
+
+            <!-- FALSE ⇒ verde + label(s) principal(ais) -->
+            <template v-else>
+              <v-icon color="success" small class="mr-1">{{ mdiCheck }}</v-icon>
+              <span class="success--text font-weight-medium">
+                No discrepancy, majority agreed on :
+              </span>
+
+              <!-- cada lbl gera DOIS chips; wrapper precisa de key real -->
+              <span
+                v-for="lbl in item.top_labels"
+                :key="'lblwrap-' + lbl"
+                class="d-inline-flex"
+              >
+                <v-chip
+                  color="primary"
+                  small
+                  class="ma-1 white--text"
+                  :key="'lbl-' + lbl"
+                >
+                  {{ lbl }}
+                </v-chip>
+
+                <v-chip
+                  color="primary"
+                  small
+                  class="ma-1 white--text"
+                  :key="'pct-' + lbl"
+                >
+                  {{ item.label_distribution[lbl] }}%
+                </v-chip>
+              </span>
+            </template>
+          </template>
+        </v-data-table>
+      </v-card-text>
     </v-card>
   </v-container>
 </template>
 
 <script lang="ts">
 import Vue from 'vue'
-import { mdiArrowLeft } from '@mdi/js'
-import DocumentList from '@/components/example/DocumentList.vue'
+import { mdiArrowLeft, mdiClose, mdiCheck } from '@mdi/js'
 import { ExampleDTO } from '~/services/application/example/exampleData'
 
 export default Vue.extend({
-  components: { DocumentList },
   data() {
     return {
-      examples: [] as ExampleDTO[],
-      loading: false,
-      total: 0,
-      members: [],
-      selected: [],
+      examples : [] as ExampleDTO[],
+      loading  : false,
+      total    : 0,
       threshold: 75,
-      mdiArrowLeft
+      mdiArrowLeft, mdiClose, mdiCheck
     }
   },
-  watch: {
-    threshold(newVal: number) {
-      if (process.client) localStorage.setItem('discrepancyThreshold', newVal.toString())
-      this.loadExamples()
+
+  computed: {
+    headers(): any[] {
+      return [
+        { text: this.$t('dataset.text'),            value: 'text',               sortable: false },
+        { text: this.$t('dataset.labelDistribution') || 'Label Distribution',
+          value: 'label_distribution', sortable: false },
+        { text: 'Discrepancy', value: 'has_discrepancy', sortable: false }
+      ]
     }
   },
+
   async created() {
     if (process.client) {
       const saved = localStorage.getItem('discrepancyThreshold')
@@ -73,48 +157,60 @@ export default Vue.extend({
     }
     await this.loadExamples()
   },
+
   methods: {
-    /* rota SEM query selected */
     onShowAnnotation() {
-      const link = this.localePath(`/projects/${this.$route.params.id}/annotations`)
-      this.$router.push(link)
+      this.$router.push(
+        this.localePath(`/projects/${this.$route.params.id}/annotations`)
+      )
     },
 
+    onUpdateDiscrepancies() {
+      if (process.client) localStorage.setItem('discrepancyThreshold', String(this.threshold))
+      this.loadExamples()
+    },
+
+    /** carrega exemplos + cálculo de status/top_labels */
     async loadExamples() {
       this.loading = true
       try {
-        const projectId = this.$route.params.id
-        const { items } = await this.$services.example.list(projectId, {})
+        const { items } = await this.$services.example.list(this.$route.params.id, {})
+
         this.examples = items
           .filter((ex: any) => ex.is_finished)
           .map((ex: any) => {
-            /* converter valores para % */
-            const rawEntries = Object.entries(ex.label_distribution || {})
+            /* distribuição em % (2 casas) */
+            const raw = Object.entries(ex.label_distribution || {})
             const dist = Object.fromEntries(
-              rawEntries.map(([label, value]) => {
-                const p = Number(value)
-                return [label, (p > 1 ? p : p * 100).toFixed(2)]
+              raw.map(([l, v]) => {
+                const num = Number(v)
+                return [l, (num > 1 ? num : num * 100).toFixed(2)]
               })
             )
 
-            /* discrepância automática:
-               - deve existir distribuição
-               - TODOS os percentuais ≥ threshold e < 100                 */
-            const auto =
-              rawEntries.length > 0 &&
-              rawEntries
-                .map(([, value]) => {
-                  const p = Number(value)
-                  return p > 1 ? p : p * 100
-                })
-                .every(p => p >= this.threshold && p <= 100)
+            /* maior percentagem + empates */
+            const percentages = raw.map(([, v]) => {
+              const num = Number(v)
+              return num > 1 ? num : num * 100
+            })
+            const maxP = percentages.length ? Math.max(...percentages) : 0
+            const top_labels = raw
+              .filter(([, v]) => {
+                const num = Number(v)
+                return (num > 1 ? num : num * 100) === maxP
+              })
+              .map(([l]) => l)
+
+            const hasDisc = maxP < this.threshold
 
             return {
               ...ex,
               label_distribution: dist,
-              has_discrepancy: auto
+              has_discrepancy   : hasDisc,
+              top_labels
             }
           })
+
         this.total = this.examples.length
       } finally {
         this.loading = false
@@ -125,10 +221,7 @@ export default Vue.extend({
 </script>
 
 <style scoped>
-.v-card {
-  position: relative;
-  padding-bottom: 70px;
-}
+.v-card { position: relative; padding-bottom: 70px; }
 .threshold-input-bottom-left {
   position: absolute;
   bottom: 16px;
