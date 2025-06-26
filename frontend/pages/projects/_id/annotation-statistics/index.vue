@@ -1,340 +1,5 @@
 <template>
   <v-container fluid>
-    <v-row>
-      <v-col cols="12" class="d-flex align-center justify-space-between">
-        <h1 class="text-h4 mb-4">Annotation Statistics</h1>
-        <div class="d-flex align-center">
-          <v-btn
-            class="export-btn mr-2"
-            title="Export to CSV"
-            outlined
-            color="primary"
-            @click="exportToCSV"
-          >
-            <v-icon left>mdi-file-excel</v-icon>
-            <span>CSV</span>
-          </v-btn>
-          <v-btn
-            class="export-btn mr-2"
-            title="Export to PDF"
-            outlined
-            color="primary"
-            @click="exportToPDF"
-          >
-            <v-icon left>mdi-file-pdf-box</v-icon>
-            <span>PDF</span>
-          </v-btn>
-          <v-btn
-            class="return-btn"
-            title="Return"
-            outlined
-            color="black"
-            @click="$router.back()"
-          >
-            <v-icon left color="black">mdi-arrow-left</v-icon>
-            <span style="font-weight: 600; letter-spacing: 1px;">RETURN</span>
-          </v-btn>
-        </div>
-      </v-col>
-    </v-row>
-
-    <!-- Filters Section -->
-    <v-row>
-      <v-col cols="12">
-        <v-card>
-          <v-card-title>
-            Filters
-            <v-spacer></v-spacer>
-            <v-btn
-              icon
-              title="Clear all filters"
-              class="clear-filters-btn"
-              style="display: flex; align-items: center;"
-              @click="clearFilters"
-            >
-              <v-icon color="black" size="32">mdi-close</v-icon>
-              <span
-                style="color: #222; font-weight: 500; margin-left: 1px; font-size: 12px;"
-              >
-                Cancel
-              </span>
-            </v-btn>
-          </v-card-title>
-          <v-card-text>
-            <v-row>
-              <v-col cols="12" md="3">
-                <v-menu
-                  ref="startDateMenu"
-                  v-model="filters.startDateMenu"
-                  :close-on-content-click="false"
-                  transition="scale-transition"
-                  offset-y
-                  min-width="auto"
-                >
-                  <template #activator="{ on, attrs }">
-                    <v-text-field
-                      v-model="filters.startDate"
-                      label="Start Date"
-                      prepend-icon="mdi-calendar"
-                      readonly
-                      v-bind="attrs"
-                      v-on="on"
-                    ></v-text-field>
-                  </template>
-                  <v-date-picker
-                    v-model="filters.startDate"
-                    @input="filters.startDateMenu = false"
-                  ></v-date-picker>
-                </v-menu>
-              </v-col>
-
-              <v-col cols="12" md="3">
-                <v-menu
-                  ref="endDateMenu"
-                  v-model="filters.endDateMenu"
-                  :close-on-content-click="false"
-                  transition="scale-transition"
-                  offset-y
-                  min-width="auto"
-                >
-                  <template #activator="{ on, attrs }">
-                    <v-text-field
-                      v-model="filters.endDate"
-                      label="End Date"
-                      prepend-icon="mdi-calendar"
-                      readonly
-                      v-bind="attrs"
-                      v-on="on"
-                    ></v-text-field>
-                  </template>
-                  <v-date-picker
-                    v-model="filters.endDate"
-                    @input="filters.endDateMenu = false"
-                  ></v-date-picker>
-                </v-menu>
-              </v-col>
-
-              <v-col cols="12" md="3">
-                <v-select
-                  v-model="filters.selectedPerspective"
-                  :items="perspectives"
-                  item-text="name"
-                  item-value="name"
-                  label="Perspectiva"
-                  clearable
-                  @change="onPerspectiveChange"
-                />
-              </v-col>
-
-              <v-col cols="12" md="3">
-                <v-select
-                  v-model="filters.label"
-                  :items="categories"
-                  item-text="text"
-                  item-value="text"
-                  label="Categoria"
-                  clearable
-                ></v-select>
-              </v-col>
-
-              <v-col cols="12" md="3">
-                <v-select
-                  v-model="filters.resolved"
-                  :items="statusOptions"
-                  label="Status de Resolução"
-                  clearable
-                ></v-select>
-              </v-col>
-
-              <v-col cols="12" md="3">
-                <v-select
-                  v-model="filters.example"
-                  :items="examples"
-                  item-text="text"
-                  item-value="id"
-                  label="Texto/Example"
-                  clearable
-                />
-              </v-col>
-
-              <v-col cols="12" md="3">
-                <v-select
-                  v-model="filters.finished"
-                  :items="[
-                    { text: 'Todos', value: null },
-                    { text: 'Fechados', value: 'true' },
-                    { text: 'Abertos', value: 'false' }
-                  ]"
-                  label="Status de Fechamento"
-                  clearable
-                />
-              </v-col>
-
-              <v-col v-for="field in choicePerspectiveFields" :key="field.name" cols="12" md="3">
-                <v-select
-                  v-model="filters.perspective"
-                  :items="field.choices"
-                  :label="field.name"
-                  clearable
-                />
-              </v-col>
-
-              <v-col v-for="field in numberPerspectiveFields" :key="field.name" cols="12" md="3">
-                <v-text-field
-                  v-model="filters.perspectiveValues[field.name]"
-                  :label="field.name"
-                  type="number"
-                  clearable
-                />
-              </v-col>
-            </v-row>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- All Examples Chart -->
-    <v-row>
-      <v-col cols="12">
-        <v-card>
-          <v-card-title>All Examples Overview</v-card-title>
-          <v-card-text>
-            <canvas ref="allExamplesChart"></canvas>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Detailed Statistics -->
-    <v-row>
-      <v-col cols="12" md="8">
-        <v-card>
-          <v-card-title>Label Distribution</v-card-title>
-          <v-card-text>
-            <canvas ref="labelDistChart"></canvas>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Charts Row -->
-    <v-row>
-      <v-col cols="12" md="6">
-        <v-card>
-          <v-card-title>Perspective Distribution</v-card-title>
-          <v-card-text>
-            <canvas ref="perspectiveChart"></canvas>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" md="6">
-        <v-card>
-          <v-card-title>Disagreements by Category</v-card-title>
-          <v-card-text>
-            <canvas ref="disagreementChart"></canvas>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Disagreement Details -->
-    <v-row>
-      <v-col cols="12">
-        <v-card>
-          <v-card-title>
-            Disagreement Details
-            <v-spacer></v-spacer>
-            <v-text-field
-              v-model="search"
-              append-icon="mdi-magnify"
-              label="Search"
-              single-line
-              hide-details
-            ></v-text-field>
-          </v-card-title>
-          <v-data-table
-            :headers="headers"
-            :items="disagreements"
-            :search="search"
-            :loading="loading"
-            class="elevation-1"
-          >
-            <template #[`item.actions`]="{ item }">
-              <v-btn
-                small
-                color="primary"
-                @click="viewDisagreement(item)"
-              >
-                View Details
-              </v-btn>
-              <v-btn
-                v-if="item.status !== 'resolved'"
-                small
-                color="success"
-                @click="resolveDisagreement(item)"
-                
-              >
-                Resolver
-              </v-btn>
-            </template>
-          </v-data-table>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Disagreement Dialog -->
-    <v-dialog v-model="dialog" max-width="800px">
-      <v-card>
-        <v-card-title>
-          <span class="text-h5">Disagreement Details</span>
-        </v-card-title>
-        <v-card-text>
-          <v-row>
-            <v-col cols="12">
-              <h3>Text Content</h3>
-              <p>{{ selectedDisagreement.text }}</p>
-            </v-col>
-            <v-col cols="12">
-              <h3>Annotations</h3>
-              <v-list>
-                <v-list-item 
-                  v-for="annotation in selectedDisagreement.annotations" 
-                  :key="annotation.id"
-                >
-                  <v-list-item-content>
-                    <v-list-item-title>{{ annotation.annotator }}</v-list-item-title>
-                    <v-list-item-subtitle>
-                      Label: {{ annotation.label }}
-                      <br>
-                      Perspective: {{ annotation.perspective }}
-                    </v-list-item-subtitle>
-                  </v-list-item-content>
-                </v-list-item>
-              </v-list>
-            </v-col>
-            <v-col cols="12">
-              <h3>Discussion</h3>
-              <v-list>
-                <v-list-item 
-                  v-for="comment in selectedDisagreement.discussion" 
-                  :key="comment.id"
-                >
-                  <v-list-item-content>
-                    <v-list-item-title>{{ comment.user }}</v-list-item-title>
-                    <v-list-item-subtitle>{{ comment.text }}</v-list-item-subtitle>
-                  </v-list-item-content>
-                </v-list-item>
-              </v-list>
-            </v-col>
-          </v-row>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="primary" text @click="dialog = false">Close</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <h1 class="text-h4 mb-4">Estatísticas por Texto</h1>
     <v-expansion-panels multiple @change="onPanelChange">
       <v-expansion-panel v-for="example in examples" :key="example.id">
@@ -345,7 +10,7 @@
         <v-expansion-panel-content>
           <div style="min-height: 250px;">
             <canvas :ref="'exampleChart' + example.id"></canvas>
-          </div>
+        </div>
         </v-expansion-panel-content>
       </v-expansion-panel>
     </v-expansion-panels>
@@ -834,14 +499,22 @@ export default {
     },
 
     renderChart(exampleId, distribution) {
-      const refName = 'exampleChart' + exampleId
-      const ctxArr = this.$refs[refName]
-      const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr
-      if (!ctx) return
-      const labels = Object.keys(distribution)
-      const data = Object.values(distribution)
+      // Compatível com novo e antigo formato
+      const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
+      const labels = isNewFormat ? Object.keys(distribution.labels ||
+       {}) : Object.keys(distribution || {});
+      const data = isNewFormat ? Object.values(distribution.labels || 
+      {}).map(Number) : Object.values(distribution || {}).map(Number);
+      if (isNewFormat && 'null' in distribution && distribution.null > 0) {
+        labels.push('Null');
+        data.push(Number(distribution.null));
+      }
+      const refName = 'exampleChart' + exampleId;
+      const ctxArr = this.$refs[refName];
+      const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
+      if (!ctx) return;
       if (this.charts[exampleId]) {
-        this.charts[exampleId].destroy()
+        this.charts[exampleId].destroy();
       }
       this.charts[exampleId] = new Chart(ctx, {
         type: 'bar',
@@ -874,7 +547,7 @@ export default {
             }]
           }
         }
-      })
+      });
     }
   }
 }

@@ -54,15 +54,46 @@ class ExampleSerializer(serializers.ModelSerializer):
         ]
 
     def get_label_distribution(self, obj):
-        # Import here to avoid circular import
         from labels.models import Category
-        labels = Category.objects.filter(example=obj)
-        total = labels.count()
-        if total == 0:
-            return {}
+        from examples.models import Assignment
         from collections import Counter
-        counter = Counter(label.label.text for label in labels if hasattr(label, 'label') and label.label)
-        return {k: round(v / total * 100, 2) for k, v in counter.items()}
+
+        # 1. Labels votados
+        labels = Category.objects.filter(example=obj)
+        total_labels = labels.count()
+        label_counter = Counter(label.label.text for label in labels if hasattr(label, 'label') and label.label)
+        label_percent = {k: round(v / total_labels * 100, 2) for k, v in label_counter.items()} if total_labels else {}
+
+        # 2. Assignees
+        assignees = list(obj.assignments.all())
+        assignee_ids = set(a.assignee_id for a in assignees)
+        voted_users = set(label.user_id for label in labels)
+
+        # 3. Abstenção e Null
+        abstencao_users = set()
+        null_users = set()
+        # Buscar estados confirmados para este exemplo
+        confirmed_ids = set()
+        if hasattr(obj, 'states'):
+            confirmed_ids = set(obj.states.values_list('confirmed_by_id', flat=True))
+        for a in assignees:
+            if a.assignee_id in voted_users:
+                continue  # já votou
+            if a.assignee_id in confirmed_ids:
+                abstencao_users.add(a.assignee_id)
+            else:
+                null_users.add(a.assignee_id)
+
+        total_assignees = len(assignee_ids)
+        percent_abstencao = round(len(abstencao_users) / total_assignees * 100, 2) if total_assignees else 0
+        percent_null = round(len(null_users) / total_assignees * 100, 2) if total_assignees else 0
+
+        result = dict(label_percent)
+        if percent_abstencao > 0:
+            result['abstenção'] = percent_abstencao
+        if percent_null > 0:
+            result['null'] = percent_null
+        return result
 
     class Meta:
         model = Example
