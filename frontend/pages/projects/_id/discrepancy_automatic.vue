@@ -1,8 +1,9 @@
+<!-- eslint-disable vue/valid-v-slot -->
 <template>
   <v-container class="mt-12">
     <v-card>
       <v-card-title class="d-flex align-center">
-        <span>Sinalizar Discrepâncias Automáticas</span>
+        <span>Automatic Discrepancies </span>
         <v-spacer />
         <v-btn color="primary" class="mr-2" @click="onShowAnnotation">
           Show Annotation
@@ -23,7 +24,17 @@
           :value="selected"
           mode="discrepancias"
           display-discrepancy-as-text
-        />
+        >
+          <!-- cabeçalho da coluna (substitui “Discrepancy”) -->
+          <!-- eslint-disable-next-line vue/valid-v-slot -->
+          <template #header.discrepancy>Status</template>
+
+          <!-- célula da coluna -->
+          <!-- eslint-disable-next-line vue/valid-v-slot -->
+          <template #item.discrepancy="{ item }">
+            <span :class="item.status_color">{{ item.status }}</span>
+          </template>
+        </document-list>
       </v-card-text>
 
       <!-- Threshold -->
@@ -80,15 +91,17 @@ export default Vue.extend({
       this.$router.push(link)
     },
 
+    /** Carrega exemplos já transformados com STATUS */
     async loadExamples() {
       this.loading = true
       try {
         const projectId = this.$route.params.id
         const { items } = await this.$services.example.list(projectId, {})
+
         this.examples = items
           .filter((ex: any) => ex.is_finished)
           .map((ex: any) => {
-            /* converter valores para % */
+            /** --- distribuição em % com 2 casas --- */
             const rawEntries = Object.entries(ex.label_distribution || {})
             const dist = Object.fromEntries(
               rawEntries.map(([label, value]) => {
@@ -97,34 +110,43 @@ export default Vue.extend({
               })
             )
 
-            /* discrepância automática:
-               - deve existir distribuição
-               - TODOS os percentuais <= threshold
-            */
-            const auto =
-              rawEntries.length > 0 &&
-              rawEntries
-                .map(([, value]) => {
-                  const p = Number(value)
-                  return p > 1 ? p : p * 100
-                })
-                .every(p => p <= this.threshold)
+            /** labels com valor ≥ threshold → “no discrepancy” */
+            const highLabels = rawEntries
+              .filter(([, value]) => {
+                const p = Number(value)
+                return (p > 1 ? p : p * 100) >= this.threshold
+              })
+              .map(([label]) => label)
 
+            const noDiscrepancy = highLabels.length > 0
+
+            const statusText = noDiscrepancy
+              ? `No discrepancy : ${highLabels.join(', ')}`
+              : 'Has discrepancy'
+
+            const statusColor = noDiscrepancy ? 'green--text' : 'red--text'
+
+            /* principal label (se útil noutro lado) */
             let mainLabel = ''
-            if (!auto && rawEntries.length > 0) {
-              const [label] = rawEntries.reduce((max, current) => {
-                return Number(current[1]) > Number(max[1]) ? current : max
-              }, rawEntries[0])
+            if (!noDiscrepancy && rawEntries.length > 0) {
+              const [label] = rawEntries.reduce(
+                (maxEntry, current) =>
+                  Number(current[1]) > Number(maxEntry[1]) ? current : maxEntry,
+                rawEntries[0]
+              )
               mainLabel = label
             }
 
             return {
               ...ex,
               label_distribution: dist,
-              has_discrepancy: auto,
-              main_label: mainLabel
+              has_discrepancy: !noDiscrepancy,
+              main_label: mainLabel,
+              status: statusText,
+              status_color: statusColor
             }
           })
+
         this.total = this.examples.length
       } finally {
         this.loading = false
@@ -139,6 +161,7 @@ export default Vue.extend({
   position: relative;
   padding-bottom: 70px;
 }
+
 .threshold-input-bottom-left {
   position: absolute;
   bottom: 16px;
