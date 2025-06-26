@@ -6,30 +6,30 @@
         <div class="d-flex align-center">
           <v-btn
             class="export-btn mr-2"
-            @click="exportToCSV"
             title="Export to CSV"
             outlined
             color="primary"
+            @click="exportToCSV"
           >
             <v-icon left>mdi-file-excel</v-icon>
             <span>CSV</span>
           </v-btn>
           <v-btn
             class="export-btn mr-2"
-            @click="exportToPDF"
             title="Export to PDF"
             outlined
             color="primary"
+            @click="exportToPDF"
           >
             <v-icon left>mdi-file-pdf-box</v-icon>
             <span>PDF</span>
           </v-btn>
           <v-btn
             class="return-btn"
-            @click="$router.back()"
             title="Return"
             outlined
             color="black"
+            @click="$router.back()"
           >
             <v-icon left color="black">mdi-arrow-left</v-icon>
             <span style="font-weight: 600; letter-spacing: 1px;">RETURN</span>
@@ -193,6 +193,18 @@
       </v-col>
     </v-row>
 
+    <!-- All Examples Chart -->
+    <v-row>
+      <v-col cols="12">
+        <v-card>
+          <v-card-title>All Examples Overview</v-card-title>
+          <v-card-text>
+            <canvas ref="allExamplesChart"></canvas>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <!-- Detailed Statistics -->
     <v-row>
       <v-col cols="12" md="8">
@@ -200,6 +212,26 @@
           <v-card-title>Label Distribution</v-card-title>
           <v-card-text>
             <canvas ref="labelDistChart"></canvas>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- Charts Row -->
+    <v-row>
+      <v-col cols="12" md="6">
+        <v-card>
+          <v-card-title>Perspective Distribution</v-card-title>
+          <v-card-text>
+            <canvas ref="perspectiveChart"></canvas>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" md="6">
+        <v-card>
+          <v-card-title>Disagreements by Category</v-card-title>
+          <v-card-text>
+            <canvas ref="disagreementChart"></canvas>
           </v-card-text>
         </v-card>
       </v-col>
@@ -302,6 +334,21 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <h1 class="text-h4 mb-4">Estatísticas por Texto</h1>
+    <v-expansion-panels multiple @change="onPanelChange">
+      <v-expansion-panel v-for="example in examples" :key="example.id">
+        <v-expansion-panel-header>
+          {{ example.text }}
+          <v-icon right>mdi-chevron-down</v-icon>
+        </v-expansion-panel-header>
+        <v-expansion-panel-content>
+          <div style="min-height: 250px;">
+            <canvas :ref="'exampleChart' + example.id"></canvas>
+          </div>
+        </v-expansion-panel-content>
+      </v-expansion-panel>
+    </v-expansion-panels>
   </v-container>
 </template>
 
@@ -369,7 +416,10 @@ export default {
       ],
       examples: [],
       perspectiveFields: [],
-      perspectiveChoices: []
+      perspectiveChoices: [],
+      allExamplesData: [],
+      expandedPanels: [],
+      charts: {}
     }
   },
 
@@ -398,6 +448,7 @@ export default {
     await this.fetchProjectPerspective()
     await this.fetchCategories()
     await this.fetchExamples()
+    await this.fetchAllExamplesData()
     await this.fetchStatistics()
   },
 
@@ -435,9 +486,27 @@ export default {
     async fetchExamples() {
       try {
         const response = await this.$services.example.list(this.projectId, {})
-        this.examples = response.items
+        this.examples = response.items.map((it) => ({
+          ...it,
+          label_distribution: Object.fromEntries(
+            Object.entries(it.label_distribution || {}).map(([l, v]) => {
+              const p = Number(v)
+              return [l, (p > 1 ? p : p * 100).toFixed(2)]
+            })
+          )
+        }))
       } catch (error) {
-        console.error('Erro ao buscar exemplos:', error)
+        this.examples = []
+      }
+    },
+
+    async fetchAllExamplesData() {
+      try {
+        const response = await this.$services.example.list(this.projectId, { limit: 1000 })
+        this.allExamplesData = response.items || []
+      } catch (error) {
+        console.error('Erro ao buscar dados de todos os exemplos:', error)
+        this.allExamplesData = []
       }
     },
 
@@ -475,16 +544,53 @@ export default {
     },
 
     initializeCharts() {
-      if (this.$refs.disagreementChart) {
-        const disagreementCtx = this.$refs.disagreementChart.getContext('2d')
-        this.disagreementChart = new Chart(disagreementCtx, {
+      // All Examples Chart
+      if (this.$refs.allExamplesChart) {
+        const allExamplesCtx = this.$refs.allExamplesChart.getContext('2d')
+        this.allExamplesChart = new Chart(allExamplesCtx, {
           type: 'bar',
           data: {
             labels: [],
             datasets: [{
-              label: 'Disagreements by Category',
+              label: 'Examples Count',
               data: [],
-              backgroundColor: 'rgba(255, 99, 132, 0.5)'
+              backgroundColor: 'rgba(54, 162, 235, 0.8)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  stepSize: 1
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              }
+            }
+          }
+        })
+      }
+
+      // Label Distribution Chart (now bar chart)
+      if (this.$refs.labelDistChart) {
+        const labelDistCtx = this.$refs.labelDistChart.getContext('2d')
+        this.labelDistChart = new Chart(labelDistCtx, {
+          type: 'bar',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'Label Distribution',
+              data: [],
+              backgroundColor: 'rgba(255, 99, 132, 0.8)',
+              borderColor: 'rgba(255, 99, 132, 1)',
+              borderWidth: 1
             }]
           },
           options: {
@@ -497,63 +603,83 @@ export default {
           }
         })
       }
+
+      // Perspective Chart (now bar chart)
       if (this.$refs.perspectiveChart) {
         const perspectiveCtx = this.$refs.perspectiveChart.getContext('2d')
         this.perspectiveChart = new Chart(perspectiveCtx, {
-          type: 'pie',
+          type: 'bar',
           data: {
             labels: [],
             datasets: [{
+              label: 'Perspective Distribution',
               data: [],
-              backgroundColor: [
-                'rgba(54, 162, 235, 0.5)',
-                'rgba(255, 206, 86, 0.5)',
-                'rgba(75, 192, 192, 0.5)',
-                'rgba(153, 102, 255, 0.5)',
-                'rgba(255, 159, 64, 0.5)'
-              ]
+              backgroundColor: 'rgba(75, 192, 192, 0.8)',
+              borderColor: 'rgba(75, 192, 192, 1)',
+              borderWidth: 1
             }]
           },
           options: {
-            responsive: true
+            responsive: true,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
           }
         })
       }
-      if (this.$refs.labelDistChart) {
-        const labelDistCtx = this.$refs.labelDistChart.getContext('2d')
-        this.labelDistChart = new Chart(labelDistCtx, {
-          type: 'pie',
+
+      // Disagreement Chart
+      if (this.$refs.disagreementChart) {
+        const disagreementCtx = this.$refs.disagreementChart.getContext('2d')
+        this.disagreementChart = new Chart(disagreementCtx, {
+          type: 'bar',
           data: {
             labels: [],
             datasets: [{
+              label: 'Disagreements by Category',
               data: [],
-              backgroundColor: [
-                'rgba(255, 99, 132, 0.5)',
-                'rgba(54, 162, 235, 0.5)',
-                'rgba(255, 206, 86, 0.5)',
-                'rgba(75, 192, 192, 0.5)',
-                'rgba(153, 102, 255, 0.5)',
-                'rgba(255, 159, 64, 0.5)'
-              ]
+              backgroundColor: 'rgba(255, 159, 64, 0.8)',
+              borderColor: 'rgba(255, 159, 64, 1)',
+              borderWidth: 1
             }]
           },
           options: {
-            responsive: true
+            responsive: true,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
           }
         })
       }
     },
 
     updateCharts(data) {
-      // Update disagreement chart
-      if (this.disagreementChart && data.disagreementByCategory) {
-        this.disagreementChart.data.labels = 
-          data.disagreementByCategory.map(item => item.category)
-        this.disagreementChart.data.datasets[0].data = 
-          data.disagreementByCategory.map(item => item.count)
-        this.disagreementChart.update()
+      // Update all examples chart
+      if (this.allExamplesChart && this.allExamplesData.length > 0) {
+        const exampleLabels = this.allExamplesData.map((_example, index) => `Example ${index + 1}`)
+        const exampleData = this.allExamplesData.map(example => {
+          // Count annotations for this example
+          return example.annotations ? example.annotations.length : 0
+        })
+        
+        this.allExamplesChart.data.labels = exampleLabels
+        this.allExamplesChart.data.datasets[0].data = exampleData
+        this.allExamplesChart.update()
       }
-      // Update perspective chart
+
+      // Update label distribution chart (now bar chart)
+      if (this.labelDistChart && data.labelDistribution) {
+        const labelDist = data.labelDistribution || {}
+        this.labelDistChart.data.labels = Object.keys(labelDist)
+        this.labelDistChart.data.datasets[0].data = Object.values(labelDist)
+        this.labelDistChart.update()
+      }
+
+      // Update perspective chart (now bar chart)
       if (this.perspectiveChart && data.perspectiveDistribution) {
         this.perspectiveChart.data.labels = 
           data.perspectiveDistribution.map(item => item.perspective)
@@ -561,12 +687,14 @@ export default {
           data.perspectiveDistribution.map(item => item.count)
         this.perspectiveChart.update()
       }
-      // Update label distribution chart
-      if (this.labelDistChart && data.labelDistribution) {
-        const labelDist = data.labelDistribution || {}
-        this.labelDistChart.data.labels = Object.keys(labelDist)
-        this.labelDistChart.data.datasets[0].data = Object.values(labelDist)
-        this.labelDistChart.update()
+
+      // Update disagreement chart
+      if (this.disagreementChart && data.disagreementByCategory) {
+        this.disagreementChart.data.labels = 
+          data.disagreementByCategory.map(item => item.category)
+        this.disagreementChart.data.datasets[0].data = 
+          data.disagreementByCategory.map(item => item.count)
+        this.disagreementChart.update()
       }
     },
 
@@ -602,6 +730,7 @@ export default {
         finished: null,
         startDateMenu: false,
         endDateMenu: false,
+        perspectiveValues: {}
       }
     },
 
@@ -683,6 +812,69 @@ export default {
         if (value) params[`perspective_${key}`] = value
       })
       return params
+    },
+
+    async fetchLabelDistribution(exampleId) {
+      try {
+        const response = await this.$axios.$get(`/v1/projects/${this.projectId}/discrepancies/${exampleId}/distribution`)
+        return response
+      } catch (error) {
+        return {}
+      }
+    },
+
+    onPanelChange(panelIndexes) {
+      for (const idx of panelIndexes) {
+        const example = this.examples[idx]
+        if (!example) continue
+        if (!this.charts[example.id]) {
+          this.renderChart(example.id, example.label_distribution)
+        }
+      }
+    },
+
+    renderChart(exampleId, distribution) {
+      const refName = 'exampleChart' + exampleId
+      const ctxArr = this.$refs[refName]
+      const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr
+      if (!ctx) return
+      const labels = Object.keys(distribution)
+      const data = Object.values(distribution)
+      if (this.charts[exampleId]) {
+        this.charts[exampleId].destroy()
+      }
+      this.charts[exampleId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Distribuição de Labels (%)',
+            data,
+            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              min: 0,
+              max: 100,
+              ticks: { callback: v => v + '%' }
+            },
+            yAxes: [{
+              ticks: {
+                beginAtZero: true,
+                min: 0,
+                max: 100,
+                callback: v => v + '%'
+              }
+            }]
+          }
+        }
+      })
     }
   }
 }
@@ -711,5 +903,10 @@ export default {
   font-weight: 600;
   letter-spacing: 1px;
   margin-right: 8px;
+}
+
+.v-expansion-panel-header {
+  font-size: 18px;
+  font-weight: 500;
 }
 </style> 
