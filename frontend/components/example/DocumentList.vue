@@ -19,7 +19,7 @@
     show-select
     @input="$emit('input', $event)"
   >
-    <!-- TOP BAR -------------------------------------------------------- -->
+    <!-- TOP BAR ------------------------------------------------------ -->
     <template #top>
       <v-text-field
         v-model="search"
@@ -31,14 +31,45 @@
       />
     </template>
 
-    <!-- STATUS --------------------------------------------------------- -->
+    <!-- STATUS (DATASET) -------------------------------------------- -->
     <template #[`item.isConfirmed`]="{ item }">
       <v-chip :color="item.isConfirmed ? 'success' : 'warning'" text small>
         {{ item.isConfirmed ? 'Finished' : 'In progress' }}
       </v-chip>
     </template>
 
-    <!-- TEXT ----------------------------------------------------------- -->
+    <!-- STATUS / DISCREPÂNCIA (MODO discrepancias) ------------------ -->
+    <template
+      v-if="mode === 'discrepancias' && isAdmin"
+      #[`item.has_discrepancy`]="{ item }"
+    >
+      <!-- Vista Automáticas – já vem formatado -->
+      <span v-if="item.status" :class="item.status_color">{{ item.status }}</span>
+
+      <!-- Vista manual / restantes ------------------------------ -->
+      <template v-else-if="displayDiscrepancyAsText">
+        <v-icon :color="item.has_discrepancy ? 'error' : 'success'" small>
+          {{ item.has_discrepancy ? mdiClose : mdiCheck }}
+        </v-icon>
+        <span
+          class="ml-1"
+          :class="item.has_discrepancy ? 'error--text' : 'success--text'"
+        >
+          {{ item.has_discrepancy ? 'Yes' : 'No' }}
+        </span>
+      </template>
+      <template v-else>
+        <v-switch
+          v-model="item.has_discrepancy"
+          :label="$t('dataset.discrepancy') || 'Discrepancy'"
+          dense
+          hide-details
+          @change="onDiscrepancyChange(item)"
+        />
+      </template>
+    </template>
+
+    <!-- TEXT --------------------------------------------------------- -->
     <template #[`item.text`]="{ item }">
       <span class="d-flex d-sm-none">
         {{ item.text.length > 50 ? item.text.substring(0, 50) + '...' : item.text }}
@@ -48,12 +79,12 @@
       </span>
     </template>
 
-    <!-- META ----------------------------------------------------------- -->
+    <!-- META --------------------------------------------------------- -->
     <template #[`item.meta`]="{ item }">
       {{ JSON.stringify(item.meta, null, 4) }}
     </template>
 
-    <!-- ASSIGNEE ------------------------------------------------------- -->
+    <!-- ASSIGNEE ----------------------------------------------------- -->
     <template #[`item.assignee`]="{ item }">
       <v-combobox
         :value="toSelected(item)"
@@ -80,7 +111,7 @@
       </v-combobox>
     </template>
 
-    <!-- ACTION --------------------------------------------------------- -->
+    <!-- ACTION ------------------------------------------------------- -->
     <template #[`item.action`]="{ item }">
       <v-btn class="me-1" small color="primary text-capitalize" @click="$emit('edit', item)">
         Edit
@@ -95,8 +126,11 @@
       </v-btn>
     </template>
 
-    <!-- LABEL DISTRIBUTION -------------------------------------------- -->
-    <template v-if="mode === 'discrepancias'" #[`item.label_distribution`]="{ item }">
+    <!-- LABEL DISTRIBUTION (discrepancias) --------------------------- -->
+    <template
+      v-if="mode === 'discrepancias'"
+      #[`item.label_distribution`]="{ item }"
+    >
       <div>
         <v-chip
           v-for="(percent, label) in item.label_distribution"
@@ -109,28 +143,7 @@
       </div>
     </template>
 
-    <!-- DISCREPÂNCIA --------------------------------------------------- -->
-    <template v-if="mode === 'discrepancias' && isAdmin" #[`item.has_discrepancy`]="{ item }">
-      <template v-if="displayDiscrepancyAsText">
-        <v-icon :color="item.has_discrepancy ? 'success' : 'error'" small>
-          {{ item.has_discrepancy ? mdiCheck : mdiClose }}
-        </v-icon>
-        <span class="ml-1" :class="item.has_discrepancy ? 'success--text' : 'error--text'">
-          {{ item.has_discrepancy ? 'Yes' : 'No' }}
-        </span>
-      </template>
-      <template v-else>
-        <v-switch
-          v-model="item.has_discrepancy"
-          :label="$t('dataset.discrepancy') || 'Discrepancy'"
-          dense
-          hide-details
-          @change="onDiscrepancyChange(item)"
-        />
-      </template>
-    </template>
-
-    <!-- START DATE ----------------------------------------------------- -->
+    <!-- START / END DATE (admin) ------------------------------------ -->
     <template v-if="isAdmin" #[`item.annotation_start_date`]="{ item }">
       <v-text-field
         :value="formatDateForInput(item.annotation_start_date)"
@@ -142,7 +155,6 @@
       />
     </template>
 
-    <!-- END DATE ------------------------------------------------------- -->
     <template v-if="isAdmin" #[`item.annotation_end_date`]="{ item }">
       <v-text-field
         :value="formatDateForInput(item.annotation_end_date)"
@@ -162,7 +174,6 @@ import Vue from 'vue'
 import type { PropType } from 'vue'
 import { DataOptions } from 'vuetify/types'
 import { ExampleDTO } from '~/services/application/example/exampleData'
-import { ExampleItem } from '~/domain/models/example/example'
 import { MemberItem } from '~/domain/models/member/member'
 
 export default Vue.extend({
@@ -170,7 +181,7 @@ export default Vue.extend({
     isLoading: Boolean,
     items: { type: Array as PropType<ExampleDTO[]>, default: () => [] },
     value: { type: Array as PropType<ExampleDTO[]>, default: () => [] },
-    total: Number,
+    total: { type: Number, default: 0 },
     members: { type: Array as PropType<MemberItem[]>, default: () => [] },
     isAdmin: Boolean,
     mode: { type: String, default: 'dataset' },
@@ -187,9 +198,14 @@ export default Vue.extend({
     }
   },
 
+  /* -------------------- CABEÇALHOS DINÂMICOS ---------------------- */
   computed: {
     headers(): any[] {
       if (this.mode === 'discrepancias') {
+        const statusLabel = this.items.some(it => 'status' in it)
+          ? 'Status'
+          : this.$t('dataset.discrepancy') || 'Discrepancy'
+
         return [
           { text: this.$t('dataset.text'), value: 'text', sortable: false },
           {
@@ -197,13 +213,11 @@ export default Vue.extend({
             value: 'label_distribution',
             sortable: false
           },
-          {
-            text: this.$t('dataset.discrepancy') || 'Discrepancy',
-            value: 'has_discrepancy',
-            sortable: false
-          }
+          { text: statusLabel, value: 'has_discrepancy', sortable: false }
         ]
       }
+
+      /* Cabeçalhos modo “dataset” ---------------------------------- */
       return [
         { text: 'Status', value: 'isConfirmed', sortable: false },
         { text: this.$t('dataset.text'), value: 'text', sortable: false },
@@ -220,6 +234,7 @@ export default Vue.extend({
     }
   },
 
+  /* -------------------- WATCHES ----------------------------------- */
   watch: {
     options: {
       handler() {
@@ -241,20 +256,20 @@ export default Vue.extend({
     }
   },
 
+  /* -------------------- MÉTODOS ----------------------------------- */
   methods: {
-    /* Navegar para página de anotação */
+    /* Anotação directa -------------------------------------------- */
     toLabeling(item: ExampleDTO) {
       const idx = this.items.indexOf(item)
       const offset = (this.options.page - 1) * this.options.itemsPerPage
       this.$emit('click:labeling', { page: (offset + idx + 1).toString(), q: this.search })
     },
 
-    /* Helpers de assignee */
+    /* Combobox Assignee ------------------------------------------- */
     toSelected(item: ExampleDTO) {
       const ids = item.assignments.map(a => a.assignee_id)
       return this.members.filter(m => ids.includes(m.user))
     },
-
     onAssignOrUnassign(item: ExampleDTO, newAssignees: MemberItem[]) {
       const newIds = newAssignees.map(a => a.user)
       const oldIds = item.assignments.map(a => a.assignee_id)
@@ -270,18 +285,17 @@ export default Vue.extend({
         .forEach(id => this.$emit('assign', item.id, id))
     },
 
-    /* Discrepância */
-    onDiscrepancyChange(item: ExampleItem) {
+    /* Discrepância manual ----------------------------------------- */
+    onDiscrepancyChange(item: ExampleDTO) {
       this.$emit('discrepancy-change', item)
     },
 
-    /* Utilidades */
-    isAnnotationDisabled(item: any) {
+    /* Utilidades --------------------------------------------------- */
+    isAnnotationDisabled(item: ExampleDTO) {
       const now = new Date()
       if (item.annotation_end_date && now > new Date(item.annotation_end_date)) return true
       return !!item.is_finished
     },
-
     formatDateForInput(date: any) {
       if (!date) return ''
       if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date

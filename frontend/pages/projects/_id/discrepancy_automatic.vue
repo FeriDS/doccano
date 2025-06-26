@@ -3,7 +3,7 @@
   <v-container class="mt-12">
     <v-card>
       <v-card-title class="d-flex align-center">
-        <span>Automatic Discrepancies </span>
+        <span>Automatic Discrepancies</span>
         <v-spacer />
         <v-btn color="primary" class="mr-2" @click="onShowAnnotation">
           Show Annotation
@@ -15,6 +15,8 @@
       </v-card-title>
 
       <v-card-text>
+        <!--  ❌  display-discrepancy-as-text removido
+              ✅  o DocumentList já rende­ri­za a nova coluna “Status”            -->
         <document-list
           :items="examples"
           :is-loading="loading"
@@ -23,21 +25,10 @@
           :members="members"
           :value="selected"
           mode="discrepancias"
-          display-discrepancy-as-text
-        >
-          <!-- cabeçalho da coluna (substitui “Discrepancy”) -->
-          <!-- eslint-disable-next-line vue/valid-v-slot -->
-          <template #header.discrepancy>Status</template>
-
-          <!-- célula da coluna -->
-          <!-- eslint-disable-next-line vue/valid-v-slot -->
-          <template #item.discrepancy="{ item }">
-            <span :class="item.status_color">{{ item.status }}</span>
-          </template>
-        </document-list>
+        />
       </v-card-text>
 
-      <!-- Threshold -->
+      <!-- Threshold --------------------------------------------------- -->
       <v-text-field
         v-model.number="threshold"
         label="Threshold"
@@ -85,13 +76,12 @@ export default Vue.extend({
     await this.loadExamples()
   },
   methods: {
-    /* rota SEM query selected */
     onShowAnnotation() {
       const link = this.localePath(`/projects/${this.$route.params.id}/annotations`)
       this.$router.push(link)
     },
 
-    /** Carrega exemplos já transformados com STATUS */
+    /** Gerar lista já com STATUS ------------------------------------- */
     async loadExamples() {
       this.loading = true
       try {
@@ -101,7 +91,7 @@ export default Vue.extend({
         this.examples = items
           .filter((ex: any) => ex.is_finished)
           .map((ex: any) => {
-            /** --- distribuição em % com 2 casas --- */
+            /* Distribuição convertida para % com 2 casas -------------- */
             const rawEntries = Object.entries(ex.label_distribution || {})
             const dist = Object.fromEntries(
               rawEntries.map(([label, value]) => {
@@ -110,7 +100,7 @@ export default Vue.extend({
               })
             )
 
-            /** labels com valor ≥ threshold → “no discrepancy” */
+            /* Labels que superam o limiar ----------------------------- */
             const highLabels = rawEntries
               .filter(([, value]) => {
                 const p = Number(value)
@@ -126,22 +116,10 @@ export default Vue.extend({
 
             const statusColor = noDiscrepancy ? 'green--text' : 'red--text'
 
-            /* principal label (se útil noutro lado) */
-            let mainLabel = ''
-            if (!noDiscrepancy && rawEntries.length > 0) {
-              const [label] = rawEntries.reduce(
-                (maxEntry, current) =>
-                  Number(current[1]) > Number(maxEntry[1]) ? current : maxEntry,
-                rawEntries[0]
-              )
-              mainLabel = label
-            }
-
             return {
               ...ex,
               label_distribution: dist,
-              has_discrepancy: !noDiscrepancy,
-              main_label: mainLabel,
+              has_discrepancy: !noDiscrepancy,   // flag continua a existir
               status: statusText,
               status_color: statusColor
             }
@@ -161,7 +139,6 @@ export default Vue.extend({
   position: relative;
   padding-bottom: 70px;
 }
-
 .threshold-input-bottom-left {
   position: absolute;
   bottom: 16px;
