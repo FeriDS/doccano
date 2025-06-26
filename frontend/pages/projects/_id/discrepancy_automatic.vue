@@ -15,15 +15,12 @@
       </v-card-title>
 
       <v-card-text>
-        <!--  ❌  display-discrepancy-as-text removido
-              ✅  o DocumentList já rende­ri­za a nova coluna “Status”            -->
         <document-list
           :items="examples"
           :is-loading="loading"
           :is-admin="true"
           :total="total"
           :members="members"
-          :value="selected"
           mode="discrepancias"
         />
       </v-card-text>
@@ -81,7 +78,7 @@ export default Vue.extend({
       this.$router.push(link)
     },
 
-    /** Gerar lista já com STATUS ------------------------------------- */
+    /** Carregar exemplos e gerar STATUS / TOP LABELS ------------------ */
     async loadExamples() {
       this.loading = true
       try {
@@ -91,7 +88,7 @@ export default Vue.extend({
         this.examples = items
           .filter((ex: any) => ex.is_finished)
           .map((ex: any) => {
-            /* Distribuição convertida para % com 2 casas -------------- */
+            /* ---- distribuição % com 2 casas decimais --------------- */
             const rawEntries = Object.entries(ex.label_distribution || {})
             const dist = Object.fromEntries(
               rawEntries.map(([label, value]) => {
@@ -100,28 +97,29 @@ export default Vue.extend({
               })
             )
 
-            /* Labels que superam o limiar ----------------------------- */
-            const highLabels = rawEntries
+            /* ---- maior percentagem + labels empatados ---------------- */
+            const percentages = rawEntries.map(([, value]) =>
+              Number(value) > 1 ? Number(value) : Number(value) * 100
+            )
+            const maxP = percentages.length ? Math.max(...percentages) : 0
+
+            const topLabels = rawEntries
               .filter(([, value]) => {
-                const p = Number(value)
-                return (p > 1 ? p : p * 100) >= this.threshold
+                const p = Number(value) > 1 ? Number(value) : Number(value) * 100
+                return p === maxP
               })
               .map(([label]) => label)
 
-            const noDiscrepancy = highLabels.length > 0
-
-            const statusText = noDiscrepancy
-              ? `No discrepancy : ${highLabels.join(', ')}`
-              : 'Has discrepancy'
-
-            const statusColor = noDiscrepancy ? 'green--text' : 'red--text'
+            /* ---- regra de discrepância ------------------------------ */
+            const noDiscrepancy = maxP >= this.threshold
 
             return {
               ...ex,
               label_distribution: dist,
-              has_discrepancy: !noDiscrepancy,   // flag continua a existir
-              status: statusText,
-              status_color: statusColor
+              has_discrepancy: !noDiscrepancy,
+              status: noDiscrepancy ? 'No discrepancy' : 'Has discrepancy',
+              status_color: noDiscrepancy ? 'green--text' : 'red--text',
+              top_labels: topLabels
             }
           })
 

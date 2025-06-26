@@ -43,10 +43,30 @@
       v-if="mode === 'discrepancias' && isAdmin"
       #[`item.has_discrepancy`]="{ item }"
     >
-      <!-- Vista Automáticas – já vem formatado -->
-      <span v-if="item.status" :class="item.status_color">{{ item.status }}</span>
+      <!-- ---------- VISTA AUTOMÁTICAS (status + chips) ------------- -->
+      <template v-if="item.status === 'No discrepancy'">
+        <span :class="item.status_color" class="font-weight-medium">
+          {{ item.status }}
+        </span>
+        <v-chip
+          v-for="lbl in item.top_labels"
+          :key="lbl"
+          small
+          color="primary"
+          class="ma-1 white--text"
+        >
+          {{ lbl }}
+        </v-chip>
+      </template>
 
-      <!-- Vista manual / restantes ------------------------------ -->
+      <span
+        v-else-if="item.status === 'Has discrepancy'"
+        :class="item.status_color"
+      >
+        {{ item.status }}
+      </span>
+
+      <!-- ---------- VISTAS MANUAIS (ícone ou switch) ---------------- -->
       <template v-else-if="displayDiscrepancyAsText">
         <v-icon :color="item.has_discrepancy ? 'error' : 'success'" small>
           {{ item.has_discrepancy ? mdiClose : mdiCheck }}
@@ -198,7 +218,6 @@ export default Vue.extend({
     }
   },
 
-  /* -------------------- CABEÇALHOS DINÂMICOS ---------------------- */
   computed: {
     headers(): any[] {
       if (this.mode === 'discrepancias') {
@@ -234,7 +253,6 @@ export default Vue.extend({
     }
   },
 
-  /* -------------------- WATCHES ----------------------------------- */
   watch: {
     options: {
       handler() {
@@ -256,7 +274,6 @@ export default Vue.extend({
     }
   },
 
-  /* -------------------- MÉTODOS ----------------------------------- */
   methods: {
     /* Anotação directa -------------------------------------------- */
     toLabeling(item: ExampleDTO) {

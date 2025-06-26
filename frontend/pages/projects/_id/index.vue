@@ -8,6 +8,7 @@
         Signal Discrepancies
       </v-btn>
       <v-btn
+        v-if="user.isProjectAdmin"
         class="ml-4"
         color="primary"
         aria-label="Signal discrepancies automatically"
