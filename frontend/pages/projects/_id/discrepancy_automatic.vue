@@ -15,6 +15,34 @@
         </v-btn>
       </v-card-title>
 
+      <!-- ───────────── Threshold ────────── -->
+      <v-card-text class="mb-0 pb-0">
+        <div class="threshold-section">
+          <div class="threshold-label mb-2">
+            Insert the value of the threshold for discrepancies bellow:
+          </div>
+          <v-row align="center" no-gutters>
+            <v-col cols="auto">
+              <v-text-field
+                v-model.number="threshold"
+                type="number"
+                min="0"
+                max="100"
+                dense
+                suffix="%"
+                class="mr-6"
+                style="max-width: 150px;"
+              />
+            </v-col>
+            <v-col cols="auto">
+              <v-btn color="primary" @click="onUpdateDiscrepancies">
+                Update Discrepancies
+              </v-btn>
+            </v-col>
+          </v-row>
+        </div>
+      </v-card-text>
+
       <!-- ───────────── Table ────────────── -->
       <v-card-text>
         <v-data-table
@@ -91,18 +119,6 @@
           </template>
         </v-data-table>
       </v-card-text>
-
-      <!-- ───────────── Threshold ────────── -->
-      <v-text-field
-        v-model.number="threshold"
-        label="Threshold"
-        type="number"
-        min="0"
-        max="100"
-        dense
-        suffix="%"
-        class="threshold-input-bottom-left"
-      />
     </v-card>
   </v-container>
 </template>
@@ -134,13 +150,6 @@ export default Vue.extend({
     }
   },
 
-  watch: {
-    threshold(val: number) {
-      if (process.client) localStorage.setItem('discrepancyThreshold', String(val))
-      this.loadExamples()
-    }
-  },
-
   async created() {
     if (process.client) {
       const saved = localStorage.getItem('discrepancyThreshold')
@@ -154,6 +163,11 @@ export default Vue.extend({
       this.$router.push(
         this.localePath(`/projects/${this.$route.params.id}/annotations`)
       )
+    },
+
+    onUpdateDiscrepancies() {
+      if (process.client) localStorage.setItem('discrepancyThreshold', String(this.threshold))
+      this.loadExamples()
     },
 
     /** carrega exemplos + cálculo de status/top_labels */
