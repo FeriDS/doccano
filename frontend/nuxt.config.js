@@ -175,6 +175,16 @@ export default {
           name: '[path][name].[ext]'
         }
       })
+      // Transpile @flatten-js/core to handle ES2020+ syntax
+      config.module.rules.push({
+        test: /node_modules\/@flatten-js\/core/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env']
+          }
+        }
+      })
     }
   },
   router: {
