@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Assignment, Comment, Example, ExampleState
+from perspectives.models import ProjectPerspective, UserPerspectiveAnswer
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -29,6 +30,7 @@ class ExampleSerializer(serializers.ModelSerializer):
     is_confirmed = serializers.SerializerMethodField()
     assignments = serializers.SerializerMethodField()
     label_distribution = serializers.SerializerMethodField()
+    perspective_fields = serializers.SerializerMethodField()
 
     @classmethod
     def get_annotation_approver(cls, instance):
@@ -95,6 +97,15 @@ class ExampleSerializer(serializers.ModelSerializer):
             result['null'] = percent_null
         return result
 
+    def get_perspective_fields(self, obj):
+        # Return a mapping from assignee_id to their perspective field_values for this example's project
+        try:
+            project_perspective = ProjectPerspective.objects.get(project=obj.project)
+            answers = UserPerspectiveAnswer.objects.filter(project_perspective=project_perspective)
+            return {str(ans.user_id): ans.field_values for ans in answers}
+        except ProjectPerspective.DoesNotExist:
+            return {}
+
     class Meta:
         model = Example
         fields = [
@@ -114,6 +125,7 @@ class ExampleSerializer(serializers.ModelSerializer):
             "annotation_end_date",
             "is_finished",
             "is_resolved",
+            "perspective_fields",
         ]
         read_only_fields = ["filename", "is_confirmed", "upload_name", "assignments"]
 

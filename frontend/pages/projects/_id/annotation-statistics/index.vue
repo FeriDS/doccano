@@ -55,6 +55,18 @@
               @change="onPerspectiveChange"
             />
           </v-col>
+          <template v-if="perspectiveFields && perspectiveFields.length">
+            <template v-for="field in perspectiveFields">
+              <v-col :key="field.id" cols="12" md="4">
+                <v-select
+                  :label="field.name"
+                  v-model="filters.perspectiveValues[field.id]"
+                  :items="field.choices"
+                  clearable
+                />
+              </v-col>
+            </template>
+          </template>
           <v-col cols="12" md="4">
             <v-select
               v-model="filters.label"
@@ -232,6 +244,7 @@ export default {
         endDate: null,
         selectedPerspective: null,
         perspective: null,
+        perspectiveValue: null,
         label: null,
         resolved: null,
         example: null,
@@ -468,6 +481,17 @@ export default {
               console.log('Comparando:', exampleValue, 'com', filterValue);
               if (exampleValue !== filterValue) {
                 return false;
+              }
+            }
+            
+            // Filtro por valores dos fields da perspectiva
+            if (this.filters.perspective && this.filters.perspectiveValues) {
+              const fields = Object.entries(this.filters.perspectiveValues);
+              for (const [fieldId, value] of fields) {
+                if (value && (!example.perspective_fields ||
+                 example.perspective_fields[fieldId] !== value)) {
+                  return false;
+                }
               }
             }
             
@@ -774,6 +798,7 @@ export default {
         endDate: null,
         selectedPerspective: null,
         perspective: null,
+        perspectiveValue: null,
         label: null,
         resolved: null,
         example: null,
@@ -1149,6 +1174,12 @@ export default {
           this.loading = false
         }
       })
+    },
+
+    getPerspectiveFields(perspectiveId) {
+      const perspective = this.perspectives.find(p => p.id === perspectiveId)
+      console.log('Perspective:', perspective)
+      return perspective && perspective.fields ? perspective.fields : []
     }
   }
 }
