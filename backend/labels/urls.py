@@ -13,6 +13,9 @@ from .views import (
     SpanListAPI,
     TextLabelDetailAPI,
     TextLabelListAPI,
+    DatasetVersionVotingStatsAPI,
+    DatasetVersionAllVersionsAPI,
+    DatasetVersionPerspectivesAPI,
 )
 
 urlpatterns = [
@@ -48,4 +51,7 @@ urlpatterns = [
         view=SegmentationDetailAPI.as_view(),
         name="segmentation_detail",
     ),
+    path('dataset-version/<int:example_id>/<int:version>/stats/', DatasetVersionVotingStatsAPI.as_view(), name='datasetversion-stats'),
+    path('dataset-version/<int:example_id>/versions/', DatasetVersionAllVersionsAPI.as_view(), name='datasetversion-versions'),
+    path('dataset-version/<int:example_id>/perspectives/', DatasetVersionPerspectivesAPI.as_view(), name='datasetversion-perspectives'),
 ]
