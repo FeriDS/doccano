@@ -19,7 +19,8 @@ export class ExampleItem {
     readonly label_distribution: { [label: string]: number },
     readonly annotation_start_date: string | null,
     readonly annotation_end_date: string | null,
-    readonly is_finished: boolean
+    readonly is_finished: boolean,
+    readonly is_resolved: boolean
   ) {}
 
   get url() {

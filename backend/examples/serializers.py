@@ -113,6 +113,7 @@ class ExampleSerializer(serializers.ModelSerializer):
             "annotation_start_date",
             "annotation_end_date",
             "is_finished",
+            "is_resolved",
         ]
         read_only_fields = ["filename", "is_confirmed", "upload_name", "assignments"]
 

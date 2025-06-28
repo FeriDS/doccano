@@ -17,7 +17,8 @@ function toModel(item: { [key: string]: any }): ExampleItem {
     item.label_distribution,
     item.annotation_start_date,
     item.annotation_end_date,
-    item.is_finished
+    item.is_finished,
+    item.is_resolved
   )
 }
 

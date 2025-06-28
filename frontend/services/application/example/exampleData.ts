@@ -17,6 +17,7 @@ export class ExampleDTO {
   annotation_start_date: string | null
   annotation_end_date: string | null
   is_finished: boolean
+  is_resolved: boolean
 
   constructor(item: ExampleItem) {
     this.id = item.id
@@ -35,6 +36,7 @@ export class ExampleDTO {
     this.annotation_start_date = item.annotation_start_date
     this.annotation_end_date = item.annotation_end_date
     this.is_finished = item.is_finished
+    this.is_resolved = item.is_resolved
   }
 }
 

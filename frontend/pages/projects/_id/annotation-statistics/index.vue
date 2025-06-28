@@ -1,6 +1,155 @@
 <template>
   <v-container fluid>
     <h1 class="text-h4 mb-4">Estatísticas por Texto</h1>
+    <v-alert
+      type="info"
+      class="mb-4"
+      :value="true"
+    >
+      <strong>Nota:</strong> Apenas datasets finalizados 
+      são exibidos nesta página.
+      <br>
+      <strong>Total de datasets finalizados:</strong> {{ examples.length }}
+    </v-alert>
+
+    <!-- Filtros -->
+    <v-card class="mb-6">
+      <v-card-title>
+        <v-icon left>mdi-filter</v-icon>
+        Filtros
+        <v-chip
+          v-if="hasActiveFilters"
+          color="primary"
+          small
+          class="ml-2"
+        >
+          {{ activeFiltersCount }} filtro(s) ativo(s)
+        </v-chip>
+        <v-spacer />
+        <v-switch
+          v-model="useLocalFiltering"
+          label="Filtro Local"
+          class="ml-4"
+        />
+      </v-card-title>
+      <v-card-text>
+        <v-alert
+          v-if="useLocalFiltering"
+          type="warning"
+          dense
+          class="mb-4"
+        >
+          <strong>Filtro Local Ativo:</strong> 
+          Os dados são filtrados no navegador. Use esta opção se os
+           filtros da API não estiverem funcionando.
+        </v-alert>
+        <v-row>
+          <v-col cols="12" md="4">
+            <v-select
+              v-model="filters.perspective"
+              :items="perspectives"
+              item-text="name"
+              item-value="id"
+              label="Perspetiva"
+              clearable
+              @change="onPerspectiveChange"
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-select
+              v-model="filters.label"
+              :items="categories"
+              item-text="text"
+              item-value="id"
+              label="Categoria"
+              clearable
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-select
+              v-model="filters.resolved"
+              :items="statusOptions"
+              item-text="text"
+              item-value="value"
+              label="Status"
+              clearable
+            />
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col cols="12" md="3">
+            <v-menu
+              v-model="filters.startDateMenu"
+              :close-on-content-click="false"
+              transition="scale-transition"
+              offset-y
+              min-width="auto"
+            >
+              <template #activator="{ on, attrs }">
+                <v-text-field
+                  v-model="filters.startDate"
+                  label="Data Início"
+                  prepend-icon="mdi-calendar"
+                  readonly
+                  v-bind="attrs"
+                  clearable
+                  v-on="on"
+                />
+              </template>
+              <v-date-picker
+                v-model="filters.startDate"
+                @input="filters.startDateMenu = false"
+              />
+            </v-menu>
+          </v-col>
+          <v-col cols="12" md="3">
+            <v-menu
+              v-model="filters.endDateMenu"
+              :close-on-content-click="false"
+              transition="scale-transition"
+              offset-y
+              min-width="auto"
+            >
+              <template #activator="{ on, attrs }">
+                <v-text-field
+                  v-model="filters.endDate"
+                  label="Data Fim"
+                  prepend-icon="mdi-calendar"
+                  readonly
+                  v-bind="attrs"
+                  clearable
+                  v-on="on"
+                />
+              </template>
+              <v-date-picker
+                v-model="filters.endDate"
+                @input="filters.endDateMenu = false"
+              />
+            </v-menu>
+          </v-col>
+          <v-col cols="12" md="3">
+            <v-btn
+              color="primary"
+              :loading="loading"
+              @click="applyFilters"
+            >
+              <v-icon left>mdi-filter-check</v-icon>
+              Aplicar Filtros
+            </v-btn>
+          </v-col>
+          <v-col cols="12" md="3">
+            <v-btn
+              outlined
+              @click="clearFilters"
+            >
+              <v-icon left>mdi-filter-remove</v-icon>
+              Limpar Filtros
+            </v-btn>
+          </v-col>
+        </v-row>
+      </v-card-text>
+    </v-card>
+
     <div v-for="example in examples" :key="example.id" class="mb-6">
       <v-card class="mb-4">
         <v-card-title class="text-h6">
@@ -134,7 +283,9 @@ export default {
       expandedPanels: [],
       charts: {},
       labelsCharts: {},
-      abstractionCharts: {}
+      abstractionCharts: {},
+      useLocalFiltering: false,
+      allExamples: [] // Para armazenar todos os exemplos quando usar filtro local
     }
   },
 
@@ -147,6 +298,24 @@ export default {
     },
     numberPerspectiveFields() {
       return this.perspectiveFields.filter(f => f.field_type === 'number')
+    },
+    hasActiveFilters() {
+      return this.filters.startDate || 
+             this.filters.endDate || 
+             this.filters.perspective || 
+             this.filters.label || 
+             this.filters.resolved !== null ||
+             Object.keys(this.filters.perspectiveValues).length > 0
+    },
+    activeFiltersCount() {
+      let count = 0
+      if (this.filters.startDate) count++
+      if (this.filters.endDate) count++
+      if (this.filters.perspective) count++
+      if (this.filters.label) count++
+      if (this.filters.resolved !== null) count++
+      count += Object.keys(this.filters.perspectiveValues).length
+      return count
     }
   },
 
@@ -163,6 +332,10 @@ export default {
           this.renderAllCharts()
         })
       }
+    },
+    useLocalFiltering() {
+      // Recarregar dados quando alternar entre filtro local e API
+      this.applyFilters()
     }
   },
 
@@ -200,16 +373,133 @@ export default {
     async fetchCategories() {
       try {
         const response = await this.$services.categoryType.list(this.projectId)
-        this.categories = response
+        console.log('Raw categories response:', response)
+        
+        this.categories = response.map(cat => {
+          const category = {
+            text: cat.text || cat.name || cat.label || cat.id,
+            id: cat.id
+          }
+          console.log('Processed category:', category)
+          return category
+        })
+        
+        console.log('Final categories:', this.categories)
       } catch (error) {
         console.error('Erro ao buscar categorias:', error)
+        this.categories = []
       }
     },
 
     async fetchExamples() {
       try {
-        const response = await this.$services.example.list(this.projectId, {})
-        this.examples = response.items.map((it) => ({
+        if (this.useLocalFiltering) {
+          // Filtro local - buscar todos e filtrar no frontend
+          const response = await this.$services.example.list(this.projectId, {})
+          this.allExamples = response.items.filter((it) => it.is_finished)
+          
+          // Aplicar filtros localmente
+          this.examples = this.allExamples.filter(example => {
+            // Filtro por data
+            if (this.filters.startDate && example.created_at) {
+              const exampleDate = new Date(example.created_at).toISOString().split('T')[0]
+              if (exampleDate < this.filters.startDate) return false
+            }
+            if (this.filters.endDate && example.created_at) {
+              const exampleDate = new Date(example.created_at).toISOString().split('T')[0]
+              if (exampleDate > this.filters.endDate) return false
+            }
+            
+            // Filtro por perspetiva (se aplicável)
+            if (this.filters.perspective && example.perspective_id) {
+              if (example.perspective_id !== this.filters.perspective) return false
+            }
+            
+            // Filtro por categoria (se aplicável)
+            if (this.filters.label) {
+              let hasCategory = false;
+
+              const selectedCategory = this.categories.find(
+                cat => cat.id === this.filters.label || cat.text === this.filters.label
+              );
+              const selectedCategoryId = selectedCategory ?
+               String(selectedCategory.id) : String(this.filters.label);
+              const selectedCategoryText = selectedCategory ?
+               String(selectedCategory.text) : String(this.filters.label);
+
+              // LOGS PARA DEBUG
+              console.log('Filtro categoria:', this.filters.label);
+              console.log('selectedCategory:', selectedCategory);
+              console.log('selectedCategoryId:', selectedCategoryId);
+              console.log('selectedCategoryText:', selectedCategoryText);
+              console.log('label_distribution:', example.label_distribution);
+              console.log('labels:', example.labels);
+
+              if (example.label_distribution) {
+                hasCategory = Object.keys(example.label_distribution).some(categoryName => {
+                  console.log('Comparando chave:', categoryName, 'com', selectedCategoryId, selectedCategoryText);
+                  return (
+                    String(categoryName) === selectedCategoryId ||
+                    String(categoryName) === selectedCategoryText
+                  );
+                });
+              }
+
+              if (!hasCategory && example.labels && Array.isArray(example.labels)) {
+                hasCategory = example.labels.some(label => {
+                  const labelCategoryId = String(label.category_id || label.category);
+                  console.log('Comparando label:', labelCategoryId, 'com', selectedCategoryId, selectedCategoryText);
+                  return (
+                    labelCategoryId === selectedCategoryId ||
+                    labelCategoryId === selectedCategoryText
+                  );
+                });
+              }
+
+              if (!hasCategory) return false;
+            }
+            
+            // Filtro por status (se aplicável)
+            console.log('Filtro status:', this.filters.resolved, typeof this.filters.resolved);
+            console.log('Exemplo is_resolved:', example.is_resolved, typeof example.is_resolved);
+            if (this.filters.resolved !== null && this.filters.resolved !== undefined) {
+              const filterValue = this.filters.resolved === true || this.filters.resolved === "true" || this.filters.resolved === 1 || this.filters.resolved === "1";
+              const exampleValue = example.is_resolved === true || example.is_resolved === "true" || example.is_resolved === 1 || example.is_resolved === "1";
+              console.log('Comparando:', exampleValue, 'com', filterValue);
+              if (exampleValue !== filterValue) {
+                return false;
+              }
+            }
+            
+            return true
+          })
+        } else {
+          // Filtro via API
+          const params = {}
+          
+          if (this.filters.startDate && this.filters.startDate.trim()) {
+            params.start_date = this.filters.startDate
+          }
+          if (this.filters.endDate && this.filters.endDate.trim()) {
+            params.end_date = this.filters.endDate
+          }
+          if (this.filters.perspective) {
+            params.perspective = this.filters.perspective
+          }
+          if (this.filters.label) {
+            params.label = this.filters.label
+          }
+          if (this.filters.resolved !== null && this.filters.resolved !== undefined) {
+            params.resolved = this.filters.resolved
+          }
+
+          console.log('Fetching examples with params:', params)
+          const response = await this.$services.example.list(this.projectId, params)
+          this.examples = response.items.filter((it) => it.is_finished)
+        }
+        
+        // Processar label_distribution para todos os exemplos
+        this.examples = this.examples.map((it) => ({
           ...it,
           label_distribution: Object.fromEntries(
             Object.entries(it.label_distribution || {}).map(([l, v]) => {
@@ -218,15 +508,27 @@ export default {
             })
           )
         }))
+        
+        console.log('Filtered examples:', this.examples.length)
       } catch (error) {
+        console.error('Error fetching examples:', error)
         this.examples = []
       }
     },
 
     async fetchAllExamplesData() {
       try {
-        const response = await this.$services.example.list(this.projectId, { limit: 1000 })
-        this.allExamplesData = response.items || []
+        // Construir parâmetros de filtro
+        const params = { limit: 1000 }
+        if (this.filters.startDate) params.start_date = this.filters.startDate
+        if (this.filters.endDate) params.end_date = this.filters.endDate
+        if (this.filters.perspective) params.perspective = this.filters.perspective
+        if (this.filters.label) params.label = this.filters.label
+        if (this.filters.resolved !== null) params.resolved = this.filters.resolved
+
+        const response = await this.$services.example.list(this.projectId, params)
+        this.allExamplesData = (response.items || [])
+          .filter((it) => it.is_finished) // Filtrar apenas datasets finalizados
       } catch (error) {
         console.error('Erro ao buscar dados de todos os exemplos:', error)
         this.allExamplesData = []
@@ -480,6 +782,9 @@ export default {
         endDateMenu: false,
         perspectiveValues: {}
       }
+      
+      // Recarregar dados sem filtros
+      this.applyFilters()
     },
 
     async exportToCSV() {
@@ -817,6 +1122,32 @@ export default {
       this.examples.forEach((example) => {
         this.renderLabelsChart(example.id, example.label_distribution)
         this.renderAbstractionChart(example.id, example.label_distribution)
+      })
+    },
+
+    applyFilters() {
+      console.log('Applying filters:', this.filters)
+      console.log('Available categories:', this.categories)
+      this.loading = true
+      
+      this.$nextTick(async () => {
+        try {
+          // Recarregar exemplos com filtros aplicados
+          await this.fetchExamples()
+          await this.fetchAllExamplesData()
+          await this.fetchStatistics()
+          
+          // Re-renderizar gráficos
+          this.$nextTick(() => {
+            this.renderAllCharts()
+          })
+          
+          console.log('Filters applied successfully')
+        } catch (error) {
+          console.error('Erro ao aplicar filtros:', error)
+        } finally {
+          this.loading = false
+        }
       })
     }
   }
