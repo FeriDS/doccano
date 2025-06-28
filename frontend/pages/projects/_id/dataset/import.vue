@@ -14,7 +14,7 @@
         label="File format"
         outlined
       />
-      <v-form v-model="valid" ref="form">
+      <v-form ref="form" v-model="valid">
         <v-text-field
           v-for="(item, key) in textFields"
           :key="key"

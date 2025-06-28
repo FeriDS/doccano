@@ -16,8 +16,8 @@
         ></v-select>
         <v-btn
           text
-          @click="$router.back()"
           aria-label="Voltar"
+          @click="$router.back()"
         >
           <v-icon left>{{ mdiArrowLeft }}</v-icon>
           Return

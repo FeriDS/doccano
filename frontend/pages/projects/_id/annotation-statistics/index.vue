@@ -10,15 +10,53 @@
           <v-row>
             <v-col cols="6">
               <h3 class="text-h6 mb-3">Distribuição de Labels</h3>
+              <div class="total-percentage mb-2">
+                <v-chip
+                  color="blue"
+                  text-color="white"
+                  class="font-weight-bold"
+                  :label="true"
+                >
+                  Total Labels: <span :id="'total-labels-' + example.id">0%</span>
+                </v-chip>
+              </div>
               <div style="min-height: 250px;">
                 <canvas :ref="'labelsChart' + example.id"></canvas>
               </div>
             </v-col>
             <v-col cols="6">
               <h3 class="text-h6 mb-3">Abstenção e Null</h3>
+              <div class="total-percentage mb-2">
+                <v-chip
+                  color="red"
+                  text-color="white"
+                  class="font-weight-bold"
+                  :label="true"
+                >
+                  Total non-voted: <span :id="'total-abstention-' + example.id">0%</span>
+                </v-chip>
+              </div>
               <div style="min-height: 250px;">
                 <canvas :ref="'abstractionChart' + example.id"></canvas>
               </div>
+            </v-col>
+          </v-row>
+          <v-row class="mt-4">
+            <v-col cols="12">
+              <v-card outlined class="pa-3">
+                <v-row>
+                  <v-col cols="6" class="text-center">
+                    <div class="text-h6 text-blue-darken-2 font-weight-bold">
+                      Total Labels Regulares: <span :id="'summary-labels-' + example.id">0%</span>
+                    </div>
+                  </v-col>
+                  <v-col cols="6" class="text-center">
+                    <div class="text-h6 text-red-darken-2 font-weight-bold">
+                      Total non-voted: <span :id="'summary-abstention-' + example.id">0%</span>
+                    </div>
+                  </v-col>
+                </v-row>
+              </v-card>
             </v-col>
           </v-row>
         </v-card-text>
@@ -284,6 +322,31 @@ export default {
               y: {
                 beginAtZero: true
               }
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label(context) {
+                    return context.parsed.y.toFixed(2) + '%'
+                  }
+                }
+              }
+            },
+            animation: {
+              onComplete() {
+                const ctx = this.ctx;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#000';
+                
+                this.data.datasets.forEach(function(dataset) {
+                  for (let i = 0; i < dataset.data.length; i++) {
+                    const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
+                    ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                  }
+                });
+              }
             }
           }
         })
@@ -535,6 +598,21 @@ export default {
         }
       });
       
+      // Calcular percentagem total de labels regulares
+      const totalLabels = regularData.reduce((sum, value) => sum + value, 0);
+      
+      // Atualizar o elemento HTML com a percentagem total
+      this.$nextTick(() => {
+        const totalElement = document.getElementById(`total-labels-${exampleId}`);
+        if (totalElement) {
+          totalElement.textContent = `${totalLabels.toFixed(1)}%`;
+        }
+        const summaryElement = document.getElementById(`summary-labels-${exampleId}`);
+        if (summaryElement) {
+          summaryElement.textContent = `${totalLabels.toFixed(1)}%`;
+        }
+      });
+      
       const refName = 'labelsChart' + exampleId;
       const ctxArr = this.$refs[refName];
       const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
@@ -556,6 +634,40 @@ export default {
         },
         options: {
           responsive: true,
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label(context) {
+                  return context.parsed.y.toFixed(2) + '%'
+                }
+              }
+            },
+            title: {
+              display: true,
+              text: `Total Labels: ${totalLabels.toFixed(1)}%`,
+              font: {
+                size: 14,
+                weight: 'bold'
+              },
+              color: '#1976d2'
+            }
+          },
+          animation: {
+            onComplete() {
+              const ctx = this.ctx;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              ctx.font = '12px Arial';
+              ctx.fillStyle = '#000';
+              
+              this.data.datasets.forEach(function(dataset) {
+                for (let i = 0; i < dataset.data.length; i++) {
+                  const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
+                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                }
+              });
+            }
+          },
           scales: {
             y: {
               beginAtZero: true,
@@ -611,6 +723,21 @@ export default {
         }
       }
       
+      // Calcular percentagem total de null e abstenção
+      const totalAbstentionNull = abstractionData.reduce((sum, value) => sum + value, 0);
+      
+      // Atualizar o elemento HTML com a percentagem total
+      this.$nextTick(() => {
+        const totalElement = document.getElementById(`total-abstention-${exampleId}`);
+        if (totalElement) {
+          totalElement.textContent = `${totalAbstentionNull.toFixed(1)}%`;
+        }
+        const summaryElement = document.getElementById(`summary-abstention-${exampleId}`);
+        if (summaryElement) {
+          summaryElement.textContent = `${totalAbstentionNull.toFixed(1)}%`;
+        }
+      });
+      
       const refName = 'abstractionChart' + exampleId;
       const ctxArr = this.$refs[refName];
       const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
@@ -632,6 +759,40 @@ export default {
         },
         options: {
           responsive: true,
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label(context) {
+                  return context.parsed.y.toFixed(2) + '%'
+                }
+              }
+            },
+            title: {
+              display: true,
+              text: `Total non-voted: ${totalAbstentionNull.toFixed(1)}%`,
+              font: {
+                size: 14,
+                weight: 'bold'
+              },
+              color: '#d32f2f'
+            }
+          },
+          animation: {
+            onComplete() {
+              const ctx = this.ctx;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              ctx.font = '12px Arial';
+              ctx.fillStyle = '#000';
+              
+              this.data.datasets.forEach(function(dataset) {
+                for (let i = 0; i < dataset.data.length; i++) {
+                  const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
+                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                }
+              });
+            }
+          },
           scales: {
             y: {
               beginAtZero: true,

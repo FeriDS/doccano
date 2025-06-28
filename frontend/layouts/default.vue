@@ -20,7 +20,7 @@
       color="error"
     >
       {{ techIssueMessage }}
-      <template v-slot:action="{ attrs }">
+      <template #action="{ attrs }">
         <v-btn color="white" text v-bind="attrs" @click="showTechIssue = false">
           Ok
         </v-btn>

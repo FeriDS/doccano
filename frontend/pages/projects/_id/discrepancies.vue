@@ -4,8 +4,8 @@
       <v-card-title class="d-flex align-center">
         <span>Sinalizar Discrepâncias</span>
         <v-spacer />
-        <v-btn color="primary" class="mr-2" @click="onShowAnnotation"
-        :disabled="!canShowAnnotation">
+        <v-btn color="primary" class="mr-2" :disabled="!canShowAnnotation"
+        @click="onShowAnnotation">
           Show Annotation
         </v-btn>
         <v-btn text aria-label="Return" @click="$router.back()">
@@ -64,9 +64,6 @@ export default Vue.extend({
       mdiArrowLeft
     }
   },
-  async created() {
-    await this.fetchExamples()
-  },
   computed: {
   canShowAnnotation(): boolean {
     if (!Array.isArray(this.selected) || this.selected.length === 0) return false
@@ -82,6 +79,9 @@ export default Vue.extend({
       .some((ex: any) => ex && ex.has_discrepancy)
   }
 },
+  async created() {
+    await this.fetchExamples()
+  },
   methods: {
    onShowAnnotation() {
   // Supondo que só um exemplo pode ser selecionado:

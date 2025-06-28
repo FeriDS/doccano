@@ -15,8 +15,8 @@
             </v-btn>
             <v-btn
               text
-              @click="goBack"
               aria-label="back"
+              @click="goBack"
             >
               <v-icon left>{{ mdiArrowLeft }}</v-icon>
               Return

@@ -3,12 +3,12 @@
     <v-card-title>
       {{ $t('projectHome.welcome') }}
       <v-spacer />
-      <v-btn v-if="this.isAdmin" color="warning" class="ml-4" 
+      <v-btn v-if="isAdmin" color="warning" class="ml-4" 
       @click="$router.push(`/projects/${$route.params.id}/discrepancies`)">
         Signal Discrepancies
       </v-btn>
       <v-btn
-        v-if="this.isAdmin"
+        v-if="isAdmin"
         class="ml-4"
         color="secondary"
         aria-label="Signal discrepancies automatically"

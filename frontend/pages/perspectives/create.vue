@@ -4,15 +4,15 @@
 
     <v-form>
       <v-text-field
-        label="Name"
         v-model="name"
+        label="Name"
         required
         class="mb-4"
       />
 
       <v-textarea
-        label="Description"
         v-model="description"
+        label="Description"
         rows="3"
         class="mb-4"
       />
@@ -25,23 +25,23 @@
         <v-row dense>
           <v-col cols="4">
             <v-text-field
-              label="Field Name"
               v-model="field.name"
+              label="Field Name"
               required
             />
           </v-col>
           <v-col cols="4">
             <v-text-field
-              label="Field Description"
               v-model="field.description"
+              label="Field Description"
               required
             />
           </v-col>
           <v-col cols="3">
             <v-select
+              v-model="field.field_type"
               label="Field Type"
               :items="['text', 'number', 'boolean', 'choice', 'multiple']"
-              v-model="field.field_type"
               required
             />
           </v-col>
@@ -49,8 +49,8 @@
             <v-btn
               icon
               color="error"
-              @click="removeField(index)"
               aria-label="Delete field"
+              @click="removeField(index)"
             >
               <v-icon>{{ mdiDelete }}</v-icon>
             </v-btn>
@@ -74,8 +74,8 @@
       <div class="d-flex justify-start mb-4">
         <v-btn
           color="primary"
-          @click="addField"
           aria-label="Add Field"
+          @click="addField"
         >
           <v-icon left>{{ mdiPlus }}</v-icon>
           Add Field
@@ -88,8 +88,8 @@
         </v-btn>
         <v-btn
           text
-          @click="$router.back()"
           aria-label="Return"
+          @click="$router.back()"
         >
           <v-icon left>{{ mdiArrowLeft }}</v-icon>
           Return
