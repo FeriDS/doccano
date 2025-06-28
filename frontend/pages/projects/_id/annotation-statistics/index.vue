@@ -8,9 +8,20 @@
           <v-icon right>mdi-chevron-down</v-icon>
         </v-expansion-panel-header>
         <v-expansion-panel-content>
-          <div style="min-height: 250px;">
-            <canvas :ref="'exampleChart' + example.id"></canvas>
-        </div>
+          <v-row>
+            <v-col cols="6">
+              <h3 class="text-h6 mb-3">Distribuição de Labels</h3>
+              <div style="min-height: 250px;">
+                <canvas :ref="'labelsChart' + example.id"></canvas>
+              </div>
+            </v-col>
+            <v-col cols="6">
+              <h3 class="text-h6 mb-3">Abstenção e Null</h3>
+              <div style="min-height: 250px;">
+                <canvas :ref="'abstractionChart' + example.id"></canvas>
+              </div>
+            </v-col>
+          </v-row>
         </v-expansion-panel-content>
       </v-expansion-panel>
     </v-expansion-panels>
@@ -84,7 +95,9 @@ export default {
       perspectiveChoices: [],
       allExamplesData: [],
       expandedPanels: [],
-      charts: {}
+      charts: {},
+      labelsCharts: {},
+      abstractionCharts: {}
     }
   },
 
@@ -492,39 +505,134 @@ export default {
       for (const idx of panelIndexes) {
         const example = this.examples[idx]
         if (!example) continue
-        if (!this.charts[example.id]) {
-          this.renderChart(example.id, example.label_distribution)
+        if (!this.labelsCharts[example.id]) {
+          this.renderLabelsChart(example.id, example.label_distribution)
+        }
+        if (!this.abstractionCharts[example.id]) {
+          this.renderAbstractionChart(example.id, example.label_distribution)
         }
       }
     },
 
-    renderChart(exampleId, distribution) {
+    renderLabelsChart(exampleId, distribution) {
       // Compatível com novo e antigo formato
       const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
-      const labels = isNewFormat ? Object.keys(distribution.labels ||
-       {}) : Object.keys(distribution || {});
-      const data = isNewFormat ? Object.values(distribution.labels || 
-      {}).map(Number) : Object.values(distribution || {}).map(Number);
-      if (isNewFormat && 'null' in distribution && distribution.null > 0) {
-        labels.push('Null');
-        data.push(Number(distribution.null));
-      }
-      const refName = 'exampleChart' + exampleId;
+      const allLabels = isNewFormat ? Object.keys(distribution.labels || {}) :
+       Object.keys(distribution || {});
+      const allData = isNewFormat ? Object.values(distribution.labels || {}).map(Number) : 
+       Object.values(distribution || {}).map(Number);
+      
+      // Filtrar apenas labels regulares (excluir abstração e null)
+      const regularLabels = [];
+      const regularData = [];
+      
+      allLabels.forEach((label, index) => {
+        const value = allData[index];
+        // Excluir se contém palavras-chave de abstração ou é null
+        if (!label.toLowerCase().includes('abstração') && 
+            !label.toLowerCase().includes('abstraction') && 
+            !label.toLowerCase().includes('abstenção') &&
+            !label.toLowerCase().includes('abstention') &&
+            !label.toLowerCase().includes('null') &&
+            label !== 'Null' &&
+            label !== 'null') {
+          regularLabels.push(label);
+          regularData.push(value);
+        }
+      });
+      
+      const refName = 'labelsChart' + exampleId;
       const ctxArr = this.$refs[refName];
       const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
       if (!ctx) return;
-      if (this.charts[exampleId]) {
-        this.charts[exampleId].destroy();
+      if (this.labelsCharts[exampleId]) {
+        this.labelsCharts[exampleId].destroy();
       }
-      this.charts[exampleId] = new Chart(ctx, {
+      this.labelsCharts[exampleId] = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels,
+          labels: regularLabels,
           datasets: [{
             label: 'Distribuição de Labels (%)',
-            data,
+            data: regularData,
             backgroundColor: 'rgba(54, 162, 235, 0.8)',
             borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              min: 0,
+              max: 100,
+              ticks: { callback: v => v + '%' }
+            },
+            yAxes: [{
+              ticks: {
+                beginAtZero: true,
+                min: 0,
+                max: 100,
+                callback: v => v + '%'
+              }
+            }]
+          }
+        }
+      });
+    },
+
+    renderAbstractionChart(exampleId, distribution) {
+      // Compatível com novo e antigo formato
+      const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
+      const allLabels = isNewFormat ? Object.keys(distribution.labels || 
+      {}) : Object.keys(distribution || {});
+      const allData = isNewFormat ? Object.values(distribution.labels ||
+       {}).map(Number) : Object.values(distribution || {}).map(Number);
+      
+      // Filtrar apenas abstração e null
+      const abstractionLabels = [];
+      const abstractionData = [];
+      
+      allLabels.forEach((label, index) => {
+        const value = allData[index];
+        // Considerar como abstração se contém palavras-chave ou é null
+        if (label.toLowerCase().includes('abstração') || 
+            label.toLowerCase().includes('abstraction') || 
+            label.toLowerCase().includes('abstenção') ||
+            label.toLowerCase().includes('abstention') ||
+            label.toLowerCase().includes('null') ||
+            label === 'Null' ||
+            label === 'null') {
+          abstractionLabels.push(label);
+          abstractionData.push(value);
+        }
+      });
+      
+      // Adicionar null se existir no formato novo
+      if (isNewFormat && 'null' in distribution && distribution.null > 0) {
+        if (!abstractionLabels.includes('Null')) {
+          abstractionLabels.push('Null');
+          abstractionData.push(Number(distribution.null));
+        }
+      }
+      
+      const refName = 'abstractionChart' + exampleId;
+      const ctxArr = this.$refs[refName];
+      const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
+      if (!ctx) return;
+      if (this.abstractionCharts[exampleId]) {
+        this.abstractionCharts[exampleId].destroy();
+      }
+      this.abstractionCharts[exampleId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: abstractionLabels,
+          datasets: [{
+            label: 'Abstenção e Null (%)',
+            data: abstractionData,
+            backgroundColor: 'rgba(255, 99, 132, 0.8)',
+            borderColor: 'rgba(255, 99, 132, 1)',
             borderWidth: 1
           }]
         },
