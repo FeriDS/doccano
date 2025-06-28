@@ -1,13 +1,12 @@
 <template>
   <v-container fluid>
     <h1 class="text-h4 mb-4">Estatísticas por Texto</h1>
-    <v-expansion-panels multiple @change="onPanelChange">
-      <v-expansion-panel v-for="example in examples" :key="example.id">
-        <v-expansion-panel-header>
+    <div v-for="example in examples" :key="example.id" class="mb-6">
+      <v-card class="mb-4">
+        <v-card-title class="text-h6">
           {{ example.text }}
-          <v-icon right>mdi-chevron-down</v-icon>
-        </v-expansion-panel-header>
-        <v-expansion-panel-content>
+        </v-card-title>
+        <v-card-text>
           <v-row>
             <v-col cols="6">
               <h3 class="text-h6 mb-3">Distribuição de Labels</h3>
@@ -22,9 +21,9 @@
               </div>
             </v-col>
           </v-row>
-        </v-expansion-panel-content>
-      </v-expansion-panel>
-    </v-expansion-panels>
+        </v-card-text>
+      </v-card>
+    </div>
   </v-container>
 </template>
 
@@ -119,6 +118,13 @@ export default {
       handler() {
         this.fetchStatistics()
       }
+    },
+    examples: {
+      handler() {
+        this.$nextTick(() => {
+          this.renderAllCharts()
+        })
+      }
     }
   },
 
@@ -132,6 +138,7 @@ export default {
 
   mounted() {
     this.initializeCharts()
+    this.renderAllCharts()
   },
 
   methods: {
@@ -501,19 +508,6 @@ export default {
       }
     },
 
-    onPanelChange(panelIndexes) {
-      for (const idx of panelIndexes) {
-        const example = this.examples[idx]
-        if (!example) continue
-        if (!this.labelsCharts[example.id]) {
-          this.renderLabelsChart(example.id, example.label_distribution)
-        }
-        if (!this.abstractionCharts[example.id]) {
-          this.renderAbstractionChart(example.id, example.label_distribution)
-        }
-      }
-    },
-
     renderLabelsChart(exampleId, distribution) {
       // Compatível com novo e antigo formato
       const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
@@ -656,6 +650,13 @@ export default {
           }
         }
       });
+    },
+
+    renderAllCharts() {
+      this.examples.forEach((example) => {
+        this.renderLabelsChart(example.id, example.label_distribution)
+        this.renderAbstractionChart(example.id, example.label_distribution)
+      })
     }
   }
 }
