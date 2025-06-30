@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .permissions import CanEditLabel
 from .serializers import (
@@ -24,6 +25,7 @@ from labels.models import (
     Segmentation,
     Span,
     TextLabel,
+    DatasetVersion,
 )
 from projects.models import Project
 from projects.permissions import IsProjectMember
@@ -146,3 +148,21 @@ class SegmentationListAPI(BaseListAPI):
 class SegmentationDetailAPI(BaseDetailAPI):
     queryset = Segmentation.objects.all()
     serializer_class = SegmentationSerializer
+
+
+class DatasetVersionVotingStatsAPI(APIView):
+    def get(self, request, example_id, version):
+        stats = DatasetVersion.get_voting_statistics(example_id, version)
+        return Response(stats, status=status.HTTP_200_OK)
+
+
+class DatasetVersionAllVersionsAPI(APIView):
+    def get(self, request, example_id):
+        versions = list(DatasetVersion.get_all_versions_for_example(example_id))
+        return Response({'versions': versions}, status=status.HTTP_200_OK)
+
+
+class DatasetVersionPerspectivesAPI(APIView):
+    def get(self, request, example_id):
+        perspectives = DatasetVersion.get_perspectives_for_example(example_id)
+        return Response({'perspectives': perspectives}, status=status.HTTP_200_OK)
