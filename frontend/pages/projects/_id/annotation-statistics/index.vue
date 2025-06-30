@@ -39,9 +39,7 @@
           dense
           class="mb-4"
         >
-          <strong>Filtro Local Ativo:</strong> 
-          Os dados são filtrados no navegador. Use esta opção se os
-           filtros da API não estiverem funcionando.
+          <strong>Filtro Local Ativo</strong>
         </v-alert>
         <v-row>
           <v-col cols="12" md="4">
@@ -341,8 +339,8 @@ export default {
     },
     examples: {
       handler() {
-        this.$nextTick(() => {
-          this.renderAllCharts()
+        this.$nextTick(async () => {
+          await this.renderAllCharts()
         })
       }
     },
@@ -362,7 +360,9 @@ export default {
 
   mounted() {
     this.initializeCharts()
-    this.renderAllCharts()
+    this.$nextTick(async () => {
+      await this.renderAllCharts()
+    })
   },
 
   methods: {
@@ -517,6 +517,13 @@ export default {
             params.resolved = this.filters.resolved
           }
 
+          // Adicionar filtros específicos de campos de perspectiva
+          Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
+            if (value) {
+              params[`perspective_${fieldId}`] = value
+            }
+          })
+
           console.log('Fetching examples with params:', params)
           const response = await this.$services.example.list(this.projectId, params)
           this.examples = response.items.filter((it) => it.is_finished)
@@ -570,8 +577,12 @@ export default {
         if (this.filters.resolved !== null) params.resolved = this.filters.resolved
         if (this.filters.example) params.example_id = this.filters.example
         if (this.filters.finished !== null) params.finished = this.filters.finished
-        Object.entries(this.filters.perspectiveValues).forEach(([key, value]) => {
-          if (value) params[`perspective_${key}`] = value
+        
+        // Adicionar filtros específicos de campos de perspectiva
+        Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
+          if (value) {
+            params[`perspective_${fieldId}`] = value
+          }
         })
 
         if (!this.$repositories || !this.$repositories.statistics) {
@@ -789,7 +800,10 @@ export default {
     },
 
     onPerspectiveChange() {
-      this.filters.perspective = null
+      // Limpar filtros de campos de perspectiva quando a perspectiva for alterada
+      this.filters.perspectiveValues = {}
+      // Recarregar campos da perspectiva selecionada
+      this.fetchProjectPerspective()
     },
 
     clearFilters() {
@@ -886,17 +900,37 @@ export default {
       if (this.filters.resolved !== null) params.resolved = this.filters.resolved
       if (this.filters.example) params.example_id = this.filters.example
       if (this.filters.finished !== null) params.finished = this.filters.finished
-      Object.entries(this.filters.perspectiveValues).forEach(([key, value]) => {
-        if (value) params[`perspective_${key}`] = value
+      
+      // Adicionar filtros específicos de campos de perspectiva
+      Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
+        if (value) {
+          params[`perspective_${fieldId}`] = value
+        }
       })
+      
       return params
     },
 
     async fetchLabelDistribution(exampleId) {
       try {
-        const response = await this.$axios.$get(`/v1/projects/${this.projectId}/discrepancies/${exampleId}/distribution`)
+        // Construir parâmetros de filtro para a distribuição
+        const params = {}
+        Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
+          if (value) {
+            params[`perspective_${fieldId}`] = value
+          }
+        })
+        
+        // Usar o novo endpoint de distribuição
+        const response = await this.$axios.$get(`/v1/projects/${this.projectId}/statistics/discrepancies/${exampleId}/distribution`, { params })
+        
+        // Logs para debug
+        console.log(`Debug - Example ${exampleId} distribution:`, response)
+        console.log(`Debug - Filters applied:`, params)
+        
         return response
       } catch (error) {
+        console.error('Error fetching label distribution:', error)
         return {}
       }
     },
@@ -976,10 +1010,14 @@ export default {
               display: true,
               text: `Total Labels: ${totalLabels.toFixed(1)}%`,
               font: {
-                size: 14,
+                size: 26,
                 weight: 'bold'
               },
-              color: '#1976d2'
+              color: '#1976d2',
+              padding: {
+                top: 20,
+                bottom: 40
+              }
             }
           },
           animation: {
@@ -1019,12 +1057,17 @@ export default {
     },
 
     renderAbstractionChart(exampleId, distribution) {
+      console.log(`Debug - Rendering abstraction chart for example ${exampleId}:`, distribution)
+      
       // Compatível com novo e antigo formato
       const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
       const allLabels = isNewFormat ? Object.keys(distribution.labels || 
       {}) : Object.keys(distribution || {});
       const allData = isNewFormat ? Object.values(distribution.labels ||
        {}).map(Number) : Object.values(distribution || {}).map(Number);
+      
+      console.log(`Debug - All labels:`, allLabels)
+      console.log(`Debug - All data:`, allData)
       
       // Filtrar apenas abstração e null
       const abstractionLabels = [];
@@ -1053,8 +1096,13 @@ export default {
         }
       }
       
+      console.log(`Debug - Abstraction labels:`, abstractionLabels)
+      console.log(`Debug - Abstraction data:`, abstractionData)
+      
       // Calcular percentagem total de null e abstenção
       const totalAbstentionNull = abstractionData.reduce((sum, value) => sum + value, 0);
+      
+      console.log(`Debug - Total abstention/null:`, totalAbstentionNull)
       
       // Atualizar o elemento HTML com a percentagem total
       this.$nextTick(() => {
@@ -1143,11 +1191,19 @@ export default {
       });
     },
 
-    renderAllCharts() {
-      this.examples.forEach((example) => {
-        this.renderLabelsChart(example.id, example.label_distribution)
-        this.renderAbstractionChart(example.id, example.label_distribution)
-      })
+    async renderAllCharts() {
+      for (const example of this.examples) {
+        // Se houver filtros de perspectiva ativos, buscar dados específicos
+        if (Object.keys(this.filters.perspectiveValues).length > 0) {
+          const distribution = await this.fetchLabelDistribution(example.id)
+          this.renderLabelsChart(example.id, distribution)
+          this.renderAbstractionChart(example.id, distribution)
+        } else {
+          // Usar dados do exemplo se não houver filtros
+          this.renderLabelsChart(example.id, example.label_distribution)
+          this.renderAbstractionChart(example.id, example.label_distribution)
+        }
+      }
     },
 
     applyFilters() {
@@ -1163,8 +1219,8 @@ export default {
           await this.fetchStatistics()
           
           // Re-renderizar gráficos
-          this.$nextTick(() => {
-            this.renderAllCharts()
+          this.$nextTick(async () => {
+            await this.renderAllCharts()
           })
           
           console.log('Filters applied successfully')
