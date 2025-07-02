@@ -33,32 +33,13 @@
         />
       </v-card-title>
       <v-card-text>
-        <v-alert
-          v-if="useLocalFiltering"
-          type="warning"
-          dense
-          class="mb-4"
-        >
-          <strong>Filtro Local Ativo</strong>
-        </v-alert>
         <v-row>
-          <v-col cols="12" md="4">
-            <v-select
-              v-model="filters.perspective"
-              :items="perspectives"
-              item-text="name"
-              item-value="id"
-              label="Perspetiva"
-              clearable
-              @change="onPerspectiveChange"
-            />
-          </v-col>
           <template v-if="perspectiveFields && perspectiveFields.length">
             <template v-for="field in perspectiveFields">
               <v-col :key="field.id" cols="12" md="4">
                 <v-select
+                v-model="filters.perspectiveValues[field.id]"
                   :label="field.name"
-                  v-model="filters.perspectiveValues[field.id]"
                   :items="field.choices"
                   clearable
                 />
@@ -68,7 +49,7 @@
           <v-col cols="12" md="4">
             <v-select
               v-model="filters.label"
-              :items="categories"
+              :items="filteredCategories"
               item-text="text"
               item-value="id"
               label="Categoria"
@@ -169,32 +150,14 @@
           <v-row>
             <v-col cols="6">
               <h3 class="text-h6 mb-3">Distribuição de Labels</h3>
-              <div class="total-percentage mb-2">
-                <v-chip
-                  color="blue"
-                  text-color="white"
-                  class="font-weight-bold"
-                  :label="true"
-                >
-                  Total Labels: <span :id="'total-labels-' + example.id">0%</span>
-                </v-chip>
-              </div>
+              
               <div style="min-height: 250px;">
                 <canvas :ref="'labelsChart' + example.id"></canvas>
               </div>
             </v-col>
-            <v-col cols="6">
+            <v-col cols="6" v-if="!filters.label">
               <h3 class="text-h6 mb-3">Abstenção e Null</h3>
-              <div class="total-percentage mb-2">
-                <v-chip
-                  color="red"
-                  text-color="white"
-                  class="font-weight-bold"
-                  :label="true"
-                >
-                  Total non-voted: <span :id="'total-abstention-' + example.id">0%</span>
-                </v-chip>
-              </div>
+              
               <div style="min-height: 250px;">
                 <canvas :ref="'abstractionChart' + example.id"></canvas>
               </div>
@@ -296,7 +259,8 @@ export default {
       labelsCharts: {},
       abstractionCharts: {},
       useLocalFiltering: false,
-      allExamples: [] // Para armazenar todos os exemplos quando usar filtro local
+      allExamples: [], // Para armazenar todos os exemplos quando usar filtro local
+      
     }
   },
 
@@ -327,6 +291,12 @@ export default {
       if (this.filters.resolved !== null) count++
       count += Object.keys(this.filters.perspectiveValues).length
       return count
+    },
+    filteredCategories() {
+      if (!this.filters.label) {
+        return this.categories;
+      }
+      return this.categories.filter(cat => cat.id === this.filters.label);
     }
   },
 
@@ -944,8 +914,8 @@ export default {
        Object.values(distribution || {}).map(Number);
       
       // Filtrar apenas labels regulares (excluir abstração e null)
-      const regularLabels = [];
-      const regularData = [];
+      let regularLabels = [];
+      let regularData = [];
       
       allLabels.forEach((label, index) => {
         const value = allData[index];
@@ -962,6 +932,23 @@ export default {
         }
       });
       
+      // NOVO: Se houver filtro de label, mostrar só ele
+      if (this.filters.label) {
+        const selectedCategory = this.categories.find(
+          cat => cat.id === this.filters.label || cat.text === this.filters.label
+        );
+        const selectedLabel = selectedCategory ?
+         String(selectedCategory.text) : String(this.filters.label);
+        const idx = regularLabels.findIndex(l => l === selectedLabel || l === this.filters.label);
+        if (idx !== -1) {
+          regularLabels = [regularLabels[idx]];
+          regularData = [regularData[idx]];
+        } else {
+          regularLabels = [];
+          regularData = [];
+        }
+      }
+
       // Calcular percentagem total de labels regulares
       const totalLabels = regularData.reduce((sum, value) => sum + value, 0);
       
