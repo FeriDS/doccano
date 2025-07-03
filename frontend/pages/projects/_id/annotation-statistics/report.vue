@@ -1,6 +1,17 @@
 <template>
   <v-container fluid>
-    <h1 class="text-h4 mb-4">Report Generator</h1>
+    <h1 class="text-h4 mb-6">
+      Report Generator
+      <v-alert
+      type="info"
+      class="mb-0"
+      :value="true"
+    >
+      Please fill out the filters for more specific reports.<br>
+      <strong>Total finalized datasets:</strong> {{ finalizedExamplesCount }}
+    </v-alert>
+    </h1>
+    
     <div class="d-flex align-center justify-space-between mb-6">
       <div></div>
       <v-btn text aria-label="Return" @click="$router.back()">
@@ -8,8 +19,10 @@
         Return
       </v-btn>
     </div>
-
+   
     <v-card class="pa-8">
+      
+      
       <!-- Filtros principais: Examples (esquerda) e Perspectiva (direita) -->
       <v-row dense class="mb-6">
         <!-- Examples -->
@@ -154,6 +167,11 @@ export default {
       projectPerspective: null
     }
   },
+  computed: {
+    finalizedExamplesCount() {
+      return this.exampleOptions.length;
+    }
+  },
   watch: {
     'filters.examples'() {
       this.filters.versions = []
@@ -182,7 +200,7 @@ export default {
         this.exampleOptions = items
           .filter(ex => ex.is_finished)
           .map(ex => ({
-            text: ex.content || ex.name || `Example ${ex.id}`,
+            text: ex.name || ex.content || ex.title || ex.text || `Example ${ex.id}`,
             value: ex.id
           }))
       } finally {
