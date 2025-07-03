@@ -53,8 +53,8 @@ class AnnotationStatisticsAPI(APIView):
         annotation_date_filter = {}
         if start_date and end_date:
             annotation_date_filter = {
-                'annotation_start_date__gte': start_date,
-                'annotation_end_date__lte': end_date
+                'created_at__gte': start_date,
+                'updated_at__lte': end_date
             }
         
         # Base queryset

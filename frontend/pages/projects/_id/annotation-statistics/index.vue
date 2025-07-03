@@ -381,16 +381,29 @@ export default {
           const response = await this.$services.example.list(this.projectId, {})
           this.allExamples = response.items.filter((it) => it.is_finished)
           
+          console.log('DEBUG ALL EXAMPLES:', this.allExamples);
           // Aplicar filtros localmente
           this.examples = this.allExamples.filter(example => {
-            // Filtro por data
-            if (this.filters.startDate && example.created_at) {
-              const exampleDate = new Date(example.created_at).toISOString().split('T')[0]
-              if (exampleDate < this.filters.startDate) return false
+            console.log('DEBUG EXAMPLE OBJ................:', example);
+            // Filtro por data de início
+            if (this.filters.startDate) {
+              const dateField = example.annotation_start_date
+              if (dateField) {
+                const exampleDate = new Date(dateField).toISOString().split('T')[0]
+                if (exampleDate !== this.filters.startDate) return false
+              } else {
+                return false
+              }
             }
-            if (this.filters.endDate && example.created_at) {
-              const exampleDate = new Date(example.created_at).toISOString().split('T')[0]
-              if (exampleDate > this.filters.endDate) return false
+            // Filtro por data de fim
+            if (this.filters.endDate) {
+              const dateField = example.annotation_end_date
+              if (dateField) {
+                const exampleDate = new Date(dateField).toISOString().split('T')[0]
+                if (exampleDate !== this.filters.endDate) return false
+              } else {
+                return false
+              }
             }
             
             // Filtro por perspetiva (se aplicável)
@@ -472,10 +485,10 @@ export default {
           const params = {}
           
           if (this.filters.startDate && this.filters.startDate.trim()) {
-            params.start_date = this.filters.startDate
+            params.created_at = this.filters.startDate
           }
           if (this.filters.endDate && this.filters.endDate.trim()) {
-            params.end_date = this.filters.endDate
+            params.updated_at = this.filters.endDate
           }
           if (this.filters.perspective) {
             params.perspective = this.filters.perspective
@@ -777,6 +790,7 @@ export default {
     },
 
     clearFilters() {
+      console.log('Clearing all filters')
       this.filters = {
         startDate: null,
         endDate: null,
@@ -789,10 +803,9 @@ export default {
         finished: null,
         startDateMenu: false,
         endDateMenu: false,
-        perspectiveValues: {}
+        perspectiveValues: {},
+        mdiArrowLeft: this.filters.mdiArrowLeft
       }
-      
-      // Recarregar dados sem filtros
       this.applyFilters()
     },
 
