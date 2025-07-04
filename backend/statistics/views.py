@@ -53,8 +53,8 @@ class AnnotationStatisticsAPI(APIView):
         annotation_date_filter = {}
         if start_date and end_date:
             annotation_date_filter = {
-                'annotation_start_date__gte': start_date,
-                'annotation_end_date__lte': end_date
+                'created_at__gte': start_date,
+                'updated_at__lte': end_date
             }
         
         # Base queryset
@@ -789,3 +789,81 @@ class LabelDistributionAPI(APIView):
             
         except ProjectPerspective.DoesNotExist:
             return False
+
+
+class ExportStatisticsAPI(APIView):
+    """
+    API para exportação de relatórios de estatísticas em formatos CSV e PDF.
+    
+    Endpoints:
+    - GET /v1/projects/{project_id}/statistics/export/csv - Exporta estatísticas em CSV
+    - GET /v1/projects/{project_id}/statistics/export/pdf - Exporta estatísticas em PDF
+    
+    Parâmetros de query (opcionais):
+    - start_date: Data de início (YYYY-MM-DD)
+    - end_date: Data de fim (YYYY-MM-DD)
+    - label: Filtro por categoria/label
+    - resolved: Filtro por status resolvido (true/false)
+    - perspective: Filtro por perspectiva
+    - perspective_{field_id}: Filtros específicos de campos de perspectiva
+    """
+    permission_classes = [IsAuthenticated & (IsProjectAdmin | IsProjectStaffAndReadOnly)]
+
+    def get(self, request, *args, **kwargs):
+        """
+        Exporta estatísticas baseado no formato especificado na URL.
+        """
+        project_id = self.kwargs["project_id"]
+        path = request.path
+        
+        if path.endswith('/csv'):
+            return self.export_csv(request)
+        elif path.endswith('/pdf'):
+            return self.export_pdf(request)
+        else:
+            return Response(
+                {"error": "Formato de exportação não especificado. Use /csv ou /pdf"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def export_csv(self, request):
+        """
+        Exporta estatísticas em formato CSV.
+        """
+        try:
+            # Reutilizar a lógica da view principal
+            statistics_view = AnnotationStatisticsAPI()
+            statistics_view.kwargs = self.kwargs
+            statistics_data = statistics_view.get_statistics(request).data
+            
+            return statistics_view.export_to_csv(statistics_data)
+        except Exception as e:
+            return Response(
+                {"error": f"Erro ao exportar CSV: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def export_pdf(self, request):
+        """
+        Exporta estatísticas em formato PDF.
+        """
+        try:
+            # Reutilizar a lógica da view principal
+            statistics_view = AnnotationStatisticsAPI()
+            statistics_view.kwargs = self.kwargs
+            statistics_data = statistics_view.get_statistics(request).data
+            
+            # Para PDF, não temos chart_image por enquanto
+            return statistics_view.export_to_pdf(statistics_data)
+        except Exception as e:
+            return Response(
+                {"error": f"Erro ao exportar PDF: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def post(self, request, *args, **kwargs):
+        """
+        Método POST para compatibilidade com a view principal.
+        Redireciona para GET com base no formato especificado.
+        """
+        return self.get(request, *args, **kwargs)
