@@ -1,6 +1,29 @@
 <template>
   <v-container fluid>
-    <h1 class="text-h4 mb-4">Estatísticas por Texto</h1>
+    <v-row align="center" class="mb-4">
+      <v-col>
+        <h1 class="text-h4">Estatísticas por Texto</h1>
+      </v-col>
+      <v-col cols="auto">
+        <v-btn
+          color="success"
+          :loading="exportingCSV"
+          class="mr-2"
+          @click="exportCSV"
+        >
+          <v-icon left>mdi-file-excel</v-icon>
+          Exportar CSV
+        </v-btn>
+        <v-btn
+          color="error"
+          :loading="exportingPDF"
+          @click="exportPDF"
+        >
+          <v-icon left>mdi-file-pdf</v-icon>
+          Exportar PDF
+        </v-btn>
+      </v-col>
+    </v-row>
     <v-alert
       type="info"
       class="mb-4"
@@ -119,6 +142,19 @@
             </v-menu>
           </v-col>
           <v-col cols="12" md="3">
+            <v-select
+              v-model="filters.example"
+              :items="(allExamples.length ? allExamples :
+               examples).map(e => ({ text: e.text, value: e.id }))"
+              item-text="text"
+              item-value="value"
+              label="Exemplo"
+              clearable
+              :return-object="false"
+              multiple
+            />
+          </v-col>
+          <v-col cols="12" md="3">
             <v-btn
               color="primary"
               :loading="loading"
@@ -155,7 +191,7 @@
                 <canvas :ref="'labelsChart' + example.id"></canvas>
               </div>
             </v-col>
-            <v-col cols="6" v-if="!filters.label">
+            <v-col v-if="!filters.label" cols="6" >
               <h3 class="text-h6 mb-3">Abstenção e Null</h3>
               
               <div style="min-height: 250px;">
@@ -208,7 +244,7 @@ export default {
         perspectiveValue: null,
         label: null,
         resolved: null,
-        example: null,
+        example: [],
         finished: null,
         startDateMenu: false,
         endDateMenu: false,
@@ -260,7 +296,8 @@ export default {
       abstractionCharts: {},
       useLocalFiltering: false,
       allExamples: [], // Para armazenar todos os exemplos quando usar filtro local
-      
+      exportingCSV: false,
+      exportingPDF: false
     }
   },
 
@@ -476,6 +513,11 @@ export default {
                   return false;
                 }
               }
+            }
+            
+            // Filtro por exemplo (texto)
+            if (this.filters.example && this.filters.example.length) {
+              if (!this.filters.example.includes(example.id)) return false
             }
             
             return true
@@ -774,10 +816,14 @@ export default {
     async resolveDisagreement(item) {
       try {
         await this.$services.example.resolve(this.projectId, item.id)
-        this.$toast && this.$toast.success('Desacordo resolvido!')
+        if (this.$toast && this.$toast.success) {
+          this.$toast.success('Desacordo resolvido!')
+        }
         await this.fetchStatistics()
       } catch (error) {
-        this.$toast && this.$toast.error('Erro ao resolver desacordo')
+        if (this.$toast && this.$toast.error) {
+          this.$toast.error('Erro ao resolver desacordo')
+        }
         console.error('Erro ao resolver desacordo:', error)
       }
     },
@@ -799,7 +845,7 @@ export default {
         perspectiveValue: null,
         label: null,
         resolved: null,
-        example: null,
+        example: [],
         finished: null,
         startDateMenu: false,
         endDateMenu: false,
@@ -809,89 +855,98 @@ export default {
       this.applyFilters()
     },
 
-    async exportToCSV() {
+    async exportCSV() {
+      this.exportingCSV = true
       try {
-        const params = this.getExportParams()
-        params.export_format = 'csv'
-        const response = await this.$repositories.statistics.fetchAnnotationStatistics(
-          this.projectId,
-          params
-        )
+        const params = this.buildExportParams()
+        const response = await this.$axios.get(`/v1/projects/${this.projectId}/statistics/export/csv?${params}`, {
+          responseType: 'blob'
+        })
         
-        // Create a download link
-        const blob = new Blob([response], { type: 'text/csv' })
+        // Criar link para download
+        const blob = new Blob([response.data], { type: 'text/csv' })
         const url = window.URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
-        link.setAttribute('download', `annotation-statistics-${this.projectId}.csv`)
+        link.download = `estatisticas_anotacao_${this.projectId}_${new Date().toISOString().split('T')[0]}.csv`
         document.body.appendChild(link)
         link.click()
-        link.remove()
+        document.body.removeChild(link)
         window.URL.revokeObjectURL(url)
         
-        this.$toast && this.$toast.success('CSV export successful!')
-      } catch (error) {
-        console.error('Error exporting to CSV:', error)
-        this.$toast && this.$toast.error('Error exporting to CSV')
-      }
-    },
-
-    async exportToPDF() {
-      try {
-        const params = this.getExportParams();
-        params.export_format = 'pdf';
-
-        // Get the chart image as base64
-        const chart = this.$refs.labelDistChart;
-        let chartImage = null;
-        if (chart) {
-          chartImage = chart.toDataURL('image/png');
+        if (this.$toast && this.$toast.success) {
+          this.$toast.success('Relatório CSV exportado com sucesso!')
         }
-        params.chartImage = chartImage;
-
-        // Send as POST (since GET is not suitable for large payloads)
-        const response = await this.$axios.$post(
-          `/v1/projects/${this.projectId}/statistics/annotations`,
-          params,
-          { responseType: 'arraybuffer' }
-        );
-
-        // Download the PDF
-        const blob = new Blob([response], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `annotation-statistics-${this.projectId}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-
-        this.$toast && this.$toast.success('PDF export successful!');
       } catch (error) {
-        console.error('Error exporting to PDF:', error);
-        this.$toast && this.$toast.error('Error exporting to PDF');
+        console.error('Erro ao exportar CSV:', error)
+        if (this.$toast && this.$toast.error) {
+          this.$toast.error('Erro ao exportar relatório CSV')
+        }
+      } finally {
+        this.exportingCSV = false
       }
     },
 
-    getExportParams() {
-      const params = {}
-      if (this.filters.startDate) params.start_date = this.filters.startDate
-      if (this.filters.endDate) params.end_date = this.filters.endDate
-      if (this.filters.perspective) params.perspective = this.filters.perspective
-      if (this.filters.label) params.label = this.filters.label
-      if (this.filters.resolved !== null) params.resolved = this.filters.resolved
-      if (this.filters.example) params.example_id = this.filters.example
-      if (this.filters.finished !== null) params.finished = this.filters.finished
+    async exportPDF() {
+      this.exportingPDF = true
+      try {
+        const params = this.buildExportParams()
+        const response = await this.$axios.get(`/v1/projects/${this.projectId}/statistics/export/pdf?${params}`, {
+          responseType: 'blob'
+        })
+        
+        // Criar link para download
+        const blob = new Blob([response.data], { type: 'application/pdf' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `estatisticas_anotacao_${this.projectId}_${new Date().toISOString().split('T')[0]}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        
+        if (this.$toast && this.$toast.success) {
+          this.$toast.success('Relatório PDF exportado com sucesso!')
+        }
+      } catch (error) {
+        console.error('Erro ao exportar PDF:', error)
+        if (this.$toast && this.$toast.error) {
+          this.$toast.error('Erro ao exportar relatório PDF')
+        }
+      } finally {
+        this.exportingPDF = false
+      }
+    },
+
+    buildExportParams() {
+      const params = new URLSearchParams()
+      
+      // Adicionar filtros ativos
+      if (this.filters.startDate) {
+        params.append('start_date', this.filters.startDate)
+      }
+      if (this.filters.endDate) {
+        params.append('end_date', this.filters.endDate)
+      }
+      if (this.filters.label) {
+        params.append('label', this.filters.label)
+      }
+      if (this.filters.resolved !== null && this.filters.resolved !== undefined) {
+        params.append('resolved', this.filters.resolved)
+      }
+      if (this.filters.perspective) {
+        params.append('perspective', this.filters.perspective)
+      }
       
       // Adicionar filtros específicos de campos de perspectiva
       Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
         if (value) {
-          params[`perspective_${fieldId}`] = value
+          params.append(`perspective_${fieldId}`, value)
         }
       })
       
-      return params
+      return params.toString()
     },
 
     async fetchLabelDistribution(exampleId) {
@@ -923,8 +978,8 @@ export default {
       const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
       const allLabels = isNewFormat ? Object.keys(distribution.labels || {}) :
        Object.keys(distribution || {});
-      const allData = isNewFormat ? Object.values(distribution.labels || {}).map(Number) : 
-       Object.values(distribution || {}).map(Number);
+      const allData = isNewFormat ? Object.values(distribution.labels ||
+       {}).map(Number) : Object.values(distribution || {}).map(Number);
       
       // Filtrar apenas labels regulares (excluir abstração e null)
       let regularLabels = [];
