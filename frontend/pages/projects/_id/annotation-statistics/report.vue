@@ -212,7 +212,7 @@ export default {
           if (vals.length) {
             versionOptions.push({ header: exampleLabel })
             vals.sort((a, b) => a - b).forEach(v => {
-              versionOptions.push({ text: `v${v}`, value: `${id}:${v}` })
+              versionOptions.push({ text: `Version ${v}`, value: `${id}:${v}` })
             })
           }
         }
