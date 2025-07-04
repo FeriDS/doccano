@@ -55,7 +55,7 @@
         <!-- Perspective -->
         <v-col cols="12" md="6">
           <v-card class="pa-4" outlined>
-            <h2 class="text-h6 mb-4 primary--text" v-if="projectPerspective">
+            <h2 v-if="projectPerspective" class="text-h6 mb-4 primary--text" >
               Perspective: {{ projectPerspective.name }}
             </h2>
             <v-row dense>
@@ -81,7 +81,8 @@
       </v-row>
 
       <!-- Botões -->
-      <v-btn color="primary" class="mt-4" @click="fetchReport" :disabled="!filters.examples.length">
+      <v-btn color="primary" class="mt-4" 
+        :disabled="!filters.examples.length" @click="fetchReport" >
         GENERATE REPORT
       </v-btn>
       <v-btn color="error" text class="mt-2" @click="clearFilters">
@@ -259,6 +260,7 @@ export default {
             vers.map(ver => ({ ex: +ex, ver }))
           )
 
+      const projectId = this.$route.params.id
       const rows = []
       for (const { ex, ver } of versionsToUse) {
         if (!this.versionsByExample[ex]?.includes(ver)) continue
@@ -271,7 +273,7 @@ export default {
               if (val) params[`perspective_${k}`] = val
             })
           }
-          stats = await this.$axios.$get(`/api/dataset-version/${ex}/${ver}/stats/`, { params })
+          stats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/stats/`, { params })
           rows.push({
             example: ex,
             exampleName: this.exampleOptions.find(o => o.value === ex)?.text,
