@@ -94,9 +94,6 @@
         <v-simple-table>
           <thead>
             <tr>
-              <th>Example</th>
-              <th>Version</th>
-              <th>Perspective</th>
               <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
             </tr>
           </thead>
@@ -108,14 +105,9 @@
             </tr>
             <tr
               v-for="row in reportData"
-              :key="`${row.example}-${row.version}-${row.perspective}`"
+              :key="`${row.Example}-${row.Version}-${row.perspective}`"
             >
-              <td>{{ row.exampleName }}</td>
-              <td>{{ row.version }}</td>
-              <td>{{ row.perspective }}</td>
-              <td v-for="header in tableHeaders" :key="header">
-                {{ row[header] }}
-              </td>
+              <td v-for="header in tableHeaders" :key="header">{{ row[header] }}</td>
             </tr>
           </tbody>
         </v-simple-table>
@@ -251,6 +243,7 @@ export default {
       const { examples, versions, perspective, perspectiveValues } = this.filters
       if (!examples.length) return
 
+      const projectId = this.$route.params.id
       const versionsToUse = versions.length
         ? versions.map(v => {
             const [ex, ver] = v.split(":")
@@ -260,8 +253,9 @@ export default {
             vers.map(ver => ({ ex: +ex, ver }))
           )
 
-      const projectId = this.$route.params.id
       const rows = []
+      let allPerspectiveFields = []
+      let allLabels = new Set()
       for (const { ex, ver } of versionsToUse) {
         if (!this.versionsByExample[ex]?.includes(ver)) continue
         let stats = {}
@@ -274,11 +268,24 @@ export default {
             })
           }
           stats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/stats/`, { params })
+          // Coletar todos os campos de perspectiva e labels
+          if (stats.perspective_fields) {
+            allPerspectiveFields = 
+              allPerspectiveFields.concat(Object.keys(stats.perspective_fields))
+          }
+          Object.keys(stats).forEach(k => {
+            if (k.startsWith('label_')) allLabels.add(k)
+          })
+          // Preencher os campos de perspectiva na linha
+          const perspectiveData = {}
+          allPerspectiveFields.forEach(field => {
+            perspectiveData[field] = stats.perspective_fields ? stats.perspective_fields[field] : ''
+          })
           rows.push({
             example: ex,
             exampleName: this.exampleOptions.find(o => o.value === ex)?.text,
             version: ver,
-            perspective,
+            ...perspectiveData,
             ...stats
           })
         } catch {
@@ -286,18 +293,61 @@ export default {
             example: ex,
             exampleName: this.exampleOptions.find(o => o.value === ex)?.text,
             version: ver,
-            perspective,
             total: 0,
             concordant: 0,
             discordant: 0
           })
         }
       }
-
-      this.reportData = rows
-      this.tableHeaders = rows.length
-        ? Object.keys(rows[0]).filter(h => !['example', 'exampleName', 'version', 'perspective'].includes(h))
-        : []
+      // Remover duplicatas dos campos de perspectiva
+      allPerspectiveFields = [...new Set(allPerspectiveFields)]
+      allLabels = Array.from(allLabels)
+      // Determinar os campos de perspectiva filtrados
+      const filteredPerspectiveFields = 
+        Object.keys(perspectiveValues).filter(k => perspectiveValues[k])
+      // Mapear ids para nomes amigáveis
+      const perspectiveFieldHeaders = filteredPerspectiveFields.map(id => {
+        const field = this.perspectiveFields.find(f => String(f.id) === String(id))
+        return field ? field.name : id
+      })
+      // Montar headers: Example, Version, nomes amigáveis das perspectivas, labels, abstenção, null
+      const tableHeaders = [
+        'Example',
+        'Version',
+        ...perspectiveFieldHeaders,
+        ...allLabels,
+        'abstention',
+        'null'
+      ]
+      // Ordenar rows por exampleName
+      rows.sort((a, b) => (a.exampleName || '').localeCompare(b.exampleName || ''))
+      
+      this.reportData = rows.map(row => {
+        const perspectiveData = {}
+        filteredPerspectiveFields.forEach(fieldId => {
+          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId))
+          let value = this.filters.perspectiveValues[fieldId]
+          if (field && field.choices && Array.isArray(value)) {
+            value = value.map(v => {
+              const choice = field.choices.find(c => c.value === v || c.id === v)
+              return choice ? (choice.text || choice.label || choice.value) : v
+            }).join(', ')
+          } else if (field && field.choices) {
+            const choice = field.choices.find(c => c.value === value || c.id === value)
+            value = choice ? (choice.text || choice.label || choice.value) : value
+          }
+          perspectiveData[field ? field.name : fieldId] = value
+        })
+        return {
+          Example: row.exampleName,
+          Version: row.version,
+          ...perspectiveData,
+          ...allLabels.reduce((acc, label) => { acc[label] = row[label] || ''; return acc }, {}),
+          abstention: row.abstention || '',
+          null: row.null || ''
+        }
+      })
+      this.tableHeaders = tableHeaders
     },
     clearFilters() {
       this.filters.examples = []
