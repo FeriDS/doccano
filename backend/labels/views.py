@@ -1,10 +1,14 @@
 from functools import partial
 from typing import Type
 
+from rest_framework.decorators import api_view
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -157,7 +161,9 @@ class DatasetVersionVotingStatsAPI(APIView):
 
 
 class DatasetVersionAllVersionsAPI(APIView):
-    def get(self, request, example_id):
+    permission_classes = [AllowAny]
+
+    def get(self, request, project_id, example_id):
         versions = list(DatasetVersion.get_all_versions_for_example(example_id))
         return Response({'versions': versions}, status=status.HTTP_200_OK)
 
@@ -166,3 +172,34 @@ class DatasetVersionPerspectivesAPI(APIView):
     def get(self, request, example_id):
         perspectives = DatasetVersion.get_perspectives_for_example(example_id)
         return Response({'perspectives': perspectives}, status=status.HTTP_200_OK)
+
+class DatasetVersionFullDataAPI(APIView):
+    def get(self, request, example_id):
+        data = DatasetVersion.get_full_data_for_example(example_id)
+        serialized = [
+            {
+                "example_id": dv.example_id,
+                "version": dv.version,
+                "user": dv.user.username,
+                "label": dv.label.text,
+                "is_active": dv.is_active,
+                "created_at": dv.created_at,
+            }
+            for dv in data
+        ]
+        return Response({"data": serialized}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def example_versions(request, example_id):
+    versions = list(DatasetVersion.get_all_versions_for_example(example_id))
+    return Response({"versions": versions})
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DatasetVersionBulkVersionsAPI(APIView):
+    def post(self, request):
+        example_ids = request.data.get("example_ids", [])
+        result = {}
+        for ex_id in example_ids:
+            versions = list(DatasetVersion.get_all_versions_for_example(ex_id))
+            result[str(ex_id)] = versions
+        return Response({str(k): v for k, v in result.items()}, status=status.HTTP_200_OK)

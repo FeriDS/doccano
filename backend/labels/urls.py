@@ -16,6 +16,8 @@ from .views import (
     DatasetVersionVotingStatsAPI,
     DatasetVersionAllVersionsAPI,
     DatasetVersionPerspectivesAPI,
+    DatasetVersionFullDataAPI,
+    DatasetVersionBulkVersionsAPI,
 )
 
 urlpatterns = [
@@ -54,4 +56,6 @@ urlpatterns = [
     path('dataset-version/<int:example_id>/<int:version>/stats/', DatasetVersionVotingStatsAPI.as_view(), name='datasetversion-stats'),
     path('dataset-version/<int:example_id>/versions/', DatasetVersionAllVersionsAPI.as_view(), name='datasetversion-versions'),
     path('dataset-version/<int:example_id>/perspectives/', DatasetVersionPerspectivesAPI.as_view(), name='datasetversion-perspectives'),
+    path('dataset-version/<int:example_id>/full/', DatasetVersionFullDataAPI.as_view(), name='datasetversion-full'),
+    path('dataset-version/bulk-versions/', DatasetVersionBulkVersionsAPI.as_view(), name='datasetversion-bulk-versions'),
 ]
