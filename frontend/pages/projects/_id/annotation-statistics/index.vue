@@ -77,6 +77,7 @@
               item-value="id"
               label="Categoria"
               clearable
+              multiple
             />
           </v-col>
           <v-col cols="12" md="4">
@@ -191,9 +192,8 @@
                 <canvas :ref="'labelsChart' + example.id"></canvas>
               </div>
             </v-col>
-            <v-col v-if="!filters.label" cols="6" >
+            <v-col cols="6">
               <h3 class="text-h6 mb-3">Abstenção e Null</h3>
-              
               <div style="min-height: 250px;">
                 <canvas :ref="'abstractionChart' + example.id"></canvas>
               </div>
@@ -242,7 +242,7 @@ export default {
         selectedPerspective: null,
         perspective: null,
         perspectiveValue: null,
-        label: null,
+        label: [],
         resolved: null,
         example: [],
         finished: null,
@@ -315,7 +315,7 @@ export default {
       return this.filters.startDate || 
              this.filters.endDate || 
              this.filters.perspective || 
-             this.filters.label || 
+             this.filters.label.length > 0 || 
              this.filters.resolved !== null ||
              Object.keys(this.filters.perspectiveValues).length > 0
     },
@@ -324,16 +324,13 @@ export default {
       if (this.filters.startDate) count++
       if (this.filters.endDate) count++
       if (this.filters.perspective) count++
-      if (this.filters.label) count++
+      if (this.filters.label.length > 0) count++
       if (this.filters.resolved !== null) count++
       count += Object.keys(this.filters.perspectiveValues).length
       return count
     },
     filteredCategories() {
-      if (!this.filters.label) {
-        return this.categories;
-      }
-      return this.categories.filter(cat => cat.id === this.filters.label);
+      return this.categories;
     }
   },
 
@@ -449,31 +446,29 @@ export default {
             }
             
             // Filtro por categoria (se aplicável)
-            if (this.filters.label) {
+            if (this.filters.label.length > 0) {
               let hasCategory = false;
 
-              const selectedCategory = this.categories.find(
-                cat => cat.id === this.filters.label || cat.text === this.filters.label
+              const selectedCategories = this.categories.filter(
+                cat => this.filters.label.includes(cat.id) || this.filters.label.includes(cat.text)
               );
-              const selectedCategoryId = selectedCategory ?
-               String(selectedCategory.id) : String(this.filters.label);
-              const selectedCategoryText = selectedCategory ?
-               String(selectedCategory.text) : String(this.filters.label);
+              const selectedCategoryIds = selectedCategories.map(cat => String(cat.id));
+              const selectedCategoryTexts = selectedCategories.map(cat => String(cat.text));
 
               // LOGS PARA DEBUG
               console.log('Filtro categoria:', this.filters.label);
-              console.log('selectedCategory:', selectedCategory);
-              console.log('selectedCategoryId:', selectedCategoryId);
-              console.log('selectedCategoryText:', selectedCategoryText);
+              console.log('selectedCategories:', selectedCategories);
+              console.log('selectedCategoryIds:', selectedCategoryIds);
+              console.log('selectedCategoryTexts:', selectedCategoryTexts);
               console.log('label_distribution:', example.label_distribution);
               console.log('labels:', example.labels);
 
               if (example.label_distribution) {
                 hasCategory = Object.keys(example.label_distribution).some(categoryName => {
-                  console.log('Comparando chave:', categoryName, 'com', selectedCategoryId, selectedCategoryText);
+                  console.log('Comparando chave:', categoryName, 'com', selectedCategoryIds, selectedCategoryTexts);
                   return (
-                    String(categoryName) === selectedCategoryId ||
-                    String(categoryName) === selectedCategoryText
+                    selectedCategoryIds.includes(categoryName) ||
+                    selectedCategoryTexts.includes(categoryName)
                   );
                 });
               }
@@ -481,10 +476,10 @@ export default {
               if (!hasCategory && example.labels && Array.isArray(example.labels)) {
                 hasCategory = example.labels.some(label => {
                   const labelCategoryId = String(label.category_id || label.category);
-                  console.log('Comparando label:', labelCategoryId, 'com', selectedCategoryId, selectedCategoryText);
+                  console.log('Comparando label:', labelCategoryId, 'com', selectedCategoryIds, selectedCategoryTexts);
                   return (
-                    labelCategoryId === selectedCategoryId ||
-                    labelCategoryId === selectedCategoryText
+                    selectedCategoryIds.includes(labelCategoryId) ||
+                    selectedCategoryTexts.includes(labelCategoryId)
                   );
                 });
               }
@@ -535,8 +530,8 @@ export default {
           if (this.filters.perspective) {
             params.perspective = this.filters.perspective
           }
-          if (this.filters.label) {
-            params.label = this.filters.label
+          if (this.filters.label.length > 0) {
+            params.label = this.filters.label.join(',')
           }
           if (this.filters.resolved !== null && this.filters.resolved !== undefined) {
             params.resolved = this.filters.resolved
@@ -579,7 +574,7 @@ export default {
         if (this.filters.startDate) params.start_date = this.filters.startDate
         if (this.filters.endDate) params.end_date = this.filters.endDate
         if (this.filters.perspective) params.perspective = this.filters.perspective
-        if (this.filters.label) params.label = this.filters.label
+        if (this.filters.label.length > 0) params.label = this.filters.label.join(',')
         if (this.filters.resolved !== null) params.resolved = this.filters.resolved
 
         const response = await this.$services.example.list(this.projectId, params)
@@ -598,7 +593,7 @@ export default {
         if (this.filters.startDate) params.start_date = this.filters.startDate
         if (this.filters.endDate) params.end_date = this.filters.endDate
         if (this.filters.perspective) params.perspective = this.filters.perspective
-        if (this.filters.label) params.label = this.filters.label
+        if (this.filters.label.length > 0) params.label = this.filters.label.join(',')
         if (this.filters.resolved !== null) params.resolved = this.filters.resolved
         if (this.filters.example) params.example_id = this.filters.example
         if (this.filters.finished !== null) params.finished = this.filters.finished
@@ -843,7 +838,7 @@ export default {
         selectedPerspective: null,
         perspective: null,
         perspectiveValue: null,
-        label: null,
+        label: [],
         resolved: null,
         example: [],
         finished: null,
@@ -929,8 +924,8 @@ export default {
       if (this.filters.endDate) {
         params.append('end_date', this.filters.endDate)
       }
-      if (this.filters.label) {
-        params.append('label', this.filters.label)
+      if (this.filters.label.length > 0) {
+        params.append('label', this.filters.label.join(','))
       }
       if (this.filters.resolved !== null && this.filters.resolved !== undefined) {
         params.append('resolved', this.filters.resolved)
@@ -1001,20 +996,22 @@ export default {
       });
       
       // NOVO: Se houver filtro de label, mostrar só ele
-      if (this.filters.label) {
-        const selectedCategory = this.categories.find(
-          cat => cat.id === this.filters.label || cat.text === this.filters.label
+      if (this.filters.label.length > 0) {
+        const selectedCategories = this.categories.filter(
+          cat => this.filters.label.includes(cat.id) || this.filters.label.includes(cat.text)
         );
-        const selectedLabel = selectedCategory ?
-         String(selectedCategory.text) : String(this.filters.label);
-        const idx = regularLabels.findIndex(l => l === selectedLabel || l === this.filters.label);
-        if (idx !== -1) {
-          regularLabels = [regularLabels[idx]];
-          regularData = [regularData[idx]];
-        } else {
-          regularLabels = [];
-          regularData = [];
-        }
+        const selectedLabels = selectedCategories.map(cat => String(cat.text));
+        // Filtra todos os labels selecionados
+        const filteredRegularLabels = [];
+        const filteredRegularData = [];
+        regularLabels.forEach((l, i) => {
+          if (selectedLabels.includes(l)) {
+            filteredRegularLabels.push(l);
+            filteredRegularData.push(regularData[i]);
+          }
+        });
+        regularLabels = filteredRegularLabels;
+        regularData = filteredRegularData;
       }
 
       // Calcular percentagem total de labels regulares
