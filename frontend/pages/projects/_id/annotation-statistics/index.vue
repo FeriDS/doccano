@@ -33,6 +33,10 @@
       são exibidos nesta página.
       <br>
       <strong>Total de datasets finalizados:</strong> {{ examples.length }}
+      <br>
+      <strong>Exportação:</strong> Os relatórios CSV e
+       PDF incluem a distribuição de labels por exemplo, 
+      totais de labels regulares vs non-voted, e estatísticas gerais do projeto.
     </v-alert>
 
     <!-- Filtros -->
@@ -859,11 +863,11 @@ export default {
         })
         
         // Criar link para download
-        const blob = new Blob([response.data], { type: 'text/csv' })
+        const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' })
         const url = window.URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
-        link.download = `estatisticas_anotacao_${this.projectId}_${new Date().toISOString().split('T')[0]}.csv`
+        link.download = `estatisticas_por_texto_${this.projectId}_${new Date().toISOString().split('T')[0]}.csv`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
@@ -885,32 +889,59 @@ export default {
     async exportPDF() {
       this.exportingPDF = true
       try {
-        const params = this.buildExportParams()
-        const response = await this.$axios.get(`/v1/projects/${this.projectId}/statistics/export/pdf?${params}`, {
-          responseType: 'blob'
-        })
-        
+        await this.$nextTick(); // Garante que os gráficos estejam renderizados
+        const chartImages = {};
+        // PNG 1x1 px branco
+        const blankImg = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2ZkAAAAASUVORK5CYII=';
+        for (const example of this.examples) {
+          let labelsImg = null;
+          let abstractionImg = null;
+          if (this.labelsCharts[example.id]) {
+            try {
+              labelsImg = this.labelsCharts[example.id].toBase64Image();
+            } catch (e) { labelsImg = null; }
+          }
+          if (this.abstractionCharts[example.id]) {
+            try {
+              abstractionImg = this.abstractionCharts[example.id].toBase64Image();
+            } catch (e) { abstractionImg = null; }
+          }
+          if (!labelsImg) labelsImg = blankImg;
+          if (!abstractionImg) abstractionImg = blankImg;
+          chartImages[example.id] = {
+            labels: labelsImg,
+            abstraction: abstractionImg
+          };
+        }
+        // Enviar também todos os exemplos exibidos na tela
+        const screenExamples = this.examples.map(e => ({
+          id: e.id,
+          text: e.text,
+          label_distribution: e.label_distribution || {},
+        }));
+        const params = this.buildExportParams();
+        const url = `/v1/projects/${this.projectId}/statistics/export/pdf?${params}`;
+        const response = await this.$axios.post(url, { chartImages, screenExamples }, { responseType: 'blob' });
         // Criar link para download
-        const blob = new Blob([response.data], { type: 'application/pdf' })
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `estatisticas_anotacao_${this.projectId}_${new Date().toISOString().split('T')[0]}.pdf`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
-        
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url_download = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url_download;
+        link.download = `estatisticas_por_texto_${this.projectId}_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url_download);
         if (this.$toast && this.$toast.success) {
-          this.$toast.success('Relatório PDF exportado com sucesso!')
+          this.$toast.success('Relatório PDF exportado com sucesso!');
         }
       } catch (error) {
-        console.error('Erro ao exportar PDF:', error)
+        console.error('Erro ao exportar PDF:', error);
         if (this.$toast && this.$toast.error) {
-          this.$toast.error('Erro ao exportar relatório PDF')
+          this.$toast.error('Erro ao exportar relatório PDF');
         }
       } finally {
-        this.exportingPDF = false
+        this.exportingPDF = false;
       }
     },
 

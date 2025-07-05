@@ -50,6 +50,30 @@ class AnnotationStatisticsAPI(APIView):
                 field_id = key.replace('perspective_', '')
                 perspective_field_filters[field_id] = value
 
+        # Buscar nomes dos campos de perspectiva
+        perspective_field_names = {}
+        if project_id:
+            try:
+                project_perspective = ProjectPerspective.objects.get(project=project_id)
+                for field in project_perspective.perspective.fields.all():
+                    perspective_field_names[str(field.id)] = field.name
+            except Exception:
+                pass
+
+        # Montar dicionário de filtros aplicados para exportação
+        applied_filters = {
+            'Data Início': start_date,
+            'Data Fim': end_date,
+            'Categoria': label,
+            'Status': resolved,
+            'Perspectiva': perspective,
+            'Exemplo': example_id,
+        }
+        # Adicionar campos de perspectiva com nome legível
+        for k, v in perspective_field_filters.items():
+            field_name = perspective_field_names.get(str(k), f'Campo {k}')
+            applied_filters[f'Perspectiva {field_name}'] = v
+
         annotation_date_filter = {}
         if start_date and end_date:
             annotation_date_filter = {
@@ -117,6 +141,24 @@ class AnnotationStatisticsAPI(APIView):
         resolved_disagreements = len([d for d in disagreements if d['status'] == 'resolved'])
         unique_perspectives = 1
 
+        # Preparar exemplos com distribuição de labels para exportação
+        examples_with_distribution = []
+        for example in examples:
+            if example.is_finished:  # Apenas exemplos finalizados
+                # Calcular distribuição de labels para este exemplo
+                example_label_dist = self._get_example_label_distribution(
+                    example, perspective, annotation_date_filter, perspective_field_filters
+                )
+                
+                examples_with_distribution.append({
+                    'id': example.id,
+                    'text': example.text,
+                    'label_distribution': example_label_dist,
+                    'is_resolved': example.is_resolved,
+                    'annotation_start_date': example.created_at.strftime('%Y-%m-%d') if example.created_at else None,
+                    'annotation_end_date': example.updated_at.strftime('%Y-%m-%d') if example.updated_at else None
+                })
+
         statistics = {
             'statistics': {
                 'disagreementRate': disagreement_rate,
@@ -124,11 +166,13 @@ class AnnotationStatisticsAPI(APIView):
                 'resolutionRate': (resolved_disagreements / disagreement_count * 100) if disagreement_count > 0 else 0,
                 'averageAnnotationTime': self._calculate_avg_annotation_time(examples),
             },
+            'examples': examples_with_distribution,  # Adicionar exemplos com distribuição
             'disagreements': disagreements,
             'disagreementByCategory': self._get_disagreement_by_category(disagreements),
             'perspectiveDistribution': self._get_perspective_distribution(examples, perspective, annotation_date_filter, perspective_field_filters),
             'labelDistribution': self._get_label_distribution(examples, perspective, annotation_date_filter, perspective_field_filters),
-            'perspectivePatterns': self._get_perspective_patterns(examples, disagreements, perspective, annotation_date_filter, perspective_field_filters)
+            'perspectivePatterns': self._get_perspective_patterns(examples, disagreements, perspective, annotation_date_filter, perspective_field_filters),
+            'applied_filters': applied_filters
         }
 
         return Response(data=statistics, status=status.HTTP_200_OK)
@@ -325,6 +369,40 @@ class AnnotationStatisticsAPI(APIView):
             return round(sum(times) / len(times), 2)
         return 0
 
+    def _get_example_label_distribution(self, example, perspective=None, annotation_date_filter=None, perspective_field_filters=None):
+        """
+        Calcula a distribuição de labels para um exemplo específico (apenas categorias).
+        """
+        from collections import Counter
+        
+        # Coletar apenas as categorias do exemplo
+        categories = Category.objects.filter(example=example)
+        
+        # Aplicar filtros de data se especificados
+        if annotation_date_filter:
+            categories = categories.filter(**annotation_date_filter)
+        
+        # Filtrar por perspectiva se necessário
+        if perspective or perspective_field_filters:
+            categories = [cat for cat in categories if self.user_matches_perspective_filters(example.project, cat.user, perspective, perspective_field_filters)]
+        
+        # Contar labels
+        label_counts = Counter()
+        for cat in categories:
+            label_counts[cat.label.text] += 1
+        
+        # Calcular percentagens
+        total_annotations = sum(label_counts.values())
+        if total_annotations == 0:
+            return {}
+        
+        distribution = {}
+        for label, count in label_counts.items():
+            percentage = (count / total_annotations) * 100
+            distribution[label] = round(percentage, 2)
+        
+        return distribution
+
     def _get_perspective_patterns(self, examples, disagreements, perspective=None, annotation_date_filter=None, perspective_field_filters=None):
         from collections import defaultdict
         patterns = defaultdict(lambda: {'total': 0, 'disagreements': 0, 'agreements': 0})
@@ -374,120 +452,327 @@ class AnnotationStatisticsAPI(APIView):
 
     def export_statistics(self, request, export_format, is_post=False):
         project_id = self.kwargs["project_id"]
-        if is_post:
-            chart_image = request.data.get('chartImage')
+        if is_post or request.method == 'POST':
+            chartImages = request.data.get('chartImages')
         else:
-            chart_image = request.query_params.get('chartImage')
+            chartImages = None
         statistics_data = self.get_statistics(request).data
         if export_format == 'csv':
             return self.export_to_csv(statistics_data)
         elif export_format == 'pdf':
-            return self.export_to_pdf(statistics_data, chart_image)
+            return self.export_to_pdf(statistics_data, chartImages)
         else:
             return Response({"error": "Unsupported export format"}, status=status.HTTP_400_BAD_REQUEST)
 
     def export_to_csv(self, statistics_data):
         buffer = io.StringIO()
-        # Remove metrics table: do not write stats_df
-        # Label Distribution (Pie Chart Data)
-        total_labels = sum(statistics_data['labelDistribution'].values())
-        label_dist_df = pd.DataFrame({
-            'Label': list(statistics_data['labelDistribution'].keys()),
-            'Count': list(statistics_data['labelDistribution'].values()),
-            'Percentage': [f"{(count/total_labels*100):.2f}%" for count in statistics_data['labelDistribution'].values()]
-        })
-        perspective_dist_df = pd.DataFrame(statistics_data['perspectiveDistribution'])
-        if not perspective_dist_df.empty:
-            perspective_dist_df['Percentage'] = perspective_dist_df['count'].apply(
-                lambda x: f"{(x/perspective_dist_df['count'].sum()*100):.2f}%"
-            )
-        disagreement_cat_df = pd.DataFrame(statistics_data['disagreementByCategory'])
-        if not disagreement_cat_df.empty:
-            total_disagreements = disagreement_cat_df['count'].sum()
-            disagreement_cat_df['Percentage'] = disagreement_cat_df['count'].apply(
-                lambda x: f"{(x/total_disagreements*100):.2f}%"
-            )
-        perspective_patterns_df = pd.DataFrame(statistics_data['perspectivePatterns'])
-        if not perspective_patterns_df.empty:
-            perspective_patterns_df['Agreement Rate'] = perspective_patterns_df.apply(
-                lambda x: f"{(x['agreements']/x['total']*100):.2f}%" if x['total'] > 0 else "0%",
-                axis=1
-            )
-            perspective_patterns_df['Disagreement Rate'] = perspective_patterns_df.apply(
-                lambda x: f"{(x['disagreements']/x['total']*100):.2f}%" if x['total'] > 0 else "0%",
-                axis=1
-            )
-        buffer.write('=== Label Distribution (Pie Chart) ===\n')
-        label_dist_df.to_csv(buffer, index=False)
-        if not perspective_dist_df.empty:
-            buffer.write('\n=== Perspective Distribution ===\n')
-            perspective_dist_df.to_csv(buffer, index=False)
-        if not disagreement_cat_df.empty:
-            buffer.write('\n=== Disagreement by Category ===\n')
-            disagreement_cat_df.to_csv(buffer, index=False)
-        if not perspective_patterns_df.empty:
-            buffer.write('\n=== Perspective Patterns ===\n')
-            perspective_patterns_df.to_csv(buffer, index=False)
+        
+        # Seção 1: Resumo Geral
+        buffer.write('=== RESUMO GERAL ===\n')
+        buffer.write(f'Total de Exemplos Finalizados,{len(statistics_data.get("examples", []))}\n')
+        buffer.write(f'Taxa de Desacordo,{statistics_data["statistics"]["disagreementRate"]:.2f}%\n')
+        buffer.write(f'Taxa de Resolução,{statistics_data["statistics"]["resolutionRate"]:.2f}%\n')
+        buffer.write(f'Tempo Médio de Anotação,{statistics_data["statistics"]["averageAnnotationTime"]:.2f} minutos\n\n')
+        
+        # Seção 2: Distribuição de Labels por Exemplo
+        buffer.write('=== DISTRIBUIÇÃO DE LABELS POR EXEMPLO ===\n')
+        examples = statistics_data.get("examples", [])
+        if examples:
+            # Cabeçalho
+            buffer.write('ID do Exemplo,Texto,')
+            
+            # Coletar todos os labels únicos
+            all_labels = set()
+            for example in examples:
+                if example.get('label_distribution'):
+                    all_labels.update(example['label_distribution'].keys())
+            
+            # Ordenar labels
+            sorted_labels = sorted(all_labels)
+            
+            # Escrever cabeçalhos dos labels
+            for label in sorted_labels:
+                buffer.write(f'{label} (%),')
+            buffer.write('Total Labels Regulares (%),Total Non-Voted (%)\n')
+            
+            # Dados de cada exemplo
+            for example in examples:
+                buffer.write(f'{example["id"]},"{example["text"][:100]}...",')
+                
+                # Percentagens de cada label
+                for label in sorted_labels:
+                    value = example.get('label_distribution', {}).get(label, 0)
+                    buffer.write(f'{value},')
+                
+                # Calcular totais
+                label_dist = example.get('label_distribution', {})
+                regular_total = 0
+                non_voted_total = 0
+                
+                for label, value in label_dist.items():
+                    value_num = float(value) if isinstance(value, (int, float, str)) else 0
+                    if (label.lower().find('abstração') != -1 or 
+                        label.lower().find('abstraction') != -1 or 
+                        label.lower().find('abstenção') != -1 or
+                        label.lower().find('abstention') != -1 or
+                        label.lower().find('null') != -1 or
+                        label in ['Null', 'null']):
+                        non_voted_total += value_num
+                    else:
+                        regular_total += value_num
+                
+                buffer.write(f'{regular_total:.1f},{non_voted_total:.1f}\n')
+        
+        buffer.write('\n')
+        
+        # Seção 3: Distribuição Geral de Labels (se disponível)
+        if statistics_data.get('labelDistribution'):
+            buffer.write('=== DISTRIBUIÇÃO GERAL DE LABELS ===\n')
+            total_labels = sum(statistics_data['labelDistribution'].values())
+            label_dist_df = pd.DataFrame({
+                'Label': list(statistics_data['labelDistribution'].keys()),
+                'Count': list(statistics_data['labelDistribution'].values()),
+                'Percentage': [f"{(count/total_labels*100):.2f}%" for count in statistics_data['labelDistribution'].values()]
+            })
+            label_dist_df.to_csv(buffer, index=False)
+            buffer.write('\n')
+        
+        # Seção 4: Distribuição por Perspectiva (se aplicável)
+        if statistics_data.get('perspectiveDistribution'):
+            buffer.write('=== DISTRIBUIÇÃO POR PERSPECTIVA ===\n')
+            perspective_dist_df = pd.DataFrame(statistics_data['perspectiveDistribution'])
+            if not perspective_dist_df.empty:
+                perspective_dist_df['Percentage'] = perspective_dist_df['count'].apply(
+                    lambda x: f"{(x/perspective_dist_df['count'].sum()*100):.2f}%"
+                )
+                perspective_dist_df.to_csv(buffer, index=False)
+                buffer.write('\n')
+        
+        # Seção 5: Desacordos por Categoria (se houver)
+        if statistics_data.get('disagreementByCategory'):
+            buffer.write('=== DESACORDOS POR CATEGORIA ===\n')
+            disagreement_cat_df = pd.DataFrame(statistics_data['disagreementByCategory'])
+            if not disagreement_cat_df.empty:
+                total_disagreements = disagreement_cat_df['count'].sum()
+                disagreement_cat_df['Percentage'] = disagreement_cat_df['count'].apply(
+                    lambda x: f"{(x/total_disagreements*100):.2f}%"
+                )
+                disagreement_cat_df.to_csv(buffer, index=False)
+                buffer.write('\n')
+        
+        # Seção 6: Padrões de Perspectiva (se aplicável)
+        if statistics_data.get('perspectivePatterns'):
+            buffer.write('=== PADRÕES DE PERSPECTIVA ===\n')
+            perspective_patterns_df = pd.DataFrame(statistics_data['perspectivePatterns'])
+            if not perspective_patterns_df.empty:
+                perspective_patterns_df['Agreement Rate'] = perspective_patterns_df.apply(
+                    lambda x: f"{(x['agreements']/x['total']*100):.2f}%" if x['total'] > 0 else "0%",
+                    axis=1
+                )
+                perspective_patterns_df['Disagreement Rate'] = perspective_patterns_df.apply(
+                    lambda x: f"{(x['disagreements']/x['total']*100):.2f}%" if x['total'] > 0 else "0%",
+                    axis=1
+                )
+                perspective_patterns_df.to_csv(buffer, index=False)
+                buffer.write('\n')
+        
+        # Seção 7: Lista de Desacordos (se houver)
+        if statistics_data.get('disagreements'):
+            buffer.write('=== LISTA DE DESACORDOS ===\n')
+            disagreements_data = [['Text ID', 'Texto', 'Category', 'Type', 'Status', 'Annotators']]
+            for d in statistics_data['disagreements']:
+                annotators = ', '.join([ann.get('user', 'Unknown') for ann in d.get('annotations', [])])
+                disagreements_data.append([
+                    d['textId'],
+                    d.get('text', '')[:100] + '...' if d.get('text') else '',
+                    d['category'],
+                    d['type'],
+                    d['status'],
+                    annotators
+                ])
+            
+            # Converter para DataFrame e exportar
+            disagreements_df = pd.DataFrame(disagreements_data[1:], columns=disagreements_data[0])
+            disagreements_df.to_csv(buffer, index=False)
+        
         response = Response(
             buffer.getvalue(),
             content_type='text/csv'
         )
-        response['Content-Disposition'] = 'attachment; filename=annotation_statistics.csv'
+        response['Content-Disposition'] = 'attachment; filename=estatisticas_por_texto.csv'
         return response
 
-    def export_to_pdf(self, statistics_data, chart_image=None):
+    def export_to_pdf(self, statistics_data, chartImages=None, screenExamples=None):
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter)
         styles = getSampleStyleSheet()
         elements = []
+        
+        # DEBUG: Verificar chartImages recebido
+        print('DEBUG chartImages:', chartImages)
+        
+        # Título principal
         title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, spaceAfter=30)
-        elements.append(Paragraph("Annotation Statistics Report", title_style))
+        elements.append(Paragraph("Estatísticas por Texto", title_style))
         elements.append(Spacer(1, 20))
-        # Add the chart image if provided
-        if chart_image:
-            if chart_image.startswith('data:image/png;base64,'):
-                chart_image = chart_image.split(',')[1]
-            imgdata = base64.b64decode(chart_image)
-            img_buffer = io.BytesIO(imgdata)
-            img = RLImage(img_buffer, width=300, height=300)
-            elements.append(Paragraph("Label Distribution (Pie Chart)", styles['Heading2']))
-            elements.append(img)
-            elements.append(Spacer(1, 20))
-        # Remove metrics table (do not add statistics table)
-        # Add disagreements table if there are any
-        if statistics_data['disagreements']:
-            elements.append(Paragraph("Disagreements", styles['Heading2']))
+        
+        # Seção 1: Resumo Geral
+        elements.append(Paragraph("Resumo Geral", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        
+        # Montar descrição dos filtros aplicados
+        filtros = statistics_data.get('applied_filters', {})
+        filtros_strs = []
+        for k, v in filtros.items():
+            if v:
+                filtros_strs.append(f"{k}: {v}")
+        filtros_descr = '\n'.join(filtros_strs) if filtros_strs else 'Nenhum filtro aplicado'
+        
+        summary_data = [
+            ['Métrica', 'Valor'],
+            ['Total de Exemplos Finalizados', str(len(statistics_data.get("examples", [])))],
+            ['Filtros Aplicados', filtros_descr]
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+        
+        # Seção 2: Distribuição de Labels por Exemplo
+        elements.append(Paragraph("Distribuição de Labels por Exemplo", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        # Usar screenExamples se enviado, senão usar statistics_data["examples"]
+        examples = screenExamples if screenExamples is not None else statistics_data.get("examples", [])
+        if examples:
+            for i, example in enumerate(examples[:10]):  # Limitar a 10 exemplos para não sobrecarregar
+                elements.append(Paragraph(f"Exemplo {example['id']}: {example['text'][:50]}...", styles['Heading3']))
+                elements.append(Spacer(1, 5))
+                # Inserir gráficos se enviados
+                chart_key_str = str(example['id'])
+                chart_key_int = int(example['id']) if isinstance(example['id'], str) and str(example['id']).isdigit() else example['id']
+                imgs = None
+                if chartImages:
+                    imgs = chartImages.get(chart_key_str) or chartImages.get(chart_key_int)
+                print('DEBUG imgs for example', example['id'], ':', imgs)
+                if imgs:
+                    if imgs.get('labels'):
+                        print('DEBUG labels image (first 100 chars):', imgs['labels'][:100])
+                        try:
+                            imgdata = base64.b64decode(imgs['labels'].split(',')[1] if ',' in imgs['labels'] else imgs['labels'])
+                            img_buffer = io.BytesIO(imgdata)
+                            img = RLImage(img_buffer, width=4*inch, height=2.5*inch)
+                            elements.append(Paragraph("Gráfico: Distribuição de Labels", styles['Normal']))
+                            elements.append(img)
+                            elements.append(Spacer(1, 8))
+                        except Exception as e:
+                            print('ERROR ao inserir imagem de labels no PDF:', e)
+                    if imgs.get('abstraction'):
+                        print('DEBUG abstraction image (first 100 chars):', imgs['abstraction'][:100])
+                        try:
+                            imgdata = base64.b64decode(imgs['abstraction'].split(',')[1] if ',' in imgs['abstraction'] else imgs['abstraction'])
+                            img_buffer = io.BytesIO(imgdata)
+                            img = RLImage(img_buffer, width=4*inch, height=2.5*inch)
+                            elements.append(Paragraph("Gráfico: Abstenção e Null", styles['Normal']))
+                            elements.append(img)
+                            elements.append(Spacer(1, 8))
+                        except Exception as e:
+                            print('ERROR ao inserir imagem de abstenção no PDF:', e)
+                label_dist = example.get('label_distribution', {})
+                if label_dist:
+                    regular_total = 0
+                    non_voted_total = 0
+                    for label, value in label_dist.items():
+                        value_num = float(value) if isinstance(value, (int, float, str)) else 0
+                        if (label.lower().find('abstração') != -1 or 
+                            label.lower().find('abstraction') != -1 or 
+                            label.lower().find('abstenção') != -1 or
+                            label.lower().find('abstention') != -1 or
+                            label.lower().find('null') != -1 or
+                            label in ['Null', 'null']):
+                            non_voted_total += value_num
+                        else:
+                            regular_total += value_num
+                    dist_data = [['Label', 'Percentagem (%)']]
+                    for label, value in sorted(label_dist.items()):
+                        dist_data.append([label, f"{value}%"])
+                    dist_data.append(['', ''])
+                    dist_data.append(['Total Labels Regulares', f"{regular_total:.1f}%"])
+                    dist_data.append(['Total Non-Voted', f"{non_voted_total:.1f}%"])
+                    dist_table = Table(dist_data, colWidths=[3*inch, 1.5*inch])
+                    dist_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                        ('BACKGROUND', (0, 1), (-1, -2), colors.white),
+                        ('TEXTCOLOR', (0, 1), (-1, -2), colors.black),
+                        ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
+                        ('FONTSIZE', (0, 1), (-1, -2), 9),
+                        ('BACKGROUND', (0, -2), (-1, -1), colors.lightgrey),
+                        ('FONTNAME', (0, -2), (-1, -1), 'Helvetica-Bold'),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+                    ]))
+                    elements.append(dist_table)
+                    elements.append(Spacer(1, 15))
+        else:
+            elements.append(Paragraph("Nenhum exemplo exibido na tela para os filtros aplicados.", styles['Normal']))
+            elements.append(Spacer(1, 15))
+        
+        # Seção 3: Desacordos (se houver)
+        if statistics_data.get('disagreements'):
+            elements.append(Paragraph("Lista de Desacordos", styles['Heading2']))
             elements.append(Spacer(1, 10))
+            
             disagreements_data = [['Text ID', 'Category', 'Type', 'Status']]
-            for d in statistics_data['disagreements']:
+            for d in statistics_data['disagreements'][:10]:  # Limitar a 10 desacordos
                 disagreements_data.append([
                     d['textId'],
                     d['category'],
                     d['type'],
                     d['status']
                 ])
+            
             disagreements_table = Table(disagreements_data, colWidths=[1.5*inch, 2*inch, 2*inch, 1.5*inch])
             disagreements_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 10),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
             ]))
             elements.append(disagreements_table)
+            
+            if len(statistics_data['disagreements']) > 10:
+                elements.append(Paragraph(f"... e mais {len(statistics_data['disagreements']) - 10} desacordos", styles['Normal']))
+        
         doc.build(elements)
         buffer.seek(0)
         response = HttpResponse(
             buffer,
             content_type='application/pdf'
         )
-        response['Content-Disposition'] = 'attachment; filename=annotation_statistics.pdf'
+        response['Content-Disposition'] = 'attachment; filename=estatisticas_por_texto.pdf'
         return response
 
     @action(detail=True, methods=['get'])
@@ -844,17 +1129,13 @@ class ExportStatisticsAPI(APIView):
             )
 
     def export_pdf(self, request):
-        """
-        Exporta estatísticas em formato PDF.
-        """
         try:
-            # Reutilizar a lógica da view principal
             statistics_view = AnnotationStatisticsAPI()
             statistics_view.kwargs = self.kwargs
             statistics_data = statistics_view.get_statistics(request).data
-            
-            # Para PDF, não temos chart_image por enquanto
-            return statistics_view.export_to_pdf(statistics_data)
+            chartImages = request.data.get('chartImages') if request.method == 'POST' else None
+            screenExamples = request.data.get('screenExamples') if request.method == 'POST' else None
+            return statistics_view.export_to_pdf(statistics_data, chartImages, screenExamples)
         except Exception as e:
             return Response(
                 {"error": f"Erro ao exportar PDF: {str(e)}"},
