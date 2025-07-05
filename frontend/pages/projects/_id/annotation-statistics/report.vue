@@ -80,6 +80,90 @@
         </v-col>
       </v-row>
 
+      <!-- Filtros adicionais -->
+      <v-row dense class="mb-6">
+        <v-col cols="12" md="6">
+          <v-card class="pa-4" outlined>
+            <h2 class="text-h6 mb-4 primary--text">Labels e Status</h2>
+            <v-select
+              v-model="filters.category"
+              :items="categoryOptions"
+              label="Labels"
+              multiple
+              chips
+              clearable
+              color="primary"
+              class="mb-4"
+            />
+            <v-select
+              v-model="filters.status"
+              :items="statusOptions"
+              label="Status"
+              clearable
+              color="primary"
+              class="mb-4"
+            />
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="6">
+          <v-card class="pa-4 pl-0" outlined>
+            <h2 class="text-h6 mb-4 primary--text" style="padding-left: 16px;">Date Interval</h2>
+            <div class="d-flex" style="gap: 24px;">
+              <div style="flex:1;">
+                <v-menu
+                  v-model="filters.startDateMenu"
+                  :close-on-content-click="false"
+                  transition="scale-transition"
+                  offset-y
+                  min-width="auto"
+                >
+                  <template #activator="{ on, attrs }">
+                    <v-text-field
+                      v-model="filters.startDate"
+                      label="Begin Date"
+                      prepend-icon="mdi-calendar"
+                      readonly
+                      v-bind="attrs"
+                      clearable
+                      v-on="on"
+                    />
+                  </template>
+                  <v-date-picker
+                    v-model="filters.startDate"
+                    @input="filters.startDateMenu = false"
+                  />
+                </v-menu>
+              </div>
+              <div style="flex:1;">
+                <v-menu
+                  v-model="filters.endDateMenu"
+                  :close-on-content-click="false"
+                  transition="scale-transition"
+                  offset-y
+                  min-width="auto"
+                >
+                  <template #activator="{ on, attrs }">
+                    <v-text-field
+                      v-model="filters.endDate"
+                      label="End Date"
+                      prepend-icon="mdi-calendar"
+                      readonly
+                      v-bind="attrs"
+                      clearable
+                      v-on="on"
+                    />
+                  </template>
+                  <v-date-picker
+                    v-model="filters.endDate"
+                    @input="filters.endDateMenu = false"
+                  />
+                </v-menu>
+              </div>
+            </div>
+          </v-card>
+        </v-col>
+      </v-row>
+
       <!-- Botões -->
       <v-btn color="primary" class="mt-4" 
         :disabled="!filters.examples.length" @click="fetchReport" >
@@ -135,7 +219,13 @@ export default {
         examples: [],
         versions: [],
         perspective: null,
-        perspectiveValues: {}
+        perspectiveValues: {},
+        category: [],
+        startDate: null,
+        endDate: null,
+        startDateMenu: false,
+        endDateMenu: false,
+        status: null
       },
       exampleOptions: [],
       versionOptions: [],
@@ -144,7 +234,13 @@ export default {
       versionsByExample: {},
       reportData: [],
       tableHeaders: [],
-      projectPerspective: null
+      projectPerspective: null,
+      categoryOptions: [],
+      statusOptions: [
+        { text: 'All', value: null },
+        { text: 'Resolved', value: 'true' },
+        { text: 'Not resolved', value: 'false' }
+      ]
     }
   },
   computed: {
@@ -165,6 +261,7 @@ export default {
   mounted() {
     this.fetchExamples()
     this.fetchPerspectives()
+    this.fetchCategories()
   },
   methods: {
     async fetchExamples() {
@@ -237,6 +334,17 @@ export default {
         this.perspectives = []
       } finally {
         this.loading.perspectives = false
+      }
+    },
+    async fetchCategories() {
+      try {
+        const response = await this.$services.categoryType.list(this.$route.params.id)
+        this.categoryOptions = response.map(cat => ({
+          text: cat.text || cat.name || cat.label || cat.id,
+          value: cat.id
+        }))
+      } catch (error) {
+        this.categoryOptions = []
       }
     },
     async fetchReport() {
