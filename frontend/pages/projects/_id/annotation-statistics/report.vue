@@ -175,26 +175,46 @@
 
       <!-- Tabela principal -->
       <div class="mt-8">
-        <v-simple-table>
-          <thead>
-            <tr>
-              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!reportData.length">
-              <td colspan="100%" class="text-center">
-                No data found. Try changing filters or generate anyway.
-              </td>
-            </tr>
-            <tr
-              v-for="row in reportData"
-              :key="`${row.Example}-${row.Version}-${row.perspective}`"
-            >
-              <td v-for="header in tableHeaders" :key="header">{{ row[header] }}</td>
-            </tr>
-          </tbody>
-        </v-simple-table>
+        <div v-if="Object.keys(reportData).length === 0">
+          <v-simple-table>
+            <tbody>
+              <tr>
+                <td colspan="100%" class="text-center">
+                  Select some filters or generate without filters.
+                </td>
+              </tr>
+            </tbody>
+          </v-simple-table>
+        </div>
+        <div v-else>
+          <v-card v-for="(versions, exampleName) in reportData" 
+            :key="exampleName" class="mb-8 pa-6">
+            <h2 class="text-h6 mb-2 primary--text">{{ exampleName }}</h2>
+            <div v-for="(rows, version) in versions" :key="version" class="mb-4">
+              <h3 class="text-subtitle-1 mb-1">Version {{ version }}</h3>
+              <v-simple-table>
+                <thead>
+                  <tr>
+                    <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, idx) in rows" 
+                    :key="idx">
+                    <td v-for="header in tableHeaders" :key="header">
+                      <template v-if="header === 'abstention' || header === 'null'">
+                        {{ formatPercent(row[header]) }}
+                      </template>
+                      <template v-else>
+                        {{ row[header] }}
+                      </template>
+                    </td>
+                  </tr>
+                </tbody>
+              </v-simple-table>
+            </div>
+          </v-card>
+        </div>
       </div>
     </v-card>
   </v-container>
@@ -202,6 +222,7 @@
 
 <script>
 import { mdiArrowLeft } from '@mdi/js'
+import { APIMemberRepository } from '@/repositories/member/apiMemberRepository'
 
 export default {
   name: 'AnnotationReportView',
@@ -232,7 +253,7 @@ export default {
       perspectives: [],
       perspectiveFields: [],
       versionsByExample: {},
-      reportData: [],
+      reportData: {},
       tableHeaders: [],
       projectPerspective: null,
       categoryOptions: [],
@@ -240,7 +261,8 @@ export default {
         { text: 'All', value: null },
         { text: 'Resolved', value: 'true' },
         { text: 'Not resolved', value: 'false' }
-      ]
+      ],
+      projectMembers: [],
     }
   },
   computed: {
@@ -262,6 +284,7 @@ export default {
     this.fetchExamples()
     this.fetchPerspectives()
     this.fetchCategories()
+    this.fetchProjectMembers()
   },
   methods: {
     async fetchExamples() {
@@ -345,6 +368,15 @@ export default {
         }))
       } catch (error) {
         this.categoryOptions = []
+      }
+    },
+    async fetchProjectMembers() {
+      try {
+        const projectId = this.$route.params.id
+        const repo = new APIMemberRepository(this.$axios)
+        this.projectMembers = await repo.list(projectId)
+      } catch (e) {
+        this.projectMembers = []
       }
     },
     async fetchReport() {
@@ -453,8 +485,6 @@ export default {
       // Montar nomes amigáveis para os labels nas colunas
       const labelColumnNames = labelHeaders.map(lab => lab.replace(/^label_/, ''));
       const tableHeaders = [
-        'Example',
-        'Version',
         ...perspectiveFieldHeaders,
         ...labelColumnNames,
         ...(this.filters.status !== null ? ['Status'] : []),
@@ -464,51 +494,55 @@ export default {
         'null'
       ]
       // Ordenar rows por exampleName
-      rows.sort((a, b) => (a.exampleName || '').localeCompare(b.exampleName || ''))
+      rows.sort((a, b) => (a.exampleName || '').localeCompare(b.exampleName || ''));
       
-      this.reportData = rows.map(row => {
-        const perspectiveData = {}
+      // Agrupar dados por exemplo e versão
+      const groupedData = {};
+      rows.forEach(row => {
+        const exampleName = row.exampleName || row.example || '';
+        const version = row.version;
+        if (!groupedData[exampleName]) groupedData[exampleName] = {};
+        if (!groupedData[exampleName][version]) groupedData[exampleName][version] = [];
+        const perspectiveData = {};
         filteredPerspectiveFields.forEach(fieldId => {
-          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId))
-          let value = this.filters.perspectiveValues[fieldId]
+          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+          let value = this.filters.perspectiveValues[fieldId];
           if (field && field.choices && Array.isArray(value)) {
             value = value.map(v => {
-              const choice = field.choices.find(c => c.value === v || c.id === v)
-              return choice ? (choice.text || choice.label || choice.value) : v
-            }).join(', ')
+              const choice = field.choices.find(c => c.value === v || c.id === v);
+              return choice ? (choice.text || choice.label || choice.value) : v;
+            }).join(', ');
           } else if (field && field.choices) {
-            const choice = field.choices.find(c => c.value === value || c.id === value)
-            value = choice ? (choice.text || choice.label || choice.value) : value
+            const choice = field.choices.find(c => c.value === value || c.id === value);
+            value = choice ? (choice.text || choice.label || choice.value) : value;
           }
-          perspectiveData[field ? field.name : fieldId] = value
-        })
-        // Montar objeto de labels filtrados, usando nomes amigáveis nas colunas
+          perspectiveData[field ? field.name : fieldId] = value;
+        });
         const labelData = {};
         labelHeaders.forEach((label) => {
           let val = row[label];
-          if (!val || val === '0%' || val === 0) val = '-';
+          if (!val || val === '0%' || val === 0) val = '0%';
           const colName = label.replace(/^label_/, '');
           labelData[colName] = val;
         });
-        // Estado e datas
-        let statusValue = ''
+        let statusValue = '';
         if (this.filters.status !== null && this.filters.status !== undefined) {
-          const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status)
-          statusValue = statusOpt ? statusOpt.text : this.filters.status
+          const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status);
+          statusValue = statusOpt ? statusOpt.text : this.filters.status;
         }
-        return {
-          Example: row.exampleName,
-          Version: row.version,
+        groupedData[exampleName][version].push({
           ...perspectiveData,
           ...labelData,
           ...(this.filters.status !== null ? { Status: statusValue } : {}),
           ...(this.filters.startDate ? { 'Begin Date': this.filters.startDate } : {}),
           ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
-          abstention: row.abstention || '',
-          null: row.null || ''
-        }
-      })
-      this.tableHeaders = tableHeaders
+          abstention: (row.abstention !== undefined && row.abstention !== null) ?
+             row.abstention : 0,
+          null: (row.null !== undefined && row.null !== null) ? row.null : 0
+        });
+      });
+      this.reportData = groupedData;
+      this.tableHeaders = tableHeaders;
     },
     clearFilters() {
       this.filters.examples = []
@@ -521,7 +555,63 @@ export default {
       this.filters.startDateMenu = false
       this.filters.endDateMenu = false
       this.filters.status = null
-    }
+    },
+    getTotalLabels(rows) {
+      // Soma os percentuais das labels regulares (exclui 'abstention' e 'null')
+      if (!rows || !rows.length) return '0.0';
+      const labelKeys = this.tableHeaders.filter(h => h !== 'abstention' && h !== 'null' && h !== 'Status' && h !== 'Begin Date' && h !== 'End Date');
+      let total = 0;
+      for (const row of rows) {
+        for (const key of labelKeys) {
+          let val = row[key];
+          if (typeof val === 'string' && val.endsWith('%')) val = parseFloat(val);
+          if (!isNaN(val) && val !== '-' && key !== 'abstention' && key !== 'null') total += Number(val);
+        }
+      }
+      return total.toFixed(1);
+    },
+    getTotalAbstentionNull(rows) {
+      // Soma os percentuais das colunas 'abstention' e 'null'
+      if (!rows || !rows.length) return '0.0';
+      let total = 0;
+      for (const row of rows) {
+        ['abstention', 'null'].forEach(key => {
+          let val = row[key];
+          if (typeof val === 'string' && val.endsWith('%')) val = parseFloat(val);
+          if (!isNaN(val) && val !== '-') total += Number(val);
+        });
+      }
+      return total.toFixed(1);
+    },
+    getUserStats(rows) {
+      // Retorna { totalUsers, votaram, absteveOuNull }
+      const totalUsers = this.projectMembers.length
+     
+      const row = rows && rows.length ? rows[0] : null
+      let voted = null;
+      let abstained = null;
+      let nulled = null;
+      if (row) {
+        // Se vierem campos específicos, usa
+        if ('voted_users' in row) voted = row.voted_users
+        if ('abstention_users' in row) abstained = row.abstention_users
+        if ('null_users' in row) nulled = row.null_users
+      }
+      // Se não vierem, só mostra total de usuários
+      return {
+        totalUsers,
+        voted: voted !== null ? voted : '-',
+        abstained: abstained !== null ? abstained : '-',
+        nulled: nulled !== null ? nulled : '-',
+      }
+    },
+    formatPercent(val) {
+      if (val === undefined || val === null || val === '' || val === '-' || val === 0 || val === '0' || val === '0.0') return '0%';
+      if (typeof val === 'string' && val.endsWith('%')) return val;
+      const num = Number(val);
+      if (isNaN(num)) return '0%';
+      return num.toFixed(1) + '%';
+    },
   }
 }
 </script>
