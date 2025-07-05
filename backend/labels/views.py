@@ -155,7 +155,8 @@ class SegmentationDetailAPI(BaseDetailAPI):
 
 
 class DatasetVersionVotingStatsAPI(APIView):
-    def get(self, request, example_id, version):
+    permission_classes = [AllowAny]
+    def get(self, request, project_id, example_id, version):
         stats = DatasetVersion.get_voting_statistics(example_id, version)
         return Response(stats, status=status.HTTP_200_OK)
 

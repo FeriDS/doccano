@@ -187,3 +187,20 @@ class DatasetVersion(models.Model):
         return cls.objects.filter(example_id=example_id)\
             .select_related("user", "label")\
             .order_by("version", "created_at")
+
+    @classmethod
+    def get_voting_statistics(cls, example_id, version):
+        qs = cls.objects.filter(example_id=example_id, version=version)
+        total = qs.count()
+        labels = {}
+        for dv in qs:
+            label_name = f'label_{dv.label.text}'
+            labels[label_name] = labels.get(label_name, 0) + 1
+        # Converter para percentagem com símbolo %
+        percent_labels = {}
+        for k, v in labels.items():
+            percent_labels[k] = f'{round((v / total) * 100, 2)}%' if total > 0 else '0%'
+        return {
+            'total': total,
+            **percent_labels
+        }

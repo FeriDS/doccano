@@ -419,16 +419,17 @@ export default {
         return field ? field.name : id
       })
       // Determinar labels a exibir: todos ou apenas os escolhidos
-      let labelHeaders = allLabels
+      let labelHeaders = allLabels;
       if (this.filters.category && this.filters.category.length > 0) {
-        // Mapear ids para texts
         const selectedCats = 
-          this.categoryOptions.filter(opt => this.filters.category.includes(opt.value))
-        const selectedTexts = selectedCats.map(opt => String(opt.text))
+          this.categoryOptions.filter(opt => this.filters.category.includes(opt.value));
+        const selectedTexts = selectedCats.map(opt => String(opt.text).toLowerCase().trim());
         labelHeaders = allLabels.filter(lab => {
-          const labelSuffix = lab.replace(/^label_/, '');
+          const labelSuffix = lab.replace(/^label_/, '').toLowerCase().trim();
           return selectedTexts.includes(labelSuffix);
-        })
+        });
+        // Se não encontrar nenhum, mostra todos como fallback
+        if (labelHeaders.length === 0) labelHeaders = allLabels;
       }
       // Adicionar colunas de estado e datas
       const tableHeaders = [
