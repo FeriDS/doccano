@@ -166,7 +166,7 @@
 
       <!-- Botões -->
       <v-btn color="primary" class="mt-4" 
-        :disabled="!filters.examples.length" @click="fetchReport" >
+        @click="fetchReport" >
         GENERATE REPORT
       </v-btn>
       <v-btn color="error" text class="mt-2" @click="clearFilters">
@@ -348,8 +348,27 @@ export default {
       }
     },
     async fetchReport() {
-      const { examples, versions, perspective, perspectiveValues } = this.filters
-      if (!examples.length) return
+      let { examples } = this.filters;
+      const { versions, perspective, perspectiveValues } = this.filters;
+      // Se nenhum exemplo for selecionado, usar todos os exemplos disponíveis
+      if (!examples.length) {
+        // Buscar todos os exemplos possíveis
+        examples = this.exampleOptions.map(opt => opt.value);
+        // Buscar as versões para todos os exemplos se ainda não estiverem carregadas
+        const projectId = this.$route.params.id;
+        const calls = examples.map(id =>
+          this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${id}/versions/`).then(res => {
+            return { id, res };
+          })
+        );
+        const results = await Promise.all(calls);
+        this.versionsByExample = {};
+        for (const { id, res } of results) {
+          const raw = Array.isArray(res.versions) ? res.versions : [];
+          const vals = raw.map(v => +v).filter(n => Number.isFinite(n));
+          this.versionsByExample[id] = vals;
+        }
+      }
 
       const projectId = this.$route.params.id
       const versionsToUse = versions.length

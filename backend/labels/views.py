@@ -157,7 +157,13 @@ class SegmentationDetailAPI(BaseDetailAPI):
 class DatasetVersionVotingStatsAPI(APIView):
     permission_classes = [AllowAny]
     def get(self, request, project_id, example_id, version):
-        stats = DatasetVersion.get_voting_statistics(example_id, version)
+        # Extrair filtros de perspectiva dos parâmetros da query
+        perspective_filters = {}
+        for key, value in request.query_params.items():
+            if key.startswith('perspective_'):
+                field = key.replace('perspective_', '')
+                perspective_filters[field] = value
+        stats = DatasetVersion.get_voting_statistics(example_id, version, perspective_filters)
         return Response(stats, status=status.HTTP_200_OK)
 
 

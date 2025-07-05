@@ -189,8 +189,13 @@ class DatasetVersion(models.Model):
             .order_by("version", "created_at")
 
     @classmethod
-    def get_voting_statistics(cls, example_id, version):
+    def get_voting_statistics(cls, example_id, version, perspective_filters=None):
         qs = cls.objects.filter(example_id=example_id, version=version)
+        if perspective_filters:
+            for field, value in perspective_filters.items():
+                # Supondo que o campo JSON está em user.profile.perspective
+                lookup = {f'user__profile__perspective__{field}': value}
+                qs = qs.filter(**lookup)
         total = qs.count()
         labels = {}
         for dv in qs:
