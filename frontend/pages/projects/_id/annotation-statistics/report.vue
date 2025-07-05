@@ -431,13 +431,14 @@ export default {
         // Se não encontrar nenhum, mostra todos como fallback
         if (labelHeaders.length === 0) labelHeaders = allLabels;
       }
-      // Adicionar colunas de estado e datas
+      // Montar nomes amigáveis para os labels nas colunas
+      const labelColumnNames = labelHeaders.map(lab => lab.replace(/^label_/, ''));
       const tableHeaders = [
         'Example',
         'Version',
         ...perspectiveFieldHeaders,
-        ...labelHeaders,
-        'Status',
+        ...labelColumnNames,
+        ...(this.filters.status !== null ? ['Status'] : []),
         ...(this.filters.startDate ? ['Begin Date'] : []),
         ...(this.filters.endDate ? ['End Date'] : []),
         'abstention',
@@ -462,8 +463,14 @@ export default {
           }
           perspectiveData[field ? field.name : fieldId] = value
         })
-        // Montar objeto de labels filtrados
-        const labelData = labelHeaders.reduce((acc, label) => { acc[label] = row[label] || ''; return acc }, {})
+        // Montar objeto de labels filtrados, usando nomes amigáveis nas colunas
+        const labelData = {};
+        labelHeaders.forEach((label) => {
+          let val = row[label];
+          if (!val || val === '0%' || val === 0) val = '-';
+          const colName = label.replace(/^label_/, '');
+          labelData[colName] = val;
+        });
         // Estado e datas
         let statusValue = ''
         if (this.filters.status !== null && this.filters.status !== undefined) {
@@ -475,7 +482,7 @@ export default {
           Version: row.version,
           ...perspectiveData,
           ...labelData,
-          Status: statusValue,
+          ...(this.filters.status !== null ? { Status: statusValue } : {}),
           ...(this.filters.startDate ? { 'Begin Date': this.filters.startDate } : {}),
           ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
           abstention: row.abstention || '',
