@@ -205,27 +205,36 @@
             <h2 class="text-h6 mb-2 primary--text">{{ exampleName }}</h2>
             <div v-for="(rows, version) in versions" :key="version" class="mb-4">
               <h3 class="text-subtitle-1 mb-1">Version {{ version }}</h3>
-        <v-simple-table>
-          <thead>
-            <tr>
-              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
-            </tr>
-          </thead>
-          <tbody>
+              <div v-if="rows && rows.length" class="d-flex mb-2" style="gap: 32px;">
+                <div class="text-body-1 font-weight-bold">
+                  Total de usuários: {{ getVoteStats(rows).totalUsers }}
+                </div>
+                <div class="text-body-1 font-weight-bold">
+                  Usuários que votaram: {{ getVoteStats(rows).usersVoted }}
+                </div>
+              </div>
+              
+              <v-simple-table>
+                <thead>
+                  <tr>
+                    <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
+                  </tr>
+                </thead>
+                <tbody>
                   <tr v-for="(row, idx) in rows" 
                     :key="idx">
-              <td v-for="header in tableHeaders" :key="header"
-                :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
+                    <td v-for="header in tableHeaders" :key="header"
+                      :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
                       <template v-if="header === 'abstention' || header === 'null'">
                         {{ formatPercent(row[header]) }}
                       </template>
                       <template v-else>
-                {{ row[header] }}
+                        {{ row[header] }}
                       </template>
-              </td>
-            </tr>
-          </tbody>
-        </v-simple-table>
+                    </td>
+                  </tr>
+                </tbody>
+              </v-simple-table>
             </div>
           </v-card>
         </div>
@@ -236,7 +245,6 @@
 
 <script>
 import { mdiArrowLeft } from '@mdi/js'
-import { APIMemberRepository } from '@/repositories/member/apiMemberRepository'
 
 export default {
   name: 'AnnotationReportView',
@@ -276,9 +284,9 @@ export default {
         { text: 'Resolved', value: 'true' },
         { text: 'Not resolved', value: 'false' }
       ],
-      projectMembers: [],
       exportingCSV: false,
       exportingPDF: false,
+      voteStatsByExampleVersion: {},
     }
   },
   computed: {
@@ -300,7 +308,6 @@ export default {
     this.fetchExamples()
     this.fetchPerspectives()
     this.fetchCategories()
-    this.fetchProjectMembers()
   },
   methods: {
     async fetchExamples() {
@@ -386,15 +393,6 @@ export default {
         this.categoryOptions = []
       }
     },
-    async fetchProjectMembers() {
-      try {
-        const projectId = this.$route.params.id
-        const repo = new APIMemberRepository(this.$axios)
-        this.projectMembers = await repo.list(projectId)
-      } catch (e) {
-        this.projectMembers = []
-      }
-    },
     async fetchReport() {
       let { examples } = this.filters;
       const { versions, perspective, perspectiveValues } = this.filters;
@@ -431,6 +429,9 @@ export default {
       const rows = []
       let allPerspectiveFields = []
       let allLabels = new Set()
+      // Novo: objeto para armazenar estatísticas de votação por exemplo/versão
+      this.voteStatsByExampleVersion = {};
+      const groupedData = {};
       for (const { ex, ver } of versionsToUse) {
         if (!this.versionsByExample[ex]?.includes(ver)) continue
         let stats = {}
@@ -446,8 +447,19 @@ export default {
           if (this.filters.endDate) params.end_date = this.filters.endDate;
           stats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/stats/`, { params })
 
-          // NOVO: Filtragem local dos votos por data, se votes estiver presente
+          // NOVO: buscar estatísticas de votação do backend
+          let votingStats = {};
+          try {
+            votingStats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/voting-user-stats/`, { params });
+            console.log('votingStats', votingStats);
+          } catch (e) {
+            votingStats = {};
+          }
+          this.voteStatsByExampleVersion[`${ex}:${ver}`] = votingStats;
+
+          // NOVO: Filtragem local dos votos por data e perspectiva, se votes estiver presente
           let filteredVotes = stats.votes || [];
+          // Filtrar por data
           if (filteredVotes.length && (this.filters.startDate || this.filters.endDate)) {
             const start = this.filters.startDate ? new Date(this.filters.startDate) : null;
             const end = this.filters.endDate ? new Date(this.filters.endDate) : null;
@@ -456,6 +468,26 @@ export default {
               if (start && voteDate < start) return false;
               if (end && voteDate > end) return false;
               return true;
+            });
+          }
+          // Filtrar por perspectiva
+          if (filteredVotes.length && this.perspectiveFields 
+            && Object.keys(this.filters.perspectiveValues).length > 0) {
+            filteredVotes = filteredVotes.filter(vote => {
+              const member = this.projectMembers.find(
+                  u => u.username === vote.user || u.id === vote.user || u.id === vote.user_id);
+              if (!member || !member.perspective) return false;
+              // Checar todos os campos de perspectiva filtrados
+              return Object.entries(this.filters.perspectiveValues).every(([fieldId, value]) => {
+                if (!value) return true;
+                const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+                if (!field) return true;
+                const memberValue = member.perspective[field.name] || member.perspective[fieldId];
+                if (Array.isArray(value)) {
+                  return value.includes(memberValue);
+                }
+                return memberValue === value;
+              });
             });
           }
           // Se filtrou, recalcula os percentuais
@@ -494,13 +526,35 @@ export default {
           allPerspectiveFields.forEach(field => {
             perspectiveData[field] = stats.perspective_fields ? stats.perspective_fields[field] : ''
           })
-          rows.push({
+          const labelData = {}
+          const labelHeaders = allLabels;
+          labelHeaders.forEach((label) => {
+            let val = stats[label];
+            if (!val || val === '0%' || val === 0) val = '0%';
+            const colName = label.replace(/^label_/, '');
+            labelData[colName] = val;
+          });
+          let statusValue = '';
+          if (this.filters.status !== null && this.filters.status !== undefined) {
+            const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status);
+            statusValue = statusOpt ? statusOpt.text : this.filters.status;
+          }
+          // Agrupamento e push devem acontecer aqui, onde ex e ver existem
+          const exampleName = this.exampleOptions.find(o => o.value === ex)?.text || `Example ${ex}`;
+          if (!groupedData[exampleName]) groupedData[exampleName] = {};
+          if (!groupedData[exampleName][ver]) groupedData[exampleName][ver] = [];
+          groupedData[exampleName][ver].push({
             example: ex,
-            exampleName: this.exampleOptions.find(o => o.value === ex)?.text,
             version: ver,
             ...perspectiveData,
-            ...stats
-          })
+            ...labelData,
+            ...(this.filters.status !== null ? { Status: statusValue } : {}),
+            ...(this.filters.startDate ? { 'Begin Date': this.filters.startDate } : {}),
+            ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
+            abstention: (stats.abstention !== undefined && 
+              stats.abstention !== null) ? stats.abstention : 0,
+            null: (stats.null !== undefined && stats.null !== null) ? stats.null : 0
+          });
         } catch {
           rows.push({
             example: ex,
@@ -550,51 +604,6 @@ export default {
       // Ordenar rows por exampleName
       rows.sort((a, b) => (a.exampleName || '').localeCompare(b.exampleName || ''));
       
-      // Agrupar dados por exemplo e versão
-      const groupedData = {};
-      rows.forEach(row => {
-        const exampleName = row.exampleName || row.example || '';
-        const version = row.version;
-        if (!groupedData[exampleName]) groupedData[exampleName] = {};
-        if (!groupedData[exampleName][version]) groupedData[exampleName][version] = [];
-        const perspectiveData = {};
-        filteredPerspectiveFields.forEach(fieldId => {
-          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
-          let value = this.filters.perspectiveValues[fieldId];
-          if (field && field.choices && Array.isArray(value)) {
-            value = value.map(v => {
-              const choice = field.choices.find(c => c.value === v || c.id === v);
-              return choice ? (choice.text || choice.label || choice.value) : v;
-            }).join(', ');
-          } else if (field && field.choices) {
-            const choice = field.choices.find(c => c.value === value || c.id === value);
-            value = choice ? (choice.text || choice.label || choice.value) : value;
-          }
-          perspectiveData[field ? field.name : fieldId] = value;
-        });
-        const labelData = {};
-        labelHeaders.forEach((label) => {
-          let val = row[label];
-          if (!val || val === '0%' || val === 0) val = '0%';
-          const colName = label.replace(/^label_/, '');
-          labelData[colName] = val;
-        });
-        let statusValue = '';
-        if (this.filters.status !== null && this.filters.status !== undefined) {
-          const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status);
-          statusValue = statusOpt ? statusOpt.text : this.filters.status;
-        }
-        groupedData[exampleName][version].push({
-          ...perspectiveData,
-          ...labelData,
-          ...(this.filters.status !== null ? { Status: statusValue } : {}),
-          ...(this.filters.startDate ? { 'Begin Date': this.filters.startDate } : {}),
-          ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
-          abstention: (row.abstention !== undefined && row.abstention !== null) ?
-             row.abstention : 0,
-          null: (row.null !== undefined && row.null !== null) ? row.null : 0
-        });
-      });
       this.reportData = groupedData;
       this.tableHeaders = tableHeaders;
     },
@@ -636,28 +645,6 @@ export default {
         });
       }
       return total.toFixed(1);
-    },
-    getUserStats(rows) {
-      // Retorna { totalUsers, votaram, absteveOuNull }
-      const totalUsers = this.projectMembers.length
-     
-      const row = rows && rows.length ? rows[0] : null
-      let voted = null;
-      let abstained = null;
-      let nulled = null;
-      if (row) {
-        // Se vierem campos específicos, usa
-        if ('voted_users' in row) voted = row.voted_users
-        if ('abstention_users' in row) abstained = row.abstention_users
-        if ('null_users' in row) nulled = row.null_users
-      }
-      // Se não vierem, só mostra total de usuários
-      return {
-        totalUsers,
-        voted: voted !== null ? voted : '-',
-        abstained: abstained !== null ? abstained : '-',
-        nulled: nulled !== null ? nulled : '-',
-      }
     },
     formatPercent(val) {
       if (val === undefined || val === null || val === '' || val === '-' || val === 0 || val === '0' || val === '0.0') return '0%';
@@ -784,6 +771,39 @@ export default {
       });
       return header === maxKey && max > 0;
     },
+    // Calcula estatísticas de votos/abstenção/null por versão
+    getVoteStats(rows) {
+    if (!rows || !rows.length)
+      return {
+        totalUsers: 0,
+        usersVoted: 0,
+        usersNotVoted: 0,
+        usersOnlyAbstention: 0,
+        totalVotes: 0
+      };
+    const row = rows[0];
+    const key = row && row.example !== undefined && row.version !== undefined
+      ? `${row.example}:${row.version}`
+      : null;
+    if (key && this.voteStatsByExampleVersion && this.voteStatsByExampleVersion[key]) {
+      const stats = this.voteStatsByExampleVersion[key];
+      return {
+        totalUsers: stats.total_users || 0,
+        usersVoted: stats.users_voted || 0,
+        usersNotVoted: stats.users_not_voted || 0,
+        usersOnlyAbstention: stats.users_only_abstention || 0,
+        totalVotes: row.total || 0
+      };
+    }
+    // fallback antigo
+    return {
+      totalUsers: 0,
+      usersVoted: 0,
+      usersNotVoted: 0,
+      usersOnlyAbstention: 0,
+      totalVotes: 0
+    };
+  },
   }
 }
 </script>

@@ -219,3 +219,45 @@ class DatasetVersion(models.Model):
             **percent_labels,
             'votes': votes,  # <--- ADICIONADO
         }
+
+    @classmethod
+    def get_voting_user_stats(cls, example_id, version, abstention_labels=("abstention", "null"), perspective_filters=None):
+        """
+        Retorna estatísticas de votação dos membros do projeto para um exemplo e versão:
+        - total_users: total de membros do projeto
+        - users_voted: membros que votaram em qualquer label (exceto só abstenção/null)
+        - users_only_abstention: membros que só votaram em abstenção/null
+        - users_not_voted: membros que não votaram nada
+        """
+        from projects.models import Member
+        from examples.models import Example
+        example = Example.objects.get(id=example_id)
+        project = example.project
+        members = Member.objects.filter(project=project)
+        usernames = set(m.username for m in members)
+        qs = cls.objects.filter(example_id=example_id, version=version)
+        if perspective_filters:
+            for field, value in perspective_filters.items():
+                lookup = {f'user__profile__perspective__{field}': value}
+                qs = qs.filter(**lookup)
+        votes_by_user = {}
+        for dv in qs.select_related('user', 'label'):
+            uname = dv.user.username
+            label = dv.label.text.lower()
+            votes_by_user.setdefault(uname, []).append(label)
+        users_voted = set(votes_by_user.keys())
+        users_only_abstention = set(
+            uname for uname, labels in votes_by_user.items()
+            if all(lab in abstention_labels for lab in labels)
+        )
+        users_not_voted = usernames - users_voted
+        return {
+            'total_users': len(usernames),
+            'users_voted': len(users_voted - users_only_abstention),
+            'users_only_abstention': len(users_only_abstention),
+            'users_not_voted': len(users_not_voted),
+            'usernames': list(usernames),
+            'usernames_voted': list(users_voted - users_only_abstention),
+            'usernames_only_abstention': list(users_only_abstention),
+            'usernames_not_voted': list(users_not_voted),
+        }
