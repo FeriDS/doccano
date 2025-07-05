@@ -442,7 +442,45 @@ export default {
               if (val) params[`perspective_${k}`] = val
             })
           }
+          if (this.filters.startDate) params.start_date = this.filters.startDate;
+          if (this.filters.endDate) params.end_date = this.filters.endDate;
           stats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/stats/`, { params })
+
+          // NOVO: Filtragem local dos votos por data, se votes estiver presente
+          let filteredVotes = stats.votes || [];
+          if (filteredVotes.length && (this.filters.startDate || this.filters.endDate)) {
+            const start = this.filters.startDate ? new Date(this.filters.startDate) : null;
+            const end = this.filters.endDate ? new Date(this.filters.endDate) : null;
+            filteredVotes = filteredVotes.filter(vote => {
+              const voteDate = new Date(vote.created_at);
+              if (start && voteDate < start) return false;
+              if (end && voteDate > end) return false;
+              return true;
+            });
+          }
+          // Se filtrou, recalcula os percentuais
+          const labelCounts = {};
+          const totalVotes = filteredVotes.length;
+          if (filteredVotes.length) {
+            filteredVotes.forEach(vote => {
+              const labelKey = `label_${vote.label}`;
+              labelCounts[labelKey] = (labelCounts[labelKey] || 0) + 1;
+            });
+          }
+          // Percentuais recalculados
+          const percentLabels = {};
+          Object.keys(labelCounts).forEach(k => {
+            percentLabels[k] = totalVotes > 0 ? `${((labelCounts[k] / totalVotes) * 100).toFixed(2)}%` : '0%';
+          });
+          // Substitui os percentuais originais pelos recalculados, se votes foi filtrado
+          if (filteredVotes.length || (this.filters.startDate || this.filters.endDate)) {
+            Object.keys(percentLabels).forEach(k => { stats[k] = percentLabels[k]; });
+            // Zera labels não presentes
+            Object.keys(stats).forEach(k => {
+              if (k.startsWith('label_') && !(k in percentLabels)) stats[k] = '0%';
+            });
+            stats.total = totalVotes;
+          }
           // Coletar todos os campos de perspectiva e labels
           if (stats.perspective_fields) {
             allPerspectiveFields = 

@@ -205,7 +205,17 @@ class DatasetVersion(models.Model):
         percent_labels = {}
         for k, v in labels.items():
             percent_labels[k] = f'{round((v / total) * 100, 2)}%' if total > 0 else '0%'
+        # NOVO: lista de votos
+        votes = [
+            {
+                "label": dv.label.text,
+                "user": dv.user.username,
+                "created_at": dv.created_at.isoformat()
+            }
+            for dv in qs
+        ]
         return {
             'total': total,
-            **percent_labels
+            **percent_labels,
+            'votes': votes,  # <--- ADICIONADO
         }
