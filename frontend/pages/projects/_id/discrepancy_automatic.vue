@@ -122,13 +122,13 @@
                 </div>
                 <div class="details-side-text">
                   <div class="most-voted mb-3">
-                    <span>Most label used:</span>
+                    <span>Most used label :</span>
                     <v-chip class="black--text green-chip ml-2" small>
                       {{ getMostVotedLabel(item) }}
                     </v-chip>
                   </div>
                   <div class="least-voted">
-                    <span>Least label used:</span>
+                    <span>Least used label:</span>
                     <v-chip class="black--text red-chip ml-2" small>
                       {{ getLeastVotedLabel(item) }}
                     </v-chip>
