@@ -204,38 +204,40 @@
             :key="exampleName" class="mb-8 pa-6">
             <h2 class="text-h6 mb-2 primary--text">{{ exampleName }}</h2>
             <!-- Total de usuários por exemplo -->
-            <div class="mb-2 text-body-1 font-weight-bold">
-              Total de usuários: {{ getExampleTotalUsers(versions) }}
+            <div class="mb-2 text-body-1">
+              Total users: {{ getExampleTotalUsers(versions) }}
             </div>
             <div v-for="(rows, version) in versions" :key="version" class="mb-4">
-              <h3 class="text-subtitle-1 mb-1">Version {{ version }}</h3>
-              <div v-if="rows && rows.length" class="d-flex mb-2" style="gap: 32px;">
-                <div class="text-body-1 font-weight-bold">
-                  Usuários que votaram: {{ getVoteStats(rows).usersVoted }}
+              <div style="border: 1px solid #eee; 
+                border-radius: 6px; padding: 12px 8px; margin-bottom: 8px;">
+                <h3 class="text-subtitle-1 mb-1 font-weight-bold">Version {{ version }}</h3>
+                <div v-if="rows && rows.length" class="d-flex mb-2" style="gap: 32px;">
+                  <div class="text-body-1">
+                    Users that voted: {{ getVoteStats(rows).usersVoted }}
+                  </div>
                 </div>
+                <v-simple-table>
+                  <thead>
+                    <tr>
+                      <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, idx) in rows" 
+                      :key="idx">
+                      <td v-for="header in tableHeaders" :key="header"
+                        :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
+                        <template v-if="header === 'abstention' || header === 'null'">
+                          {{ formatPercent(row[header]) }}
+                        </template>
+                        <template v-else>
+                          {{ row[header] }}
+                        </template>
+                      </td>
+                    </tr>
+                  </tbody>
+                </v-simple-table>
               </div>
-              
-        <v-simple-table>
-          <thead>
-            <tr>
-              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
-            </tr>
-          </thead>
-          <tbody>
-                  <tr v-for="(row, idx) in rows" 
-                    :key="idx">
-                    <td v-for="header in tableHeaders" :key="header"
-                      :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
-                      <template v-if="header === 'abstention' || header === 'null'">
-                        {{ formatPercent(row[header]) }}
-                      </template>
-                      <template v-else>
-                {{ row[header] }}
-                      </template>
-              </td>
-            </tr>
-          </tbody>
-        </v-simple-table>
             </div>
           </v-card>
         </div>
