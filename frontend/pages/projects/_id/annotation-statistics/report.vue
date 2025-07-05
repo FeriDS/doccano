@@ -203,24 +203,25 @@
           <v-card v-for="(versions, exampleName) in reportData" 
             :key="exampleName" class="mb-8 pa-6">
             <h2 class="text-h6 mb-2 primary--text">{{ exampleName }}</h2>
+            <!-- Total de usuários por exemplo -->
+            <div class="mb-2 text-body-1 font-weight-bold">
+              Total de usuários: {{ getExampleTotalUsers(versions) }}
+            </div>
             <div v-for="(rows, version) in versions" :key="version" class="mb-4">
               <h3 class="text-subtitle-1 mb-1">Version {{ version }}</h3>
               <div v-if="rows && rows.length" class="d-flex mb-2" style="gap: 32px;">
-                <div class="text-body-1 font-weight-bold">
-                  Total de usuários: {{ getVoteStats(rows).totalUsers }}
-                </div>
                 <div class="text-body-1 font-weight-bold">
                   Usuários que votaram: {{ getVoteStats(rows).usersVoted }}
                 </div>
               </div>
               
-              <v-simple-table>
-                <thead>
-                  <tr>
-                    <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
-                  </tr>
-                </thead>
-                <tbody>
+        <v-simple-table>
+          <thead>
+            <tr>
+              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
+            </tr>
+          </thead>
+          <tbody>
                   <tr v-for="(row, idx) in rows" 
                     :key="idx">
                     <td v-for="header in tableHeaders" :key="header"
@@ -229,12 +230,12 @@
                         {{ formatPercent(row[header]) }}
                       </template>
                       <template v-else>
-                        {{ row[header] }}
+                {{ row[header] }}
                       </template>
-                    </td>
-                  </tr>
-                </tbody>
-              </v-simple-table>
+              </td>
+            </tr>
+          </tbody>
+        </v-simple-table>
             </div>
           </v-card>
         </div>
@@ -804,6 +805,11 @@ export default {
       totalVotes: 0
     };
   },
+    getExampleTotalUsers(versions) {
+      const firstVersionRows = Object.values(versions)[0];
+      if (!firstVersionRows || !firstVersionRows.length) return 0;
+      return this.getVoteStats(firstVersionRows).totalUsers;
+    },
   }
 }
 </script>

@@ -204,13 +204,3 @@ class DatasetVersionBulkVersionsAPI(APIView):
             versions = list(DatasetVersion.get_all_versions_for_example(ex_id))
             result[str(ex_id)] = versions
         return Response({str(k): v for k, v in result.items()}, status=status.HTTP_200_OK)
-
-class DatasetVersionVotingUserStatsAPI(APIView):
-    permission_classes = [IsAuthenticated & IsProjectMember]
-    def get(self, request, project_id, example_id, version):
-        perspective_filters = {}
-        for k, v in request.query_params.items():
-            if k.startswith('perspective_'):
-                perspective_filters[k.replace('perspective_', '')] = v
-        stats = DatasetVersion.get_voting_user_stats(example_id, version, perspective_filters=perspective_filters)
-        return Response(stats, status=status.HTTP_200_OK)
