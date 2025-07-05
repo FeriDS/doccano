@@ -676,9 +676,13 @@ export default {
         let csv = '';
         // Para cada exemplo
         Object.entries(this.reportData).forEach(([exampleName, versions]) => {
+          // Total de usuários por exemplo
+          const totalUsers = this.getExampleTotalUsers(versions);
+          csv += `"${exampleName}";"Total users: ${totalUsers}"
+`;
           Object.entries(versions).forEach(([version, rows]) => {
             // Cabeçalho de bloco
-            csv += `"${exampleName}";"Version ${version}"
+            csv += `"Version ${version}";"Users that voted: ${this.getVoteStats(rows).usersVoted}"
 `;
             // Cabeçalho de colunas
             csv += headers.map(h => `"${h}"`).join(';') + '\n';
@@ -718,12 +722,16 @@ export default {
       try {
         // Geração de HTML para PDF
         let html = '<html><head><title>Relatório de Anotação</title>' +
-          '<style>body{font-family:sans-serif;}table{border-collapse:collapse;width:100%;margin-bottom:24px;}th,td{border:1px solid #ccc;padding:6px 8px;text-align:center;}th{background:#f5f5f5;}h2{color:#1976d2;}h3{color:#333;}</style>' +
+          '<style>body{font-family:sans-serif;}table{border-collapse:collapse;width:100%;margin-bottom:24px;}th,td{border:1px solid #ccc;padding:6px 8px;text-align:center;}th{background:#f5f5f5;}h2{color:#1976d2;}h3{color:#333;}.users-summary{margin-bottom:8px;font-weight:bold;}</style>' +
           '</head><body>';
         Object.entries(this.reportData).forEach(([exampleName, versions]) => {
+          const totalUsers = this.getExampleTotalUsers(versions);
           html += `<h2>${exampleName}</h2>`;
+          html += `<div class='users-summary'>Total users: ${totalUsers}</div>`;
           Object.entries(versions).forEach(([version, rows]) => {
+            html += `<div style='border:1px solid #eee;border-radius:6px;padding:12px 8px;margin-bottom:8px;'>`;
             html += `<h3>Version ${version}</h3>`;
+            html += `<div class='users-summary'>Users that voted: ${this.getVoteStats(rows).usersVoted}</div>`;
             html += '<table><thead><tr>';
             this.tableHeaders.forEach(h => { html += `<th>${h}</th>`; });
             html += '</tr></thead><tbody>';
@@ -739,6 +747,7 @@ export default {
               html += '</tr>';
             });
             html += '</tbody></table>';
+            html += '</div>';
           });
         });
         html += '</body></html>';
