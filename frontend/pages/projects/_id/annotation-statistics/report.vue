@@ -165,13 +165,26 @@
       </v-row>
 
       <!-- Botões -->
-      <v-btn color="primary" class="mt-4" 
-        @click="fetchReport" >
+      <div class="d-flex align-center justify-space-between">
+        <div>
+          <v-btn color="primary" class="mr-2" @click="fetchReport">
         GENERATE REPORT
       </v-btn>
       <v-btn color="error" text class="mt-2" @click="clearFilters">
         CLEAR ALL FILTERS
       </v-btn>
+        </div>
+        <div>
+          <v-btn color="success" :loading="exportingCSV" class="mr-2" @click="exportReportCSV">
+            <v-icon left>mdi-file-excel</v-icon>
+            Exportar CSV
+          </v-btn>
+          <v-btn color="error" :loading="exportingPDF" @click="exportReportPDF">
+            <v-icon left>mdi-file-pdf</v-icon>
+            Exportar PDF
+          </v-btn>
+        </div>
+      </div>
 
       <!-- Tabela principal -->
       <div class="mt-8">
@@ -192,26 +205,27 @@
             <h2 class="text-h6 mb-2 primary--text">{{ exampleName }}</h2>
             <div v-for="(rows, version) in versions" :key="version" class="mb-4">
               <h3 class="text-subtitle-1 mb-1">Version {{ version }}</h3>
-              <v-simple-table>
-                <thead>
-                  <tr>
-                    <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
-                  </tr>
-                </thead>
-                <tbody>
+        <v-simple-table>
+          <thead>
+            <tr>
+              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
+            </tr>
+          </thead>
+          <tbody>
                   <tr v-for="(row, idx) in rows" 
                     :key="idx">
-                    <td v-for="header in tableHeaders" :key="header">
+              <td v-for="header in tableHeaders" :key="header"
+                :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
                       <template v-if="header === 'abstention' || header === 'null'">
                         {{ formatPercent(row[header]) }}
                       </template>
                       <template v-else>
-                        {{ row[header] }}
+                {{ row[header] }}
                       </template>
-                    </td>
-                  </tr>
-                </tbody>
-              </v-simple-table>
+              </td>
+            </tr>
+          </tbody>
+        </v-simple-table>
             </div>
           </v-card>
         </div>
@@ -263,6 +277,8 @@ export default {
         { text: 'Not resolved', value: 'false' }
       ],
       projectMembers: [],
+      exportingCSV: false,
+      exportingPDF: false,
     }
   },
   computed: {
@@ -612,6 +628,124 @@ export default {
       if (isNaN(num)) return '0%';
       return num.toFixed(1) + '%';
     },
+    buildExportParams() {
+      const params = new URLSearchParams();
+      if (this.filters.startDate) params.append('start_date', this.filters.startDate);
+      if (this.filters.endDate) params.append('end_date', this.filters.endDate);
+      if (this.filters.category && this.filters.category.length > 0) params.append('label', this.filters.category.join(','));
+      if (this.filters.status !== null && this.filters.status !== undefined) params.append('resolved', this.filters.status);
+      if (this.filters.perspective) params.append('perspective', this.filters.perspective);
+      Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
+        if (value) params.append(`perspective_${fieldId}`, value);
+      });
+      return params.toString();
+    },
+    exportReportCSV() {
+      this.exportingCSV = true;
+      try {
+        // Geração de CSV a partir dos dados do frontend
+        const headers = this.tableHeaders;
+        let csv = '';
+        // Para cada exemplo
+        Object.entries(this.reportData).forEach(([exampleName, versions]) => {
+          Object.entries(versions).forEach(([version, rows]) => {
+            // Cabeçalho de bloco
+            csv += `"${exampleName}";"Version ${version}"
+`;
+            // Cabeçalho de colunas
+            csv += headers.map(h => `"${h}"`).join(';') + '\n';
+            // Dados
+            rows.forEach(row => {
+              csv += headers.map(h => {
+                let val = row[h];
+                if (h === 'abstention' || h === 'null') val = this.formatPercent(val);
+                if (val === undefined || val === null) val = '';
+                const safeVal = String(val).replace(/"/g, '""');
+                return `"${safeVal}"`;
+              }).join(';') + '\n';
+            });
+            csv += '\n';
+          });
+        });
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `relatorio_anotacao_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        this.$toast && this.$toast.success && this.$toast.success('Relatório CSV exportado com sucesso!');
+      } catch (error) {
+        console.error('Erro ao exportar CSV:', error);
+        this.$toast && this.$toast.error && this.$toast.error('Erro ao exportar relatório CSV');
+      } finally {
+        this.exportingCSV = false;
+      }
+    },
+    exportReportPDF() {
+      this.exportingPDF = true;
+      try {
+        // Geração de HTML para PDF
+        let html = '<html><head><title>Relatório de Anotação</title>' +
+          '<style>body{font-family:sans-serif;}table{border-collapse:collapse;width:100%;margin-bottom:24px;}th,td{border:1px solid #ccc;padding:6px 8px;text-align:center;}th{background:#f5f5f5;}h2{color:#1976d2;}h3{color:#333;}</style>' +
+          '</head><body>';
+        Object.entries(this.reportData).forEach(([exampleName, versions]) => {
+          html += `<h2>${exampleName}</h2>`;
+          Object.entries(versions).forEach(([version, rows]) => {
+            html += `<h3>Version ${version}</h3>`;
+            html += '<table><thead><tr>';
+            this.tableHeaders.forEach(h => { html += `<th>${h}</th>`; });
+            html += '</tr></thead><tbody>';
+            rows.forEach(row => {
+              html += '<tr>';
+              this.tableHeaders.forEach(h => {
+                let val = row[h];
+                if (h === 'abstention' || h === 'null') val = this.formatPercent(val);
+                if (val === undefined || val === null) val = '';
+                html += `<td>${val}</td>`;
+                return null;
+              });
+              html += '</tr>';
+            });
+            html += '</tbody></table>';
+          });
+        });
+        html += '</body></html>';
+        // Abrir nova janela e imprimir
+        const printWindow = window.open('', '', 'width=900,height=700');
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        this.$toast && this.$toast.success && this.$toast.success('Relatório PDF gerado via impressão!');
+      } catch (error) {
+        console.error('Erro ao exportar PDF:', error);
+        this.$toast && this.$toast.error && this.$toast.error('Erro ao exportar relatório PDF');
+      } finally {
+        this.exportingPDF = false;
+      }
+    },
+    // Retorna true se este header é o label de maior valor da linha
+    isMaxLabelCell(header, row) {
+      // Só aplica para colunas de label regular
+      if (['abstention', 'null', 'Status', 'Begin Date', 'End Date'].includes(header)) return false;
+      // Pega só os valores das colunas de label
+      const labelKeys = this.tableHeaders.filter(h => !['abstention', 'null', 'Status', 'Begin Date', 'End Date'].includes(h));
+      let max = -Infinity;
+      let maxKey = null;
+      labelKeys.forEach(h => {
+        let val = row[h];
+        if (typeof val === 'string' && val.endsWith('%')) val = parseFloat(val);
+        if (!isNaN(val) && val > max) {
+          max = val;
+          maxKey = h;
+        }
+      });
+      return header === maxKey && max > 0;
+    },
   }
 }
 </script>
@@ -620,5 +754,9 @@ export default {
 .v-expansion-panel-header {
   font-size: 18px;
   font-weight: 500;
+}
+td.highlight-label {
+  background: #fff9c4;
+  font-weight: bold;
 }
 </style>
