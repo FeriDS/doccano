@@ -654,7 +654,6 @@ class AnnotationStatisticsAPI(APIView):
         # Seção 2: Distribuição de Labels por Exemplo
         elements.append(Paragraph("Distribuição de Labels por Exemplo", styles['Heading2']))
         elements.append(Spacer(1, 10))
-        # Usar screenExamples se enviado, senão usar statistics_data["examples"]
         examples = screenExamples if screenExamples is not None else statistics_data.get("examples", [])
         if examples:
             for i, example in enumerate(examples[:10]):  # Limitar a 10 exemplos para não sobrecarregar
@@ -690,24 +689,48 @@ class AnnotationStatisticsAPI(APIView):
                             elements.append(Spacer(1, 8))
                         except Exception as e:
                             print('ERROR ao inserir imagem de abstenção no PDF:', e)
-                label_dist = example.get('label_distribution', {})
-                if label_dist:
+                # Montar tabela de labels exatamente como no gráfico
+                labels_data = example.get('labelsChartData', {})
+                abstraction_data = example.get('abstractionChartData', {})
+                # Juntar todas as labels dos dois gráficos
+                all_labels = list(labels_data.get('labels', [])) + [l for l in abstraction_data.get('labels', []) if l not in labels_data.get('labels', [])]
+                if all_labels:
+                    dist_data = [['Label', 'Percentagem (%)']]
+                    for label in all_labels:
+                        # Buscar valor na ordem: labelsChartData, abstractionChartData
+                        if label in labels_data.get('labels', []):
+                            idx = labels_data['labels'].index(label)
+                            value = labels_data['data'][idx]
+                        elif label in abstraction_data.get('labels', []):
+                            idx = abstraction_data['labels'].index(label)
+                            value = abstraction_data['data'][idx]
+                        else:
+                            value = 0
+                        dist_data.append([label, f"{value}%"])
+                    # Calcular totais
                     regular_total = 0
                     non_voted_total = 0
-                    for label, value in label_dist.items():
-                        value_num = float(value) if isinstance(value, (int, float, str)) else 0
+                    for label in all_labels:
                         if (label.lower().find('abstração') != -1 or 
                             label.lower().find('abstraction') != -1 or 
                             label.lower().find('abstenção') != -1 or
                             label.lower().find('abstention') != -1 or
                             label.lower().find('null') != -1 or
                             label in ['Null', 'null']):
-                            non_voted_total += value_num
+                            # Buscar valor
+                            if label in abstraction_data.get('labels', []):
+                                idx = abstraction_data['labels'].index(label)
+                                non_voted_total += float(abstraction_data['data'][idx])
+                            elif label in labels_data.get('labels', []):
+                                idx = labels_data['labels'].index(label)
+                                non_voted_total += float(labels_data['data'][idx])
                         else:
-                            regular_total += value_num
-                    dist_data = [['Label', 'Percentagem (%)']]
-                    for label, value in sorted(label_dist.items()):
-                        dist_data.append([label, f"{value}%"])
+                            if label in labels_data.get('labels', []):
+                                idx = labels_data['labels'].index(label)
+                                regular_total += float(labels_data['data'][idx])
+                            elif label in abstraction_data.get('labels', []):
+                                idx = abstraction_data['labels'].index(label)
+                                regular_total += float(abstraction_data['data'][idx])
                     dist_data.append(['', ''])
                     dist_data.append(['Total Labels Regulares', f"{regular_total:.1f}%"])
                     dist_data.append(['Total Non-Voted', f"{non_voted_total:.1f}%"])
@@ -732,39 +755,6 @@ class AnnotationStatisticsAPI(APIView):
         else:
             elements.append(Paragraph("Nenhum exemplo exibido na tela para os filtros aplicados.", styles['Normal']))
             elements.append(Spacer(1, 15))
-        
-        # Seção 3: Desacordos (se houver)
-        if statistics_data.get('disagreements'):
-            elements.append(Paragraph("Lista de Desacordos", styles['Heading2']))
-            elements.append(Spacer(1, 10))
-            
-            disagreements_data = [['Text ID', 'Category', 'Type', 'Status']]
-            for d in statistics_data['disagreements'][:10]:  # Limitar a 10 desacordos
-                disagreements_data.append([
-                    d['textId'],
-                    d['category'],
-                    d['type'],
-                    d['status']
-                ])
-            
-            disagreements_table = Table(disagreements_data, colWidths=[1.5*inch, 2*inch, 2*inch, 1.5*inch])
-            disagreements_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
-            ]))
-            elements.append(disagreements_table)
-            
-            if len(statistics_data['disagreements']) > 10:
-                elements.append(Paragraph(f"... e mais {len(statistics_data['disagreements']) - 10} desacordos", styles['Normal']))
         
         doc.build(elements)
         buffer.seek(0)

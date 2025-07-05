@@ -913,11 +913,18 @@ export default {
             abstraction: abstractionImg
           };
         }
-        // Enviar também todos os exemplos exibidos na tela
+        // Enviar também todos os exemplos exibidos na tela, com os dados dos gráficos
         const screenExamples = this.examples.map(e => ({
           id: e.id,
           text: e.text,
-          label_distribution: e.label_distribution || {},
+          labelsChartData: {
+            labels: this.labelsCharts[e.id]?.data.labels || [],
+            data: this.labelsCharts[e.id]?.data.datasets[0]?.data || []
+          },
+          abstractionChartData: {
+            labels: this.abstractionCharts[e.id]?.data.labels || [],
+            data: this.abstractionCharts[e.id]?.data.datasets[0]?.data || []
+          }
         }));
         const params = this.buildExportParams();
         const url = `/v1/projects/${this.projectId}/statistics/export/pdf?${params}`;
