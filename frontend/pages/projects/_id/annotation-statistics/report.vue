@@ -216,13 +216,13 @@
                     Users that voted: {{ getVoteStats(rows).usersVoted }}
                   </div>
                 </div>
-                <v-simple-table>
-                  <thead>
-                    <tr>
-                      <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+        <v-simple-table>
+          <thead>
+            <tr>
+              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
+            </tr>
+          </thead>
+          <tbody>
                     <tr v-for="(row, idx) in rows" 
                       :key="idx">
                       <td v-for="header in tableHeaders" :key="header"
@@ -231,12 +231,12 @@
                           {{ formatPercent(row[header]) }}
                         </template>
                         <template v-else>
-                          {{ row[header] }}
+                {{ row[header] }}
                         </template>
-                      </td>
-                    </tr>
-                  </tbody>
-                </v-simple-table>
+              </td>
+            </tr>
+          </tbody>
+        </v-simple-table>
               </div>
             </div>
           </v-card>
@@ -248,6 +248,8 @@
 
 <script>
 import { mdiArrowLeft } from '@mdi/js'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
 
 export default {
   name: 'AnnotationReportView',
@@ -719,51 +721,91 @@ export default {
     },
     exportReportPDF() {
       this.exportingPDF = true;
-      try {
-        // Geração de HTML para PDF
-        let html = '<html><head><title>Relatório de Anotação</title>' +
-          '<style>body{font-family:sans-serif;}table{border-collapse:collapse;width:100%;margin-bottom:24px;}th,td{border:1px solid #ccc;padding:6px 8px;text-align:center;}th{background:#f5f5f5;}h2{color:#1976d2;}h3{color:#333;}.users-summary{margin-bottom:8px;font-weight:bold;}</style>' +
-          '</head><body>';
-        Object.entries(this.reportData).forEach(([exampleName, versions]) => {
-          const totalUsers = this.getExampleTotalUsers(versions);
-          html += `<h2>${exampleName}</h2>`;
-          html += `<div class='users-summary'>Total users: ${totalUsers}</div>`;
-          Object.entries(versions).forEach(([version, rows]) => {
-            html += `<div style='border:1px solid #eee;border-radius:6px;padding:12px 8px;margin-bottom:8px;'>`;
-            html += `<h3>Version ${version}</h3>`;
-            html += `<div class='users-summary'>Users that voted: ${this.getVoteStats(rows).usersVoted}</div>`;
-            html += '<table><thead><tr>';
-            this.tableHeaders.forEach(h => { html += `<th>${h}</th>`; });
-            html += '</tr></thead><tbody>';
-            rows.forEach(row => {
-              html += '<tr>';
+      this.$nextTick(async () => {
+        try {
+          const container = document.createElement('div');
+          container.style.width = '800px';
+          container.style.padding = '16px';
+          container.style.fontFamily = 'sans-serif';
+          container.innerHTML = '';
+
+          Object.entries(this.reportData).forEach(([exampleName, versions]) => {
+            const totalUsers = this.getExampleTotalUsers(versions);
+            container.innerHTML += `<h2 style="color:#1976d2;">${exampleName}</h2>`;
+            container.innerHTML += `<div style="margin-bottom:6px;font-weight:bold;">Total users: ${totalUsers}</div>`;
+
+            Object.entries(versions).forEach(([version, rows]) => {
+              container.innerHTML += `<div style="border:1px solid #eee;border-radius:6px;padding:12px 8px;margin-bottom:16px;">`;
+              container.innerHTML += `<h3 style="color:#333;">Version ${version}</h3>`;
+              container.innerHTML += `<div style="margin-bottom:8px;font-weight:bold;">Users that voted: ${this.getVoteStats(rows).usersVoted}</div>`;
+
+              // tabela
+              let table = '<table style="border-collapse:collapse;width:100%;margin-top:12px;">';
+              table += '<thead><tr>';
               this.tableHeaders.forEach(h => {
-                let val = row[h];
-                if (h === 'abstention' || h === 'null') val = this.formatPercent(val);
-                if (val === undefined || val === null) val = '';
-                html += `<td>${val}</td>`;
-                return null;
+                table += `<th style="border:1px solid #ccc;padding:6px 8px;background:#f5f5f5;text-align:center;">${h}</th>`;
               });
-              html += '</tr>';
+              table += '</tr></thead><tbody>';
+
+              rows.forEach(row => {
+                table += '<tr>';
+                this.tableHeaders.forEach(h => {
+                  let val = row[h];
+                  if (h === 'abstention' || h === 'null') val = this.formatPercent(val);
+                  if (val === undefined || val === null) val = '';
+                  table += `<td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${val}</td>`;
+                });
+                table += '</tr>';
+              });
+
+              table += '</tbody></table>';
+              container.innerHTML += table;
+              container.innerHTML += '</div>';
             });
-            html += '</tbody></table>';
-            html += '</div>';
           });
-        });
-        html += '</body></html>';
-        // Abrir nova janela e imprimir
-        const printWindow = window.open('', '', 'width=900,height=700');
-        printWindow.document.write(html);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-        this.$toast && this.$toast.success && this.$toast.success('Relatório PDF gerado via impressão!');
-      } catch (error) {
-        console.error('Erro ao exportar PDF:', error);
-        this.$toast && this.$toast.error && this.$toast.error('Erro ao exportar relatório PDF');
-      } finally {
-        this.exportingPDF = false;
-      }
+
+          document.body.appendChild(container);
+          const canvas = await html2canvas(container, { scale: 2 });
+          const imgData = canvas.toDataURL('image/png');
+
+          // eslint-disable-next-line new-cap
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+
+          // Calcula as dimensões da imagem em mm
+          const imgProps = pdf.getImageProperties(imgData);
+          const imgWidth = pdfWidth;
+          const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+          let heightLeft = imgHeight;
+          let position = 0;
+
+          // Adiciona a primeira página
+          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+
+          heightLeft -= pdfHeight;
+
+          // Adiciona páginas extras se necessário
+          while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pdfHeight;
+          }
+
+          pdf.save(`relatorio_anotacao_${new Date().toISOString().split('T')[0]}.pdf`);
+
+          document.body.removeChild(container);
+
+          this.$toast && this.$toast.success && this.$toast.success('Relatório PDF exportado com sucesso!');
+        } catch (error) {
+          console.error('Erro ao exportar PDF:', error);
+          this.$toast && this.$toast.error && this.$toast.error('Erro ao exportar relatório PDF');
+        } finally {
+          this.exportingPDF = false;
+        }
+      });
     },
     // Retorna true se este header é o label de maior valor da linha
     isMaxLabelCell(header, row) {
