@@ -418,12 +418,27 @@ export default {
         const field = this.perspectiveFields.find(f => String(f.id) === String(id))
         return field ? field.name : id
       })
-      // Montar headers: Example, Version, nomes amigáveis das perspectivas, labels, abstenção, null
+      // Determinar labels a exibir: todos ou apenas os escolhidos
+      let labelHeaders = allLabels
+      if (this.filters.category && this.filters.category.length > 0) {
+        // Mapear ids para texts
+        const selectedCats = 
+          this.categoryOptions.filter(opt => this.filters.category.includes(opt.value))
+        const selectedTexts = selectedCats.map(opt => String(opt.text))
+        labelHeaders = allLabels.filter(lab => {
+          const labelSuffix = lab.replace(/^label_/, '');
+          return selectedTexts.includes(labelSuffix);
+        })
+      }
+      // Adicionar colunas de estado e datas
       const tableHeaders = [
         'Example',
         'Version',
         ...perspectiveFieldHeaders,
-        ...allLabels,
+        ...labelHeaders,
+        'Status',
+        ...(this.filters.startDate ? ['Begin Date'] : []),
+        ...(this.filters.endDate ? ['End Date'] : []),
         'abstention',
         'null'
       ]
@@ -446,11 +461,22 @@ export default {
           }
           perspectiveData[field ? field.name : fieldId] = value
         })
+        // Montar objeto de labels filtrados
+        const labelData = labelHeaders.reduce((acc, label) => { acc[label] = row[label] || ''; return acc }, {})
+        // Estado e datas
+        let statusValue = ''
+        if (this.filters.status !== null && this.filters.status !== undefined) {
+          const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status)
+          statusValue = statusOpt ? statusOpt.text : this.filters.status
+        }
         return {
           Example: row.exampleName,
           Version: row.version,
           ...perspectiveData,
-          ...allLabels.reduce((acc, label) => { acc[label] = row[label] || ''; return acc }, {}),
+          ...labelData,
+          Status: statusValue,
+          ...(this.filters.startDate ? { 'Begin Date': this.filters.startDate } : {}),
+          ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
           abstention: row.abstention || '',
           null: row.null || ''
         }
@@ -462,8 +488,12 @@ export default {
       this.filters.versions = []
       this.filters.perspectiveValues = {}
       this.versionOptions = []
-      this.reportData = []
-      this.tableHeaders = []
+      this.filters.category = []
+      this.filters.startDate = null
+      this.filters.endDate = null
+      this.filters.startDateMenu = false
+      this.filters.endDateMenu = false
+      this.filters.status = null
     }
   }
 }
