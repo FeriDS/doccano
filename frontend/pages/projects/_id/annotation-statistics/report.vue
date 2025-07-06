@@ -230,7 +230,10 @@
         <v-simple-table>
           <thead>
             <tr>
-              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
+              <th v-for="header in tableHeaders" :key="header">
+                {{ header === 'X (no vote)' ? 'X (no vote)' : 
+                  (header === 'abstention' ? 'Abstention' : header) }}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -238,8 +241,8 @@
                       :key="idx">
                       <td v-for="header in tableHeaders" :key="header"
                         :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
-                        <template v-if="header === 'abstention' || header === 'null'">
-                          {{ formatPercent(row[header]) }}
+                        <template v-if="header === 'abstention' || header === 'X (no vote)'">
+                          {{ formatPercent(row[header === 'X (no vote)' ? 'null' : header]) }}
                         </template>
                         <template v-else>
                 {{ row[header] }}
@@ -662,7 +665,7 @@ export default {
         ...(this.filters.startDate ? ['Begin Date'] : []),
         ...(this.filters.endDate ? ['End Date'] : []),
         'abstention',
-        'null'
+        'X (no vote)'
       ]
       // Ordenar rows por exampleName
       rows.sort((a, b) => (a.exampleName || '').localeCompare(b.exampleName || ''));
