@@ -473,30 +473,29 @@ class AnnotationStatisticsAPI(APIView):
     def export_to_csv(self, statistics_data, screenExamples=None):
         buffer = io.StringIO()
         
-        # Seção 1: Resumo Geral
-        buffer.write('RESUMO GERAL\n')
+        # Section 1: General Summary
+        buffer.write('GENERAL SUMMARY\n')
         buffer.write('-' * 20 + '\n')
-        buffer.write('Métrica;Valor\n')
-        buffer.write(f'Total de Exemplos Finalizados;{len(statistics_data.get("examples", []))}\n')
+        buffer.write('Metric;Value\n')
+        buffer.write(f'Total Finalized Examples;{len(statistics_data.get("examples", []))}\n')
         filtros = statistics_data.get('applied_filters', {})
         filtros_written = False
         for k, v in filtros.items():
             if v:
-                buffer.write(f'Filtros Aplicados;{k}: {v}\n')
+                buffer.write(f'Applied Filters;{k}: {v}\n')
                 filtros_written = True
         if not filtros_written:
-            buffer.write('Filtros Aplicados;Nenhum filtro aplicado\n')
+            buffer.write('Applied Filters;No filter applied\n')
         buffer.write('\n')
 
-        # Seção 2: Distribuição de Labels por Exemplo (tabelas igual ao PDF)
-        buffer.write('DISTRIBUIÇÃO DE LABELS POR EXEMPLO\n')
+        # Section 2: Label Distribution per Example
+        buffer.write('LABEL DISTRIBUTION PER EXAMPLE\n')
         buffer.write('-' * 40 + '\n')
         
         examples = screenExamples if screenExamples is not None else statistics_data.get("examples", [])
         if examples:
             for i, example in enumerate(examples):
-                example_text = example.get('text', f'Exemplo {i+1}')
-                # Truncar texto muito longo para o título
+                example_text = example.get('text', f'Example {i+1}')
                 if len(example_text) > 100:
                     example_text = example_text[:97] + '...'
                 buffer.write(f'{example_text}\n')
@@ -509,7 +508,7 @@ class AnnotationStatisticsAPI(APIView):
                 all_labels = list(labels_data.get('labels', [])) + [l for l in abstraction_data.get('labels', []) if l not in labels_data.get('labels', [])]
                 regular_total = 0
                 non_voted_total = 0
-                buffer.write('Label;Percentagem (%)\n')
+                buffer.write('Label;Percentage (%)\n')
                 for label in all_labels:
                     if label in labels_data.get('labels', []):
                         idx = labels_data['labels'].index(label)
@@ -539,19 +538,18 @@ class AnnotationStatisticsAPI(APIView):
                         elif label in abstraction_data.get('labels', []):
                             idx = abstraction_data['labels'].index(label)
                             regular_total += float(abstraction_data['data'][idx])
-                buffer.write(f'Total Labels Regulares;{regular_total:.1f}%\n')
+                buffer.write(f'Total Regular Labels;{regular_total:.1f}%\n')
                 buffer.write(f'Total Non-Voted;{non_voted_total:.1f}%\n')
                 buffer.write('\n')
         else:
-            buffer.write('Nenhum exemplo exibido na tela para os filtros aplicados.\n\n')
+            buffer.write('No example displayed for the applied filters.\n\n')
         
-        # Adicionar BOM UTF-8 para compatibilidade com Excel
         bom = '\ufeff'
         response = HttpResponse(
             bom + buffer.getvalue(),
             content_type='text/csv; charset=utf-8'
         )
-        response['Content-Disposition'] = 'attachment; filename=estatisticas_por_texto.csv'
+        response['Content-Disposition'] = 'attachment; filename=statistics_by_text.csv'
         return response
 
     def export_to_pdf(self, statistics_data, chartImages=None, screenExamples=None):
@@ -560,30 +558,26 @@ class AnnotationStatisticsAPI(APIView):
         styles = getSampleStyleSheet()
         elements = []
         
-        # DEBUG: Verificar chartImages recebido
         print('DEBUG chartImages:', chartImages)
         
-        # Título principal
         title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, spaceAfter=30)
-        elements.append(Paragraph("Estatísticas por Texto", title_style))
+        elements.append(Paragraph("Statistics by Text", title_style))
         elements.append(Spacer(1, 20))
         
-        # Seção 1: Resumo Geral
-        elements.append(Paragraph("Resumo Geral", styles['Heading2']))
+        elements.append(Paragraph("General Summary", styles['Heading2']))
         elements.append(Spacer(1, 10))
         
-        # Montar descrição dos filtros aplicados
         filtros = statistics_data.get('applied_filters', {})
         filtros_strs = []
         for k, v in filtros.items():
             if v:
                 filtros_strs.append(f"{k}: {v}")
-        filtros_descr = '\n'.join(filtros_strs) if filtros_strs else 'Nenhum filtro aplicado'
+        filtros_descr = '\n'.join(filtros_strs) if filtros_strs else 'No filter applied'
         
         summary_data = [
-            ['Métrica', 'Valor'],
-            ['Total de Exemplos Finalizados', str(len(statistics_data.get("examples", [])))],
-            ['Filtros Aplicados', filtros_descr]
+            ['Metric', 'Value'],
+            ['Total Finalized Examples', str(len(statistics_data.get("examples", [])))],
+            ['Applied Filters', filtros_descr]
         ]
         
         summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
@@ -603,15 +597,13 @@ class AnnotationStatisticsAPI(APIView):
         elements.append(summary_table)
         elements.append(Spacer(1, 20))
         
-        # Seção 2: Distribuição de Labels por Exemplo
-        elements.append(Paragraph("Distribuição de Labels por Exemplo", styles['Heading2']))
+        elements.append(Paragraph("Label Distribution per Example", styles['Heading2']))
         elements.append(Spacer(1, 10))
         examples = screenExamples if screenExamples is not None else statistics_data.get("examples", [])
         if examples:
-            for i, example in enumerate(examples[:10]):  # Limitar a 10 exemplos para não sobrecarregar
-                elements.append(Paragraph(f"Exemplo {example['id']}: {example['text'][:50]}...", styles['Heading3']))
+            for i, example in enumerate(examples[:10]):
+                elements.append(Paragraph(f"Example {example['id']}: {example['text'][:50]}...", styles['Heading3']))
                 elements.append(Spacer(1, 5))
-                # Inserir gráficos se enviados
                 chart_key_str = str(example['id'])
                 chart_key_int = int(example['id']) if isinstance(example['id'], str) and str(example['id']).isdigit() else example['id']
                 imgs = None
@@ -625,31 +617,28 @@ class AnnotationStatisticsAPI(APIView):
                             imgdata = base64.b64decode(imgs['labels'].split(',')[1] if ',' in imgs['labels'] else imgs['labels'])
                             img_buffer = io.BytesIO(imgdata)
                             img = RLImage(img_buffer, width=4*inch, height=2.5*inch)
-                            elements.append(Paragraph("Gráfico: Distribuição de Labels", styles['Normal']))
+                            elements.append(Paragraph("Chart: Label Distribution", styles['Normal']))
                             elements.append(img)
                             elements.append(Spacer(1, 8))
                         except Exception as e:
-                            print('ERROR ao inserir imagem de labels no PDF:', e)
+                            print('ERROR inserting labels image in PDF:', e)
                     if imgs.get('abstraction'):
                         print('DEBUG abstraction image (first 100 chars):', imgs['abstraction'][:100])
                         try:
                             imgdata = base64.b64decode(imgs['abstraction'].split(',')[1] if ',' in imgs['abstraction'] else imgs['abstraction'])
                             img_buffer = io.BytesIO(imgdata)
                             img = RLImage(img_buffer, width=4*inch, height=2.5*inch)
-                            elements.append(Paragraph("Gráfico: Abstenção e Null", styles['Normal']))
+                            elements.append(Paragraph("Chart: Abstention and Null", styles['Normal']))
                             elements.append(img)
                             elements.append(Spacer(1, 8))
                         except Exception as e:
-                            print('ERROR ao inserir imagem de abstenção no PDF:', e)
-                # Montar tabela de labels exatamente como no gráfico
+                            print('ERROR inserting abstention image in PDF:', e)
                 labels_data = example.get('labelsChartData', {})
                 abstraction_data = example.get('abstractionChartData', {})
-                # Juntar todas as labels dos dois gráficos
                 all_labels = list(labels_data.get('labels', [])) + [l for l in abstraction_data.get('labels', []) if l not in labels_data.get('labels', [])]
                 if all_labels:
-                    dist_data = [['Label', 'Percentagem (%)']]
+                    dist_data = [['Label', 'Percentage (%)']]
                     for label in all_labels:
-                        # Buscar valor na ordem: labelsChartData, abstractionChartData
                         if label in labels_data.get('labels', []):
                             idx = labels_data['labels'].index(label)
                             value = labels_data['data'][idx]
@@ -659,7 +648,6 @@ class AnnotationStatisticsAPI(APIView):
                         else:
                             value = 0
                         dist_data.append([label, f"{value}%"])
-                    # Calcular totais
                     regular_total = 0
                     non_voted_total = 0
                     for label in all_labels:
@@ -669,7 +657,6 @@ class AnnotationStatisticsAPI(APIView):
                             label.lower().find('abstention') != -1 or
                             label.lower().find('null') != -1 or
                             label in ['Null', 'null']):
-                            # Buscar valor
                             if label in abstraction_data.get('labels', []):
                                 idx = abstraction_data['labels'].index(label)
                                 non_voted_total += float(abstraction_data['data'][idx])
@@ -684,7 +671,7 @@ class AnnotationStatisticsAPI(APIView):
                                 idx = abstraction_data['labels'].index(label)
                                 regular_total += float(abstraction_data['data'][idx])
                     dist_data.append(['', ''])
-                    dist_data.append(['Total Labels Regulares', f"{regular_total:.1f}%"])
+                    dist_data.append(['Total Regular Labels', f"{regular_total:.1f}%"])
                     dist_data.append(['Total Non-Voted', f"{non_voted_total:.1f}%"])
                     dist_table = Table(dist_data, colWidths=[3*inch, 1.5*inch])
                     dist_table.setStyle(TableStyle([
@@ -705,7 +692,7 @@ class AnnotationStatisticsAPI(APIView):
                     elements.append(dist_table)
                     elements.append(Spacer(1, 15))
         else:
-            elements.append(Paragraph("Nenhum exemplo exibido na tela para os filtros aplicados.", styles['Normal']))
+            elements.append(Paragraph("No example displayed for the applied filters.", styles['Normal']))
             elements.append(Spacer(1, 15))
         
         doc.build(elements)
@@ -714,7 +701,7 @@ class AnnotationStatisticsAPI(APIView):
             buffer,
             content_type='application/pdf'
         )
-        response['Content-Disposition'] = 'attachment; filename=estatisticas_por_texto.pdf'
+        response['Content-Disposition'] = 'attachment; filename=statistics_by_text.pdf'
         return response
 
     def export_to_xlsx(self, statistics_data, screenExamples=None, chartImages=None):
@@ -724,10 +711,8 @@ class AnnotationStatisticsAPI(APIView):
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
         
-        # DEBUG: logar chartImages recebido
         print('DEBUG chartImages recebido no XLSX:', chartImages)
         
-        # Formatações
         header_format = workbook.add_format({
             'bold': True,
             'bg_color': '#4F81BD',
@@ -747,31 +732,28 @@ class AnnotationStatisticsAPI(APIView):
             'num_format': '0.0%'
         })
         
-        # Planilha 1: Resumo Geral
-        ws1 = workbook.add_worksheet('Resumo')
+        ws1 = workbook.add_worksheet('Summary')
         ws1.set_column('A:A', 25)
         ws1.set_column('B:B', 40)
         
-        ws1.write('A1', 'Métrica', header_format)
-        ws1.write('B1', 'Valor', header_format)
+        ws1.write('A1', 'Metric', header_format)
+        ws1.write('B1', 'Value', header_format)
         
         row = 1
-        ws1.write(row, 0, 'Total de Exemplos Finalizados', data_format)
+        ws1.write(row, 0, 'Total Finalized Examples', data_format)
         ws1.write(row, 1, len(statistics_data.get("examples", [])), data_format)
         
-        # Filtros aplicados
         filtros = statistics_data.get('applied_filters', {})
         filtros_strs = []
         for k, v in filtros.items():
             if v:
                 filtros_strs.append(f"{k}: {v}")
-        filtros_descr = '; '.join(filtros_strs) if filtros_strs else 'Nenhum filtro aplicado'
+        filtros_descr = '; '.join(filtros_strs) if filtros_strs else 'No filter applied'
         
         row += 1
-        ws1.write(row, 0, 'Filtros Aplicados', data_format)
+        ws1.write(row, 0, 'Applied Filters', data_format)
         ws1.write(row, 1, filtros_descr, data_format)
         
-        # Descobrir todas as labels possíveis (labels + abstenção/null)
         all_labels = set()
         all_abst_labels = set()
         if screenExamples:
@@ -786,22 +768,20 @@ class AnnotationStatisticsAPI(APIView):
         all_abst_labels = sorted(list(all_abst_labels))
         all_possible_labels = all_labels + [l for l in all_abst_labels if l not in all_labels]
 
-        # Aba Exemplos: mostrar apenas labels existentes para cada exemplo, sem replicar texto
         if screenExamples:
-            ws2 = workbook.add_worksheet('Exemplos')
+            ws2 = workbook.add_worksheet('Examples')
             ws2.set_column('A:A', 10)
             ws2.set_column('B:B', 60)
             ws2.set_column('C:C', 20)
             ws2.set_column('D:D', 15)
-            ws2.write('A1', 'ID Exemplo', header_format)
-            ws2.write('B1', 'Texto', header_format)
+            ws2.write('A1', 'Example ID', header_format)
+            ws2.write('B1', 'Text', header_format)
             ws2.write('C1', 'Label', header_format)
-            ws2.write('D1', 'Percentagem', header_format)
+            ws2.write('D1', 'Percentage', header_format)
             row = 1
             for ex in screenExamples:
                 example_id = ex.get('id')
                 example_text = ex.get('text')
-                # Juntar labels e valores reais (labelsChartData + abstractionChartData)
                 labels = []
                 values = []
                 if ex.get('labelsChartData', {}):
@@ -810,7 +790,6 @@ class AnnotationStatisticsAPI(APIView):
                 if ex.get('abstractionChartData', {}):
                     labels += ex['abstractionChartData'].get('labels', [])
                     values += ex['abstractionChartData'].get('data', [])
-                # Mostrar apenas labels com valor > 0
                 first = True
                 for label, value in zip(labels, values):
                     if value > 0:
@@ -821,20 +800,19 @@ class AnnotationStatisticsAPI(APIView):
                         ws2.write(row, 3, value / 100, percent_format)
                         first = False
 
-        # Planilha 3: Gráficos (se chartImages for fornecido)
         if chartImages:
-            ws3 = workbook.add_worksheet('Gráficos')
-            ws3.set_column('A:A', 15)  # ID do exemplo
-            ws3.set_column('B:B', 50)  # Descrição
-            ws3.set_column('C:C', 60)  # Gráfico Labels
-            ws3.set_column('G:G', 60)  # Gráfico Abstenção/Null
-            ws3.write('A1', 'ID Exemplo', header_format)
-            ws3.write('B1', 'Tipo de Gráfico', header_format)
+            ws3 = workbook.add_worksheet('Charts')
+            ws3.set_column('A:A', 15)
+            ws3.set_column('B:B', 50)
+            ws3.set_column('C:C', 60)
+            ws3.set_column('G:G', 60)
+            ws3.write('A1', 'Example ID', header_format)
+            ws3.write('B1', 'Chart Type', header_format)
             ws3.write('C1', 'Labels', header_format)
-            ws3.write('G1', 'Abstenção/Null', header_format)
+            ws3.write('G1', 'Abstention/Null', header_format)
             
             row = 1
-            data_start_row = 1000  # Linha auxiliar para dados dos gráficos
+            data_start_row = 1000
             for example_id, images in chartImages.items():
                 example = None
                 if screenExamples:
@@ -850,7 +828,6 @@ class AnnotationStatisticsAPI(APIView):
                 reg_values = labels_data.get('data', [])
                 abs_labels = abstraction_data.get('labels', [])
                 abs_values = abstraction_data.get('data', [])
-                # Gráfico 1: Labels regulares
                 chart1 = None
                 if reg_labels and reg_values:
                     for i, label in enumerate(reg_labels):
@@ -858,60 +835,56 @@ class AnnotationStatisticsAPI(APIView):
                         ws3.write(data_start_row + i, 1, reg_values[i])
                     chart1 = workbook.add_chart({'type': 'column'})
                     chart1.add_series({
-                        'name': f'Labels - Exemplo {example_id}',
-                        'categories': ['Gráficos', data_start_row, 0, data_start_row + len(reg_labels) - 1, 0],
-                        'values':     ['Gráficos', data_start_row, 1, data_start_row + len(reg_labels) - 1, 1],
+                        'name': f'Label Distribution - Example {example_id}',
+                        'categories': ['Charts', data_start_row, 0, data_start_row + len(reg_labels) - 1, 0],
+                        'values':     ['Charts', data_start_row, 1, data_start_row + len(reg_labels) - 1, 1],
                         'data_labels': {'value': True},
-                        'fill': {'color': '#42a5f5'},  # Azul
+                        'fill': {'color': '#42a5f5'},
                         'border': {'color': '#1976d2'},
                     })
-                    chart1.set_title({'name': f'Distribuição de Labels - Exemplo {example_id}'})
+                    chart1.set_title({'name': f'Label Distribution - Example {example_id}'})
                     chart1.set_x_axis({'name': 'Label'})
-                    chart1.set_y_axis({'name': 'Percentual (%)', 'min': 0, 'max': 100})
+                    chart1.set_y_axis({'name': 'Percentage (%)', 'min': 0, 'max': 100})
                     chart1.set_legend({'none': True})
-                # Gráfico 2: Abstenção/Null (sempre inserir, mesmo vazio)
                 chart2 = workbook.add_chart({'type': 'column'})
                 if abs_labels and abs_values:
                     for i, label in enumerate(abs_labels):
                         ws3.write(data_start_row + 10 + i, 0, label)
                         ws3.write(data_start_row + 10 + i, 1, abs_values[i])
                     chart2.add_series({
-                        'name': f'Abstenção/Null - Exemplo {example_id}',
-                        'categories': ['Gráficos', data_start_row + 10, 0, data_start_row + 10 + len(abs_labels) - 1, 0],
-                        'values':     ['Gráficos', data_start_row + 10, 1, data_start_row + 10 + len(abs_labels) - 1, 1],
-                        'data_labels': {'value': True},
-                        'fill': {'color': '#ec407a'},  # Rosa
-                        'border': {'color': '#ad1457'},
-                    })
-                else:
-                    # Adiciona série dummy para evitar erro EmptyChartSeries
-                    ws3.write(data_start_row + 10, 0, "Sem dados")
-                    ws3.write(data_start_row + 10, 1, 0)
-                    chart2.add_series({
-                        'name': f'Abstenção/Null - Exemplo {example_id}',
-                        'categories': ['Gráficos', data_start_row + 10, 0, data_start_row + 10, 0],
-                        'values':     ['Gráficos', data_start_row + 10, 1, data_start_row + 10, 1],
+                        'name': f'Abstention/Null - Example {example_id}',
+                        'categories': ['Charts', data_start_row + 10, 0, data_start_row + 10 + len(abs_labels) - 1, 0],
+                        'values':     ['Charts', data_start_row + 10, 1, data_start_row + 10 + len(abs_labels) - 1, 1],
                         'data_labels': {'value': True},
                         'fill': {'color': '#ec407a'},
                         'border': {'color': '#ad1457'},
                     })
-                # Mesmo sem dados, configurar título e eixos
-                chart2.set_title({'name': f'Abstenção e Null - Exemplo {example_id}'})
+                else:
+                    ws3.write(data_start_row + 10, 0, "No data")
+                    ws3.write(data_start_row + 10, 1, 0)
+                    chart2.add_series({
+                        'name': f'Abstention/Null - Example {example_id}',
+                        'categories': ['Charts', data_start_row + 10, 0, data_start_row + 10, 0],
+                        'values':     ['Charts', data_start_row + 10, 1, data_start_row + 10, 1],
+                        'data_labels': {'value': True},
+                        'fill': {'color': '#ec407a'},
+                        'border': {'color': '#ad1457'},
+                    })
+                chart2.set_title({'name': f'Abstention and Null - Example {example_id}'})
                 chart2.set_x_axis({'name': 'Non Voted'})
-                chart2.set_y_axis({'name': 'Percentual (%)', 'min': 0, 'max': 100})
+                chart2.set_y_axis({'name': 'Percentage (%)', 'min': 0, 'max': 100})
                 chart2.set_legend({'none': True})
-                # Inserir ambos na mesma linha, lado a lado
                 row += 1
                 ws3.write(row, 0, example_id, data_format)
-                ws3.write(row, 1, 'Distribuição de Labels', data_format)
+                ws3.write(row, 1, 'Label Distribution', data_format)
                 if chart1:
                     ws3.insert_chart(row, 2, chart1, {'x_offset': 0, 'y_offset': 0})
                 ws3.insert_chart(row, 6, chart2, {'x_offset': 0, 'y_offset': 0})
                 data_start_row += 30
                 row += 20
         else:
-            ws3 = workbook.add_worksheet('Gráficos')
-            ws3.write('A1', 'Nenhum dado recebido para gráficos', data_format)
+            ws3 = workbook.add_worksheet('Charts')
+            ws3.write('A1', 'No data received for charts', data_format)
         
         workbook.close()
         output.seek(0)
@@ -919,7 +892,7 @@ class AnnotationStatisticsAPI(APIView):
             output.read(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = 'attachment; filename=estatisticas_por_texto.xlsx'
+        response['Content-Disposition'] = 'attachment; filename=statistics_by_text.xlsx'
         return response
 
     @action(detail=True, methods=['get'])
