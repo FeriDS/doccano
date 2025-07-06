@@ -857,22 +857,38 @@ export default {
     async exportCSV() {
       this.exportingCSV = true
       try {
-        const params = this.buildExportParams()
-        const response = await this.$axios.get(`/v1/projects/${this.projectId}/statistics/export/csv?${params}`, {
-          responseType: 'blob'
-        })
-        
+        await this.$nextTick(); // Garante que os gráficos estejam renderizados
+        // Debug dos dados dos gráficos
+        console.log('DEBUG labelsCharts:', this.labelsCharts);
+        console.log('DEBUG abstractionCharts:', this.abstractionCharts);
+        console.log('DEBUG examples:', this.examples);
+        // Montar screenExamples igual ao exportPDF
+        const screenExamples = this.examples.map(e => ({
+          id: e.id,
+          text: e.text,
+          labelsChartData: {
+            labels: this.labelsCharts[e.id]?.data.labels || [],
+            data: this.labelsCharts[e.id]?.data.datasets[0]?.data || []
+          },
+          abstractionChartData: {
+            labels: this.abstractionCharts[e.id]?.data.labels || [],
+            data: this.abstractionCharts[e.id]?.data.datasets[0]?.data || []
+          }
+        }));
+        console.log('DEBUG screenExamples:', screenExamples);
+        const params = this.buildExportParams();
+        const url = `/v1/projects/${this.projectId}/statistics/export/csv?${params}`;
+        const response = await this.$axios.post(url, { screenExamples }, { responseType: 'blob' });
         // Criar link para download
         const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' })
-        const url = window.URL.createObjectURL(blob)
+        const url_download = window.URL.createObjectURL(blob)
         const link = document.createElement('a')
-        link.href = url
+        link.href = url_download
         link.download = `estatisticas_por_texto_${this.projectId}_${new Date().toISOString().split('T')[0]}.csv`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
-        
+        window.URL.revokeObjectURL(url_download)
         if (this.$toast && this.$toast.success) {
           this.$toast.success('Relatório CSV exportado com sucesso!')
         }

@@ -454,150 +454,98 @@ class AnnotationStatisticsAPI(APIView):
         project_id = self.kwargs["project_id"]
         if is_post or request.method == 'POST':
             chartImages = request.data.get('chartImages')
+            screenExamples = request.data.get('screenExamples')
         else:
             chartImages = None
+            screenExamples = None
         statistics_data = self.get_statistics(request).data
         if export_format == 'csv':
-            return self.export_to_csv(statistics_data)
+            return self.export_to_csv(statistics_data, screenExamples)
         elif export_format == 'pdf':
-            return self.export_to_pdf(statistics_data, chartImages)
+            return self.export_to_pdf(statistics_data, chartImages, screenExamples)
         else:
             return Response({"error": "Unsupported export format"}, status=status.HTTP_400_BAD_REQUEST)
 
-    def export_to_csv(self, statistics_data):
+    def export_to_csv(self, statistics_data, screenExamples=None):
         buffer = io.StringIO()
         
         # Seção 1: Resumo Geral
-        buffer.write('=== RESUMO GERAL ===\n')
-        buffer.write(f'Total de Exemplos Finalizados,{len(statistics_data.get("examples", []))}\n')
-        buffer.write(f'Taxa de Desacordo,{statistics_data["statistics"]["disagreementRate"]:.2f}%\n')
-        buffer.write(f'Taxa de Resolução,{statistics_data["statistics"]["resolutionRate"]:.2f}%\n')
-        buffer.write(f'Tempo Médio de Anotação,{statistics_data["statistics"]["averageAnnotationTime"]:.2f} minutos\n\n')
+        buffer.write('RESUMO GERAL\n')
+        buffer.write('-' * 20 + '\n')
+        buffer.write('Métrica;Valor\n')
+        buffer.write(f'Total de Exemplos Finalizados;{len(statistics_data.get("examples", []))}\n')
+        filtros = statistics_data.get('applied_filters', {})
+        filtros_written = False
+        for k, v in filtros.items():
+            if v:
+                buffer.write(f'Filtros Aplicados;{k}: {v}\n')
+                filtros_written = True
+        if not filtros_written:
+            buffer.write('Filtros Aplicados;Nenhum filtro aplicado\n')
+        buffer.write('\n')
+
+        # Seção 2: Distribuição de Labels por Exemplo (tabelas igual ao PDF)
+        buffer.write('DISTRIBUIÇÃO DE LABELS POR EXEMPLO\n')
+        buffer.write('-' * 40 + '\n')
         
-        # Seção 2: Distribuição de Labels por Exemplo
-        buffer.write('=== DISTRIBUIÇÃO DE LABELS POR EXEMPLO ===\n')
-        examples = statistics_data.get("examples", [])
+        examples = screenExamples if screenExamples is not None else statistics_data.get("examples", [])
         if examples:
-            # Cabeçalho
-            buffer.write('ID do Exemplo,Texto,')
-            
-            # Coletar todos os labels únicos
-            all_labels = set()
-            for example in examples:
-                if example.get('label_distribution'):
-                    all_labels.update(example['label_distribution'].keys())
-            
-            # Ordenar labels
-            sorted_labels = sorted(all_labels)
-            
-            # Escrever cabeçalhos dos labels
-            for label in sorted_labels:
-                buffer.write(f'{label} (%),')
-            buffer.write('Total Labels Regulares (%),Total Non-Voted (%)\n')
-            
-            # Dados de cada exemplo
-            for example in examples:
-                buffer.write(f'{example["id"]},"{example["text"][:100]}...",')
-                
-                # Percentagens de cada label
-                for label in sorted_labels:
-                    value = example.get('label_distribution', {}).get(label, 0)
-                    buffer.write(f'{value},')
-                
-                # Calcular totais
-                label_dist = example.get('label_distribution', {})
+            for i, example in enumerate(examples):
+                example_text = example.get('text', f'Exemplo {i+1}')
+                # Truncar texto muito longo para o título
+                if len(example_text) > 100:
+                    example_text = example_text[:97] + '...'
+                buffer.write(f'{example_text}\n')
+                buffer.write('-' * len(example_text) + '\n')
+                labels_data = example.get('labelsChartData', {})
+                abstraction_data = example.get('abstractionChartData', {})
+                if not labels_data and not abstraction_data and example.get('label_distribution'):
+                    labels_data = {'labels': list(example['label_distribution'].keys()), 'data': list(example['label_distribution'].values())}
+                    abstraction_data = {'labels': [], 'data': []}
+                all_labels = list(labels_data.get('labels', [])) + [l for l in abstraction_data.get('labels', []) if l not in labels_data.get('labels', [])]
                 regular_total = 0
                 non_voted_total = 0
-                
-                for label, value in label_dist.items():
-                    value_num = float(value) if isinstance(value, (int, float, str)) else 0
+                buffer.write('Label;Percentagem (%)\n')
+                for label in all_labels:
+                    if label in labels_data.get('labels', []):
+                        idx = labels_data['labels'].index(label)
+                        value = labels_data['data'][idx]
+                    elif label in abstraction_data.get('labels', []):
+                        idx = abstraction_data['labels'].index(label)
+                        value = abstraction_data['data'][idx]
+                    else:
+                        value = 0
+                    buffer.write(f'{label};{value}%\n')
                     if (label.lower().find('abstração') != -1 or 
                         label.lower().find('abstraction') != -1 or 
                         label.lower().find('abstenção') != -1 or
                         label.lower().find('abstention') != -1 or
                         label.lower().find('null') != -1 or
                         label in ['Null', 'null']):
-                        non_voted_total += value_num
+                        if label in abstraction_data.get('labels', []):
+                            idx = abstraction_data['labels'].index(label)
+                            non_voted_total += float(abstraction_data['data'][idx])
+                        elif label in labels_data.get('labels', []):
+                            idx = labels_data['labels'].index(label)
+                            non_voted_total += float(labels_data['data'][idx])
                     else:
-                        regular_total += value_num
-                
-                buffer.write(f'{regular_total:.1f},{non_voted_total:.1f}\n')
-        
-        buffer.write('\n')
-        
-        # Seção 3: Distribuição Geral de Labels (se disponível)
-        if statistics_data.get('labelDistribution'):
-            buffer.write('=== DISTRIBUIÇÃO GERAL DE LABELS ===\n')
-            total_labels = sum(statistics_data['labelDistribution'].values())
-            label_dist_df = pd.DataFrame({
-                'Label': list(statistics_data['labelDistribution'].keys()),
-                'Count': list(statistics_data['labelDistribution'].values()),
-                'Percentage': [f"{(count/total_labels*100):.2f}%" for count in statistics_data['labelDistribution'].values()]
-            })
-            label_dist_df.to_csv(buffer, index=False)
-            buffer.write('\n')
-        
-        # Seção 4: Distribuição por Perspectiva (se aplicável)
-        if statistics_data.get('perspectiveDistribution'):
-            buffer.write('=== DISTRIBUIÇÃO POR PERSPECTIVA ===\n')
-            perspective_dist_df = pd.DataFrame(statistics_data['perspectiveDistribution'])
-            if not perspective_dist_df.empty:
-                perspective_dist_df['Percentage'] = perspective_dist_df['count'].apply(
-                    lambda x: f"{(x/perspective_dist_df['count'].sum()*100):.2f}%"
-                )
-                perspective_dist_df.to_csv(buffer, index=False)
+                        if label in labels_data.get('labels', []):
+                            idx = labels_data['labels'].index(label)
+                            regular_total += float(labels_data['data'][idx])
+                        elif label in abstraction_data.get('labels', []):
+                            idx = abstraction_data['labels'].index(label)
+                            regular_total += float(abstraction_data['data'][idx])
+                buffer.write(f'Total Labels Regulares;{regular_total:.1f}%\n')
+                buffer.write(f'Total Non-Voted;{non_voted_total:.1f}%\n')
                 buffer.write('\n')
+        else:
+            buffer.write('Nenhum exemplo exibido na tela para os filtros aplicados.\n\n')
         
-        # Seção 5: Desacordos por Categoria (se houver)
-        if statistics_data.get('disagreementByCategory'):
-            buffer.write('=== DESACORDOS POR CATEGORIA ===\n')
-            disagreement_cat_df = pd.DataFrame(statistics_data['disagreementByCategory'])
-            if not disagreement_cat_df.empty:
-                total_disagreements = disagreement_cat_df['count'].sum()
-                disagreement_cat_df['Percentage'] = disagreement_cat_df['count'].apply(
-                    lambda x: f"{(x/total_disagreements*100):.2f}%"
-                )
-                disagreement_cat_df.to_csv(buffer, index=False)
-                buffer.write('\n')
-        
-        # Seção 6: Padrões de Perspectiva (se aplicável)
-        if statistics_data.get('perspectivePatterns'):
-            buffer.write('=== PADRÕES DE PERSPECTIVA ===\n')
-            perspective_patterns_df = pd.DataFrame(statistics_data['perspectivePatterns'])
-            if not perspective_patterns_df.empty:
-                perspective_patterns_df['Agreement Rate'] = perspective_patterns_df.apply(
-                    lambda x: f"{(x['agreements']/x['total']*100):.2f}%" if x['total'] > 0 else "0%",
-                    axis=1
-                )
-                perspective_patterns_df['Disagreement Rate'] = perspective_patterns_df.apply(
-                    lambda x: f"{(x['disagreements']/x['total']*100):.2f}%" if x['total'] > 0 else "0%",
-                    axis=1
-                )
-                perspective_patterns_df.to_csv(buffer, index=False)
-                buffer.write('\n')
-        
-        # Seção 7: Lista de Desacordos (se houver)
-        if statistics_data.get('disagreements'):
-            buffer.write('=== LISTA DE DESACORDOS ===\n')
-            disagreements_data = [['Text ID', 'Texto', 'Category', 'Type', 'Status', 'Annotators']]
-            for d in statistics_data['disagreements']:
-                annotators = ', '.join([ann.get('user', 'Unknown') for ann in d.get('annotations', [])])
-                disagreements_data.append([
-                    d['textId'],
-                    d.get('text', '')[:100] + '...' if d.get('text') else '',
-                    d['category'],
-                    d['type'],
-                    d['status'],
-                    annotators
-                ])
-            
-            # Converter para DataFrame e exportar
-            disagreements_df = pd.DataFrame(disagreements_data[1:], columns=disagreements_data[0])
-            disagreements_df.to_csv(buffer, index=False)
-        
-        response = Response(
-            buffer.getvalue(),
-            content_type='text/csv'
+        # Adicionar BOM UTF-8 para compatibilidade com Excel
+        bom = '\ufeff'
+        response = HttpResponse(
+            bom + buffer.getvalue(),
+            content_type='text/csv; charset=utf-8'
         )
         response['Content-Disposition'] = 'attachment; filename=estatisticas_por_texto.csv'
         return response
@@ -618,7 +566,7 @@ class AnnotationStatisticsAPI(APIView):
         
         # Seção 1: Resumo Geral
         elements.append(Paragraph("Resumo Geral", styles['Heading2']))
-        elements.append(Spacer(1, 10))
+            elements.append(Spacer(1, 10))
         
         # Montar descrição dos filtros aplicados
         filtros = statistics_data.get('applied_filters', {})
@@ -636,18 +584,18 @@ class AnnotationStatisticsAPI(APIView):
         
         summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
         summary_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
         elements.append(summary_table)
         elements.append(Spacer(1, 20))
         
@@ -1102,21 +1050,11 @@ class ExportStatisticsAPI(APIView):
             )
 
     def export_csv(self, request):
-        """
-        Exporta estatísticas em formato CSV.
-        """
-        try:
-            # Reutilizar a lógica da view principal
             statistics_view = AnnotationStatisticsAPI()
             statistics_view.kwargs = self.kwargs
             statistics_data = statistics_view.get_statistics(request).data
-            
-            return statistics_view.export_to_csv(statistics_data)
-        except Exception as e:
-            return Response(
-                {"error": f"Erro ao exportar CSV: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        screenExamples = request.data.get('screenExamples') if hasattr(request, 'data') else None
+        return statistics_view.export_to_csv(statistics_data, screenExamples)
 
     def export_pdf(self, request):
         try:
