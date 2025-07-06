@@ -168,11 +168,22 @@
       <div class="d-flex align-center justify-space-between">
         <div>
           <v-btn color="primary" class="mr-2" @click="fetchReport">
-        GENERATE REPORT
-      </v-btn>
-      <v-btn color="error" text class="mt-2" @click="clearFilters">
-        CLEAR ALL FILTERS
-      </v-btn>
+            GENERATE REPORT
+          </v-btn>
+          <v-btn color="error" text class="mt-2 mr-2" @click="clearFilters">
+            CLEAR ALL FILTERS
+          </v-btn>
+          <v-chip
+            v-if="hasActiveFilters"
+            small
+            color="grey lighten-3"
+            text-color="primary"
+            class="ml-1"
+            style="font-weight: 600;"
+          >
+            <v-icon left small>mdi-filter</v-icon>
+            {{ activeFiltersCount }} filter(s) selected
+          </v-chip>
         </div>
         <div>
           <v-btn color="success" :loading="exportingCSV" class="mr-2" @click="exportReportCSV">
@@ -303,6 +314,31 @@ export default {
   computed: {
     finalizedExamplesCount() {
       return this.exampleOptions.length
+    },
+    activeFiltersCount() {
+      let count = 0;
+      if (this.filters.examples && 
+      Array.isArray(this.filters.examples)) 
+      count += this.filters.examples.length;
+      if (this.filters.versions && 
+      Array.isArray(this.filters.versions)) 
+      count += this.filters.versions.length;
+      if (this.filters.category && 
+      Array.isArray(this.filters.category)) 
+      count += this.filters.category.length;
+      if (this.filters.status !== null && this.filters.status !== undefined) count += 1;
+      if (this.filters.startDate) count += 1;
+      if (this.filters.endDate) count += 1;
+      if (this.filters.perspectiveValues && typeof this.filters.perspectiveValues === 'object') {
+        Object.values(this.filters.perspectiveValues).forEach(val => {
+          if (Array.isArray(val)) count += val.length;
+          else if (val) count += 1;
+        });
+      }
+      return count;
+    },
+    hasActiveFilters() {
+      return this.activeFiltersCount > 0;
     }
   },
   watch: {
