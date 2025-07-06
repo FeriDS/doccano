@@ -2,7 +2,7 @@
   <v-container fluid>
     <v-row align="center" class="mb-4">
       <v-col>
-        <h1 class="text-h4">Estatísticas por Texto</h1>
+        <h1 class="text-h4">Statistics by Text</h1>
       </v-col>
       <v-col cols="auto">
         <v-btn
@@ -12,7 +12,7 @@
           @click="exportCSV"
         >
           <v-icon left>mdi-file-excel</v-icon>
-          Exportar CSV
+          Export CSV
         </v-btn>
         <v-btn
           color="error"
@@ -20,11 +20,11 @@
           @click="exportPDF"
         >
           <v-icon left>mdi-file-pdf</v-icon>
-          Exportar PDF
+          Export PDF
         </v-btn>
         <v-btn color="info" :loading="exportingXLSX" class="mr-2" @click="exportXLSX">
           <v-icon left>mdi-file-excel</v-icon>
-          Exportar XLSX
+          Export XLSX
         </v-btn>
       </v-col>
     </v-row>
@@ -33,16 +33,15 @@
         class="mb-4"
         :value="true"
       >
-        <strong>Nota:</strong> Apenas datasets finalizados 
-        são exibidos nesta página.
+        <strong>Note:</strong> Only finalized datasets are displayed on this page.
         <br>
-        <strong>Total de datasets finalizados:</strong> {{ examples.length }}
+        <strong>Total finalized datasets:</strong> {{ examples.length }}
         <br>
-        <strong>Exportação:</strong> 
+        <strong>Export:</strong> 
         <ul>
-          <li><strong>CSV:</strong> Dados tabulares com distribuição de labels por exemplo</li>
-          <li><strong>XLSX:</strong> Dados tabulares + gráficos visuais dos dados</li>
-          <li><strong>PDF:</strong> Relatório completo com gráficos e estatísticas detalhadas</li>
+          <li><strong>CSV:</strong> Tabular data with label distribution per example</li>
+          <li><strong>XLSX:</strong> Tabular data + visual charts</li>
+          <li><strong>PDF:</strong> Full report with charts and detailed statistics</li>
         </ul>
       </v-alert>
 
@@ -50,29 +49,37 @@
     <v-card class="mb-6">
       <v-card-title>
         <v-icon left>mdi-filter</v-icon>
-        Filtros
+        Filters
         <v-chip
           v-if="hasActiveFilters"
           color="primary"
           small
           class="ml-2"
         >
-          {{ activeFiltersCount }} filtro(s) ativo(s)
+          {{ activeFiltersCount }} active filter(s)
         </v-chip>
         <v-spacer />
         <v-switch
           v-model="useLocalFiltering"
-          label="Filtro Local"
+          label="Local Filter"
           class="ml-4"
         />
       </v-card-title>
       <v-card-text>
         <v-row>
+          <v-col cols="12">
+            <div v-if="projectPerspective">
+              <strong>Perspective:</strong> {{ projectPerspective.name }}
+            </div>
+          </v-col>
+        </v-row>
+        <v-row>
+          
           <template v-if="perspectiveFields && perspectiveFields.length">
             <template v-for="field in perspectiveFields">
               <v-col :key="field.id" cols="12" md="4">
                 <v-select
-                v-model="filters.perspectiveValues[field.id]"
+                  v-model="filters.perspectiveValues[field.id]"
                   :label="field.name"
                   :items="field.choices"
                   clearable
@@ -80,17 +87,8 @@
               </v-col>
             </template>
           </template>
-          <v-col cols="12" md="4">
-            <v-select
-              v-model="filters.label"
-              :items="filteredCategories"
-              item-text="text"
-              item-value="id"
-              label="Categoria"
-              clearable
-              multiple
-            />
-          </v-col>
+        </v-row>
+        <v-row>
           <v-col cols="12" md="4">
             <v-select
               v-model="filters.resolved"
@@ -99,6 +97,30 @@
               item-value="value"
               label="Status"
               clearable
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-select
+              v-model="filters.label"
+              :items="filteredCategories"
+              item-text="text"
+              item-value="id"
+              label="Labels"
+              clearable
+              multiple
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-select
+              v-model="filters.example"
+              :items="(allExamples.length ? allExamples :
+               examples).map(e => ({ text: e.text, value: e.id }))"
+              item-text="text"
+              item-value="value"
+              label="Example"
+              clearable
+              :return-object="false"
+              multiple
             />
           </v-col>
         </v-row>
@@ -114,7 +136,7 @@
               <template #activator="{ on, attrs }">
                 <v-text-field
                   v-model="filters.startDate"
-                  label="Data Início"
+                  label="Start Date"
                   prepend-icon="mdi-calendar"
                   readonly
                   v-bind="attrs"
@@ -139,7 +161,7 @@
               <template #activator="{ on, attrs }">
                 <v-text-field
                   v-model="filters.endDate"
-                  label="Data Fim"
+                  label="End Date"
                   prepend-icon="mdi-calendar"
                   readonly
                   v-bind="attrs"
@@ -154,26 +176,13 @@
             </v-menu>
           </v-col>
           <v-col cols="12" md="3">
-            <v-select
-              v-model="filters.example"
-              :items="(allExamples.length ? allExamples :
-               examples).map(e => ({ text: e.text, value: e.id }))"
-              item-text="text"
-              item-value="value"
-              label="Exemplo"
-              clearable
-              :return-object="false"
-              multiple
-            />
-          </v-col>
-          <v-col cols="12" md="3">
             <v-btn
               color="primary"
               :loading="loading"
               @click="applyFilters"
             >
               <v-icon left>mdi-filter-check</v-icon>
-              Aplicar Filtros
+              Apply Filters
             </v-btn>
           </v-col>
           <v-col cols="12" md="3">
@@ -182,7 +191,7 @@
               @click="clearFilters"
             >
               <v-icon left>mdi-filter-remove</v-icon>
-              Limpar Filtros
+              Clear Filters
             </v-btn>
           </v-col>
         </v-row>
@@ -197,14 +206,14 @@
         <v-card-text>
           <v-row>
             <v-col cols="6">
-              <h3 class="text-h6 mb-3">Distribuição de Labels</h3>
+              <h3 class="text-h6 mb-3">Label Distribution</h3>
               
               <div style="min-height: 250px;">
                 <canvas :ref="'labelsChart' + example.id"></canvas>
               </div>
             </v-col>
             <v-col cols="6">
-              <h3 class="text-h6 mb-3">Abstenção e Null</h3>
+              <h3 class="text-h6 mb-3">Abstention and Null</h3>
               <div style="min-height: 250px;">
                 <canvas :ref="'abstractionChart' + example.id"></canvas>
               </div>
@@ -216,7 +225,7 @@
                 <v-row>
                   <v-col cols="6" class="text-center">
                     <div class="text-h6 text-blue-darken-2 font-weight-bold">
-                      Total Labels Regulares: <span :id="'summary-labels-' + example.id">0%</span>
+                      Total Regular Labels: <span :id="'summary-labels-' + example.id">0%</span>
                     </div>
                   </v-col>
                   <v-col cols="6" class="text-center">
@@ -286,9 +295,9 @@ export default {
       projectPerspective: null,
       categories: [],
       statusOptions: [
-        { text: 'Todos', value: null },
-        { text: 'Resolvidos', value: 'true' },
-        { text: 'Não resolvidos', value: 'false' }
+        { text: 'All', value: null },
+        { text: 'resolved', value: 'true' },
+        { text: 'non-resolved', value: 'false' }
       ],
       perspectivePatterns: [],
       perspectiveHeaders: [
@@ -328,7 +337,7 @@ export default {
              this.filters.endDate || 
              this.filters.perspective || 
              this.filters.label.length > 0 || 
-             this.filters.resolved !== null || 
+             this.filters.resolved !== null ||
              Object.keys(this.filters.perspectiveValues).length > 0
     },
     activeFiltersCount() {
@@ -719,14 +728,13 @@ export default {
               onComplete() {
                 const ctx = this.ctx;
                 ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
+                ctx.textBaseline = 'middle';
                 ctx.font = '12px Arial';
                 ctx.fillStyle = '#000';
-                
                 this.data.datasets.forEach(function(dataset) {
                   for (let i = 0; i < dataset.data.length; i++) {
                     const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
-                    ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                    ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y + 15);
                   }
                 });
               }
@@ -1044,6 +1052,15 @@ export default {
       }
     },
 
+    combineAndSort(labels, data) {
+      const combined = labels.map((label, i) => ({ label, value: data[i] }));
+      combined.sort((a, b) => a.label.localeCompare(b.label));
+      return {
+        labels: combined.map(item => item.label),
+        data: combined.map(item => item.value)
+      };
+    },
+
     renderLabelsChart(exampleId, distribution) {
       // Compatível com novo e antigo formato
       const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
@@ -1105,6 +1122,11 @@ export default {
         }
       });
       
+      // Ordenar labels e valores
+      const sorted = this.combineAndSort(regularLabels, regularData);
+      regularLabels = sorted.labels;
+      regularData = sorted.data;
+      
       const refName = 'labelsChart' + exampleId;
       const ctxArr = this.$refs[refName];
       const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
@@ -1117,7 +1139,7 @@ export default {
         data: {
           labels: regularLabels,
           datasets: [{
-            label: 'Distribuição de Labels (%)',
+            label: 'Label Distribution (%)',
             data: regularData,
             backgroundColor: 'rgba(54, 162, 235, 0.8)',
             borderColor: 'rgba(54, 162, 235, 1)',
@@ -1143,7 +1165,7 @@ export default {
               },
               color: '#1976d2',
               padding: {
-                top: 20,
+                top: 50,
                 bottom: 40
               }
             }
@@ -1152,14 +1174,13 @@ export default {
             onComplete() {
               const ctx = this.ctx;
               ctx.textAlign = 'center';
-              ctx.textBaseline = 'bottom';
+              ctx.textBaseline = 'middle';
               ctx.font = '12px Arial';
               ctx.fillStyle = '#000';
-              
               this.data.datasets.forEach(function(dataset) {
                 for (let i = 0; i < dataset.data.length; i++) {
                   const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
-                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y + 15);
                 }
               });
             }
@@ -1198,8 +1219,8 @@ export default {
       console.log(`Debug - All data:`, allData)
       
       // Filtrar apenas abstração e null
-      const abstractionLabels = [];
-      const abstractionData = [];
+      let abstractionLabels = [];
+      let abstractionData = [];
       
       allLabels.forEach((label, index) => {
         const value = allData[index];
@@ -1211,7 +1232,10 @@ export default {
             label.toLowerCase().includes('null') ||
             label === 'Null' ||
             label === 'null') {
-          abstractionLabels.push(label);
+          // Tradução para inglês
+          let translatedLabel = label;
+          if (label.toLowerCase() === 'abstenção') translatedLabel = 'abstention';
+          abstractionLabels.push(translatedLabel);
           abstractionData.push(value);
         }
       });
@@ -1244,6 +1268,11 @@ export default {
         }
       });
       
+      // Ordenar labels e valores
+      const sortedAbs = this.combineAndSort(abstractionLabels, abstractionData);
+      abstractionLabels = sortedAbs.labels;
+      abstractionData = sortedAbs.data;
+      
       const refName = 'abstractionChart' + exampleId;
       const ctxArr = this.$refs[refName];
       const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
@@ -1256,7 +1285,7 @@ export default {
         data: {
           labels: abstractionLabels,
           datasets: [{
-            label: 'Abstenção e Null (%)',
+            label: 'Abstention and Null (%)',
             data: abstractionData,
             backgroundColor: 'rgba(255, 99, 132, 0.8)',
             borderColor: 'rgba(255, 99, 132, 1)',
@@ -1280,21 +1309,24 @@ export default {
                 size: 14,
                 weight: 'bold'
               },
-              color: '#d32f2f'
+              color: '#d32f2f',
+              padding: {
+                top: 50,
+                bottom: 20
+              }
             }
           },
           animation: {
             onComplete() {
               const ctx = this.ctx;
               ctx.textAlign = 'center';
-              ctx.textBaseline = 'bottom';
+              ctx.textBaseline = 'middle';
               ctx.font = '12px Arial';
               ctx.fillStyle = '#000';
-              
               this.data.datasets.forEach(function(dataset) {
                 for (let i = 0; i < dataset.data.length; i++) {
                   const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
-                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y + 15);
                 }
               });
             }
