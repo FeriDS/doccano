@@ -216,15 +216,6 @@
             <div class="mb-2 text-body-1">
               Total users: {{ getExampleTotalUsers(versions) }}
             </div>
-            <div v-if="rows && rows.length" class="d-flex mb-2" style="gap: 32px;">
-              <div class="text-body-1">
-                Users that voted: {{ getVoteStats(rows).usersVoted }}
-              </div>
-              <div class="text-body-2" style="color: #1976d2;">
-                <span v-if="getFilteredUsernames(rows).length">Filtered users:
-                 {{ getFilteredUsernames(rows).join(', ') }}</span>
-              </div>
-            </div>
             <div v-for="(rows, version) in versions" :key="version" class="mb-4">
               <div style="border: 1px solid #eee; 
                 border-radius: 6px; padding: 12px 8px; margin-bottom: 8px;">
@@ -233,31 +224,34 @@
                   <div class="text-body-1">
                     Users that voted: {{ getVoteStats(rows).usersVoted }}
                   </div>
+                  <div class="text-body-2" style="color: #1976d2;">
+                    <span v-if="getFilteredUsernames(rows).length">Filtered users:
+                     {{ getFilteredUsernames(rows).join(', ') }}</span>
+                  </div>
                 </div>
-        <v-simple-table>
-          <thead>
-            <tr>
-              <th v-for="header in tableHeaders" :key="header">
-                {{ header === 'X (no vote)' ? 'X (no vote)' : 
-                  (header === 'abstention' ? 'Abstention' : header) }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-                    <tr v-for="(row, idx) in rows" 
-                      :key="idx">
+                <v-simple-table>
+                  <thead>
+                    <tr>
+                      <th v-for="header in tableHeaders" :key="header">
+                        {{ header === 'X (no vote)' ? 'X (no vote)' : 
+                          (header === 'abstention' ? 'Abstention' : header) }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, idx) in rows" :key="idx">
                       <td v-for="header in tableHeaders" :key="header"
                         :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
                         <template v-if="header === 'abstention' || header === 'X (no vote)'">
                           {{ formatPercent(row[header === 'X (no vote)' ? 'null' : header]) }}
                         </template>
                         <template v-else>
-                {{ row[header] }}
+                          {{ row[header] }}
                         </template>
-              </td>
-            </tr>
-          </tbody>
-        </v-simple-table>
+                      </td>
+                    </tr>
+                  </tbody>
+                </v-simple-table>
               </div>
             </div>
           </v-card>
@@ -359,7 +353,24 @@ export default {
     },
     'filters.versions'() {
       if (this.filters.versions.length) this.fetchPerspectives()
-    }
+    },
+    'filters.perspectiveValues': {
+      deep: true,
+      handler() {
+        // Filtrar diretamente os membros do projeto pelos valores dos campos de perspectiva
+        if (!this.projectMembers || !Object.keys(this.filters.perspectiveValues).length) return;
+        const filteredUsers = this.projectMembers.filter(member => {
+          if (!member.perspective) return false;
+          for (const [fieldId, value] of Object.entries(this.filters.perspectiveValues)) {
+            if (value && (!member.perspective[fieldId] || member.perspective[fieldId] !== value)) {
+              return false;
+            }
+          }
+          return true;
+        }).map(u => u.username || u.id);
+        console.log('Utilizadores filtrados por perspectiva (após seleção):', filteredUsers);
+      }
+    },
   },
   mounted() {
     this.fetchExamples()
@@ -578,13 +589,17 @@ export default {
                   u => u.username === vote.user || u.id === vote.user || u.id === vote.user_id);
               if (!member || !member.perspective) return false;
               // Checar todos os campos de perspectiva filtrados (igual index.vue)
-              return Object.entries(this.filters.perspectiveValues).every(([fieldId, value]) => {
-                if (!value) return true;
-                const memberValue = member.perspective[fieldId] ||
-                 member.perspective[fieldId.toString()];
-                return memberValue === value;
-              });
+              for (const [fieldId, value] of Object.entries(this.filters.perspectiveValues)) {
+                if (value && (!member.perspective[fieldId] || 
+                  member.perspective[fieldId] !== value)) {
+                  return false;
+                }
+              }
+              return true;
             });
+            // Logar os utilizadores filtrados por perspectiva
+            const filteredUsers = filteredVotes.map(vote => vote.user);
+            console.log('Utilizadores filtrados por perspectiva:', filteredUsers);
           }
           // Se filtrou, recalcula os percentuais
           const labelCounts = {};

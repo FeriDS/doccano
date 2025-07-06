@@ -7,8 +7,8 @@ from .views import (
     UserPerspectiveAnswerViewSet,
     get_project_perspective,
     get_user_perspective_answers,
-    update_user_perspective_answer
-
+    update_user_perspective_answer,
+    users_with_perspective_value
 )
 
 router = DefaultRouter()
@@ -27,4 +27,5 @@ urlpatterns = [
     path('projects/<int:project_id>/perspective/', get_project_perspective),
     path('projects/<int:project_id>/user-answers/', get_user_perspective_answers),
     path('projects/<int:project_id>/user-answers/update/', update_user_perspective_answer),
+    path('users_with_perspective_value/', users_with_perspective_value, name='users_with_perspective_value'),
 ]
