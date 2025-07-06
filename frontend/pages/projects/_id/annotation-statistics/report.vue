@@ -485,6 +485,21 @@ export default {
       }
     },
     async fetchReport() {
+      // Aguarde a atualização dos usuários filtrados, se houver filtro de perspectiva
+      if (Object.keys(this.filters.perspectiveValues).length > 0) {
+        await this.fetchFilteredPerspectiveUsers();
+        await this.$nextTick();
+      }
+      // Lógica de geração do relatório (original)
+      await this._generateReportCore();
+      // Chame novamente para garantir atualização total
+      if (Object.keys(this.filters.perspectiveValues).length > 0) {
+        await this.fetchFilteredPerspectiveUsers();
+        await this.$nextTick();
+      }
+      await this._generateReportCore();
+    },
+    async _generateReportCore() {
       let { examples } = this.filters;
       const { versions, perspective, perspectiveValues } = this.filters;
       // Se nenhum exemplo for selecionado, usar todos os exemplos disponíveis
@@ -584,24 +599,29 @@ export default {
             });
           }
           // Filtrar por perspectiva
-          if (filteredVotes.length && this.perspectiveFields 
-            && Object.keys(this.filters.perspectiveValues).length > 0) {
+          if (
+            filteredVotes.length &&
+            this.perspectiveFields &&
+            Object.keys(this.filters.perspectiveValues).length > 0 &&
+            this.filteredPerspectiveUsers &&
+            this.filteredPerspectiveUsers.length > 0
+          ) {
+            const allowedUserIds = new Set(this.filteredPerspectiveUsers.map(u => u.id));
+            filteredVotes = filteredVotes.filter(
+              vote => allowedUserIds.has(vote.user) || allowedUserIds.has(vote.user_id)
+            );
             filteredVotes = filteredVotes.filter(vote => {
-              const member = this.projectMembers.find(
+              const user = this.projectMembers.find(
                   u => u.username === vote.user || u.id === vote.user || u.id === vote.user_id);
-              if (!member || !member.perspective) return false;
-              // Checar todos os campos de perspectiva filtrados (igual index.vue)
+              if (!user || !user.perspective) return false;
               for (const [fieldId, value] of Object.entries(this.filters.perspectiveValues)) {
-                if (value && (!member.perspective[fieldId] || 
-                  member.perspective[fieldId] !== value)) {
+                if (value && (!user.perspective[fieldId] || user.perspective[fieldId] !== value)) {
                   return false;
                 }
               }
               return true;
             });
-            // Logar os utilizadores filtrados por perspectiva
-            const filteredUsers = filteredVotes.map(vote => vote.user);
-            console.log('Utilizadores filtrados por perspectiva:', filteredUsers);
+            console.log('Usuários considerados no relatório:', filteredVotes.map(v => v.user || v.user_id));
           }
           // Se filtrou, recalcula os percentuais
           const labelCounts = {};
@@ -635,10 +655,14 @@ export default {
             if (k.startsWith('label_')) allLabels.add(k)
           })
           // Preencher os campos de perspectiva na linha
-          const perspectiveData = {}
-          allPerspectiveFields.forEach(field => {
-            perspectiveData[field] = stats.perspective_fields ? stats.perspective_fields[field] : ''
-          })
+          const perspectiveData = {};
+          this.tableHeaders.forEach(header => {
+            const field = this.perspectiveFields.find(
+              f => f.name === header || String(f.id) === String(header));
+            if (field && this.filters.perspectiveValues[field.id]) {
+              perspectiveData[header] = this.filters.perspectiveValues[field.id];
+            }
+          });
           const labelData = {}
           const labelHeaders = Array.from(allLabels)
           labelHeaders.forEach((label) => {
@@ -697,13 +721,12 @@ export default {
       allPerspectiveFields = [...new Set(allPerspectiveFields)]
       allLabels = Array.from(allLabels)
       // Determinar os campos de perspectiva filtrados
-      const filteredPerspectiveFields = 
-        Object.keys(perspectiveValues).filter(k => perspectiveValues[k])
-      // Mapear ids para nomes amigáveis
+      const filteredPerspectiveFields = Object.keys(
+          this.filters.perspectiveValues).filter(k => this.filters.perspectiveValues[k]);
       const perspectiveFieldHeaders = filteredPerspectiveFields.map(id => {
-        const field = this.perspectiveFields.find(f => String(f.id) === String(id))
-        return field ? field.name : id
-      })
+        const field = this.perspectiveFields.find(f => String(f.id) === String(id));
+        return field ? field.name : id;
+      });
       // Determinar labels a exibir: todos ou apenas os escolhidos
       let labelHeaders = allLabels;
       if (this.filters.category && this.filters.category.length > 0) {
@@ -827,7 +850,7 @@ export default {
               .filter(opt => this.filters.category.includes(opt.value))
               .map(opt => opt.text)
               .join(', ');
-            parts.push(`Categories: ${catNames}`);
+            parts.push(`Labels: ${catNames}`);
           }
           // Status nome
           if (this.filters.status !== null && this.filters.status !== undefined) {
@@ -963,7 +986,7 @@ export default {
                 .filter(opt => this.filters.category.includes(opt.value))
                 .map(opt => opt.text)
                 .join(', ');
-              parts.push(`Categories: ${catNames}`);
+              parts.push(`Labels: ${catNames}`);
             }
             // Status nome
             if (this.filters.status !== null && this.filters.status !== undefined) {
@@ -1183,32 +1206,93 @@ export default {
       }
       // FIXME: Forçando o ID correto do ProjectPerspective para teste
       const projectPerspectiveId = 1;
-      // Suporte apenas para um campo de perspectiva por vez (como no filtro)
-      const [fieldId, value] = perspectiveFieldEntries[0];
-      const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
-      const fieldName = field ? field.name : fieldId;
-      try {
-        console.log('URL chamada:', '/v1/users_with_perspective_value/', {
-          project_perspective_id: projectPerspectiveId,
-          field_name: fieldName,
-          value
-        });
-        const response = await this.$axios.$get('/v1/users_with_perspective_value/', {
-          params: {
+      // Se só um campo, lógica antiga
+      if (perspectiveFieldEntries.length === 1) {
+        const [fieldId, value] = perspectiveFieldEntries[0];
+        const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+        const fieldName = field ? field.name : fieldId;
+        try {
+          console.log('URL chamada:', '/api/v1/users_with_perspective_value/', {
             project_perspective_id: projectPerspectiveId,
             field_name: fieldName,
             value
+          });
+          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
+            params: {
+              project_perspective_id: projectPerspectiveId,
+              field_name: fieldName,
+              value
+            }
+          });
+          let users = [];
+          if (Array.isArray(response)) {
+            users = response;
+          } else if (response && Array.isArray(response.users)) {
+            users = response.users;
           }
-        });
-        console.log('Resposta completa do backend:', response);
-        let users = [];
-        if (Array.isArray(response)) {
-          users = response;
-        } else if (response && Array.isArray(response.users)) {
-          users = response.users;
+          this.filteredPerspectiveUsers = users;
+          console.log('Usuários filtrados pelo backend:', users);
+        } catch (e) {
+          this.filteredPerspectiveUsers = [];
         }
-        this.filteredPerspectiveUsers = users;
-        console.log('Usuários filtrados pelo backend:', users);
+        return;
+      }
+      // Múltiplos campos: buscar todos e fazer interseção
+      try {
+        const userSets = [];
+        for (const [fieldId, value] of perspectiveFieldEntries) {
+          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+          const fieldName = field ? field.name : fieldId;
+          console.log('URL chamada:', '/api/v1/users_with_perspective_value/', {
+            project_perspective_id: projectPerspectiveId,
+            field_name: fieldName,
+            value
+          });
+          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
+            params: {
+              project_perspective_id: projectPerspectiveId,
+              field_name: fieldName,
+              value
+            }
+          });
+          let users = [];
+          if (Array.isArray(response)) {
+            users = response;
+          } else if (response && Array.isArray(response.users)) {
+            users = response.users;
+          }
+          userSets.push(new Set(users.map(u => u.id)));
+        }
+        // Interseção dos conjuntos
+        const filteredUserIds = userSets.reduce((acc, set) => {
+          if (acc === null) return set;
+          return new Set([...acc].filter(x => set.has(x)));
+        }, null);
+        // Buscar dados completos dos usuários (opcional)
+        // Aqui, pegue os dados do primeiro conjunto que bater com o id
+        let allUsers = [];
+        if (userSets.length > 0) {
+          // Pegue todos os users do primeiro campo
+          const firstField = perspectiveFieldEntries[0];
+          const field = this.perspectiveFields.find(f => String(f.id) === String(firstField[0]));
+          const fieldName = field ? field.name : firstField[0];
+          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
+            params: {
+              project_perspective_id: projectPerspectiveId,
+              field_name: fieldName,
+              value: firstField[1]
+            }
+          });
+          if (Array.isArray(response)) {
+            allUsers = response;
+          } else if (response && Array.isArray(response.users)) {
+            allUsers = response.users;
+          }
+        }
+        // Filtrar os dados completos para manter só os que estão na interseção
+        const filteredUsers = allUsers.filter(u => filteredUserIds.has(u.id));
+        console.log('Lista final de usuários filtrados por perspectiva:', filteredUsers);
+        this.filteredPerspectiveUsers = filteredUsers;
       } catch (e) {
         this.filteredPerspectiveUsers = [];
       }
