@@ -63,18 +63,25 @@ class AnnotationStatisticsAPI(APIView):
                 pass
 
         # Montar dicionário de filtros aplicados para exportação
-        applied_filters = {
-            'Data Início': start_date,
-            'Data Fim': end_date,
-            'Categoria': label,
-            'Status': resolved,
-            'Perspectiva': perspective,
-            'Exemplo': example_id,
-        }
-        # Adicionar campos de perspectiva com nome legível
+        applied_filters = {}
+        for k, v in request.query_params.items():
+            if k == 'label' and v:
+                label_ids = v.split(',') if isinstance(v, str) else v
+                label_names = list(Category.objects.filter(id__in=label_ids).values_list('label', flat=True))
+                applied_filters['Label'] = ', '.join(label_names)
+            elif k == 'resolved' and v:
+                applied_filters['Status'] = 'resolved' if v.lower() == 'true' else 'non-resolved'
+            elif k.startswith('perspective_'):
+                # Ignorar, pois será tratado abaixo com nome legível
+                continue
+            elif k in ['start_date', 'end_date', 'perspective', 'example_id'] and v:
+                applied_filters[k.replace('_', ' ').title()] = v
+            elif v and k not in ['label', 'resolved', 'start_date', 'end_date', 'perspective', 'example_id']:
+                applied_filters[k] = v
+        # Adicionar campos de perspectiva com nome legível (apenas)
         for k, v in perspective_field_filters.items():
-            field_name = perspective_field_names.get(str(k), f'Campo {k}')
-            applied_filters[f'Perspectiva {field_name}'] = v
+            field_name = perspective_field_names.get(str(k), f'Field {k}')
+            applied_filters[f'Perspective {field_name}'] = v
 
         annotation_date_filter = {}
         if start_date and end_date:
@@ -477,7 +484,6 @@ class AnnotationStatisticsAPI(APIView):
         buffer.write('GENERAL SUMMARY\n')
         buffer.write('-' * 20 + '\n')
         buffer.write('Metric;Value\n')
-        buffer.write(f'Total Finalized Examples;{len(statistics_data.get("examples", []))}\n')
         filtros = statistics_data.get('applied_filters', {})
         filtros_written = False
         for k, v in filtros.items():
@@ -576,7 +582,6 @@ class AnnotationStatisticsAPI(APIView):
         
         summary_data = [
             ['Metric', 'Value'],
-            ['Total Finalized Examples', str(len(statistics_data.get("examples", [])))],
             ['Applied Filters', filtros_descr]
         ]
         
@@ -637,20 +642,21 @@ class AnnotationStatisticsAPI(APIView):
                 abstraction_data = example.get('abstractionChartData', {})
                 all_labels = list(labels_data.get('labels', [])) + [l for l in abstraction_data.get('labels', []) if l not in labels_data.get('labels', [])]
                 if all_labels:
+                    # Ordenar labels e valores juntos
+                    combined = list(zip(all_labels, [
+                        labels_data['data'][labels_data['labels'].index(l)] if l in labels_data.get('labels', [])
+                        else abstraction_data['data'][abstraction_data['labels'].index(l)] if l in abstraction_data.get('labels', [])
+                        else 0 for l in all_labels
+                    ]))
+                    combined.sort(key=lambda x: x[0])
+                    all_labels = [x[0] for x in combined]
+                    all_values = [x[1] for x in combined]
                     dist_data = [['Label', 'Percentage (%)']]
-                    for label in all_labels:
-                        if label in labels_data.get('labels', []):
-                            idx = labels_data['labels'].index(label)
-                            value = labels_data['data'][idx]
-                        elif label in abstraction_data.get('labels', []):
-                            idx = abstraction_data['labels'].index(label)
-                            value = abstraction_data['data'][idx]
-                        else:
-                            value = 0
+                    for label, value in zip(all_labels, all_values):
                         dist_data.append([label, f"{value}%"])
                     regular_total = 0
                     non_voted_total = 0
-                    for label in all_labels:
+                    for label, value in zip(all_labels, all_values):
                         if (label.lower().find('abstração') != -1 or 
                             label.lower().find('abstraction') != -1 or 
                             label.lower().find('abstenção') != -1 or
@@ -740,17 +746,12 @@ class AnnotationStatisticsAPI(APIView):
         ws1.write('B1', 'Value', header_format)
         
         row = 1
-        ws1.write(row, 0, 'Total Finalized Examples', data_format)
-        ws1.write(row, 1, len(statistics_data.get("examples", [])), data_format)
-        
         filtros = statistics_data.get('applied_filters', {})
         filtros_strs = []
         for k, v in filtros.items():
             if v:
                 filtros_strs.append(f"{k}: {v}")
         filtros_descr = '; '.join(filtros_strs) if filtros_strs else 'No filter applied'
-        
-        row += 1
         ws1.write(row, 0, 'Applied Filters', data_format)
         ws1.write(row, 1, filtros_descr, data_format)
         

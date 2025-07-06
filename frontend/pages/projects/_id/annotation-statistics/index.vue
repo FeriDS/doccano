@@ -67,11 +67,19 @@
       </v-card-title>
       <v-card-text>
         <v-row>
+          <v-col cols="12">
+            <div v-if="projectPerspective">
+              <strong>Perspective:</strong> {{ projectPerspective.name }}
+            </div>
+          </v-col>
+        </v-row>
+        <v-row>
+          
           <template v-if="perspectiveFields && perspectiveFields.length">
             <template v-for="field in perspectiveFields">
               <v-col :key="field.id" cols="12" md="4">
                 <v-select
-                v-model="filters.perspectiveValues[field.id]"
+                  v-model="filters.perspectiveValues[field.id]"
                   :label="field.name"
                   :items="field.choices"
                   clearable
@@ -79,6 +87,18 @@
               </v-col>
             </template>
           </template>
+        </v-row>
+        <v-row>
+          <v-col cols="12" md="4">
+            <v-select
+              v-model="filters.resolved"
+              :items="statusOptions"
+              item-text="text"
+              item-value="value"
+              label="Status"
+              clearable
+            />
+          </v-col>
           <v-col cols="12" md="4">
             <v-select
               v-model="filters.label"
@@ -92,12 +112,15 @@
           </v-col>
           <v-col cols="12" md="4">
             <v-select
-              v-model="filters.resolved"
-              :items="statusOptions"
+              v-model="filters.example"
+              :items="(allExamples.length ? allExamples :
+               examples).map(e => ({ text: e.text, value: e.id }))"
               item-text="text"
               item-value="value"
-              label="Status"
+              label="Example"
               clearable
+              :return-object="false"
+              multiple
             />
           </v-col>
         </v-row>
@@ -151,19 +174,6 @@
                 @input="filters.endDateMenu = false"
               />
             </v-menu>
-          </v-col>
-          <v-col cols="12" md="3">
-            <v-select
-              v-model="filters.example"
-              :items="(allExamples.length ? allExamples :
-               examples).map(e => ({ text: e.text, value: e.id }))"
-              item-text="text"
-              item-value="value"
-              label="Example"
-              clearable
-              :return-object="false"
-              multiple
-            />
           </v-col>
           <v-col cols="12" md="3">
             <v-btn
@@ -718,14 +728,13 @@ export default {
               onComplete() {
                 const ctx = this.ctx;
                 ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
+                ctx.textBaseline = 'middle';
                 ctx.font = '12px Arial';
                 ctx.fillStyle = '#000';
-                
                 this.data.datasets.forEach(function(dataset) {
                   for (let i = 0; i < dataset.data.length; i++) {
                     const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
-                    ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                    ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y + 15);
                   }
                 });
               }
@@ -1043,6 +1052,15 @@ export default {
       }
     },
 
+    combineAndSort(labels, data) {
+      const combined = labels.map((label, i) => ({ label, value: data[i] }));
+      combined.sort((a, b) => a.label.localeCompare(b.label));
+      return {
+        labels: combined.map(item => item.label),
+        data: combined.map(item => item.value)
+      };
+    },
+
     renderLabelsChart(exampleId, distribution) {
       // Compatível com novo e antigo formato
       const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
@@ -1104,6 +1122,11 @@ export default {
         }
       });
       
+      // Ordenar labels e valores
+      const sorted = this.combineAndSort(regularLabels, regularData);
+      regularLabels = sorted.labels;
+      regularData = sorted.data;
+      
       const refName = 'labelsChart' + exampleId;
       const ctxArr = this.$refs[refName];
       const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
@@ -1142,7 +1165,7 @@ export default {
               },
               color: '#1976d2',
               padding: {
-                top: 20,
+                top: 50,
                 bottom: 40
               }
             }
@@ -1151,14 +1174,13 @@ export default {
             onComplete() {
               const ctx = this.ctx;
               ctx.textAlign = 'center';
-              ctx.textBaseline = 'bottom';
+              ctx.textBaseline = 'middle';
               ctx.font = '12px Arial';
               ctx.fillStyle = '#000';
-              
               this.data.datasets.forEach(function(dataset) {
                 for (let i = 0; i < dataset.data.length; i++) {
                   const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
-                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y + 15);
                 }
               });
             }
@@ -1197,8 +1219,8 @@ export default {
       console.log(`Debug - All data:`, allData)
       
       // Filtrar apenas abstração e null
-      const abstractionLabels = [];
-      const abstractionData = [];
+      let abstractionLabels = [];
+      let abstractionData = [];
       
       allLabels.forEach((label, index) => {
         const value = allData[index];
@@ -1246,6 +1268,11 @@ export default {
         }
       });
       
+      // Ordenar labels e valores
+      const sortedAbs = this.combineAndSort(abstractionLabels, abstractionData);
+      abstractionLabels = sortedAbs.labels;
+      abstractionData = sortedAbs.data;
+      
       const refName = 'abstractionChart' + exampleId;
       const ctxArr = this.$refs[refName];
       const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
@@ -1282,21 +1309,24 @@ export default {
                 size: 14,
                 weight: 'bold'
               },
-              color: '#d32f2f'
+              color: '#d32f2f',
+              padding: {
+                top: 50,
+                bottom: 20
+              }
             }
           },
           animation: {
             onComplete() {
               const ctx = this.ctx;
               ctx.textAlign = 'center';
-              ctx.textBaseline = 'bottom';
+              ctx.textBaseline = 'middle';
               ctx.font = '12px Arial';
               ctx.fillStyle = '#000';
-              
               this.data.datasets.forEach(function(dataset) {
                 for (let i = 0; i < dataset.data.length; i++) {
                   const model = dataset._meta[Object.keys(dataset._meta)[0]].data[i]._model;
-                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y - 5);
+                  ctx.fillText(dataset.data[i].toFixed(1) + '%', model.x, model.y + 15);
                 }
               });
             }
