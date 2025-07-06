@@ -78,6 +78,15 @@
               <v-list-item-title>Vote Rules</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
+
+          <v-list-item
+            @click="$router.push(localePath(`/projects/${$route.params.id}/rules/closed`))"
+          >
+            <v-list-item-icon>
+              <v-icon>{{ mdiLock }}</v-icon>
+            </v-list-item-icon>
+            <v-list-item-title>Closed Rules</v-list-item-title>
+          </v-list-item>
         </v-list>
       </v-menu>
     </v-list-item-group>
@@ -100,7 +109,8 @@ import {
   mdiClipboardListOutline,
   mdiPlusCircleOutline,
   mdiFileDocumentOutline,
-  mdiClockOutline
+  mdiClockOutline,
+  mdiLock
 } from '@mdi/js'
 import { getLinkToAnnotationPage } from '~/presenter/linkToAnnotationPage'
 
@@ -120,7 +130,8 @@ export default {
       mdiPlusCircleOutline,
       mdiChartBar,
       mdiFileDocumentOutline,
-      mdiClockOutline
+      mdiClockOutline,
+      mdiLock
     }
   },
 
