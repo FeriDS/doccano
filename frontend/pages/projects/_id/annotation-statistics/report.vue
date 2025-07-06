@@ -747,13 +747,18 @@ export default {
             // Cabeçalho de bloco
             csv += `"Version ${version}";"Users that voted: ${this.getVoteStats(rows).usersVoted}"
 `;
-            // Cabeçalho de colunas
+            // Cabeçalho de colunas (apenas uma vez por bloco)
             csv += headers.map(h => `"${h}"`).join(';') + '\n';
-            // Dados
+            // Dados (apenas uma vez por linha)
             rows.forEach(row => {
               csv += headers.map(h => {
-                let val = row[h];
-                if (h === 'abstention' || h === 'null') val = this.formatPercent(val);
+                let val;
+                if (h === 'X (no vote)') {
+                  val = row.null;
+                } else {
+                  val = row[h];
+                }
+                if (h === 'abstention' || h === 'X (no vote)') val = this.formatPercent(val);
                 if (val === undefined || val === null) val = '';
                 const safeVal = String(val).replace(/"/g, '""');
                 return `"${safeVal}"`;
@@ -811,8 +816,13 @@ export default {
               rows.forEach(row => {
                 table += '<tr>';
                 this.tableHeaders.forEach(h => {
-                  let val = row[h];
-                  if (h === 'abstention' || h === 'null') val = this.formatPercent(val);
+                  let val;
+                  if (h === 'X (no vote)') {
+                    val = row.null;
+                  } else {
+                    val = row[h];
+                  }
+                  if (h === 'abstention' || h === 'X (no vote)') val = this.formatPercent(val);
                   if (val === undefined || val === null) val = '';
                   table += `<td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${val}</td>`;
                 });
