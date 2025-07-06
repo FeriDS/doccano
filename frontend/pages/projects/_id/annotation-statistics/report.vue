@@ -66,8 +66,6 @@
                       v-model="filters.perspectiveValues[field.id]"
                       :items="field.choices"
                       :label="field.name"
-                      multiple
-                      chips
                       clearable
                       color="primary"
                       class="mb-4"
@@ -217,6 +215,15 @@
             <!-- Total de usuários por exemplo -->
             <div class="mb-2 text-body-1">
               Total users: {{ getExampleTotalUsers(versions) }}
+            </div>
+            <div v-if="rows && rows.length" class="d-flex mb-2" style="gap: 32px;">
+              <div class="text-body-1">
+                Users that voted: {{ getVoteStats(rows).usersVoted }}
+              </div>
+              <div class="text-body-2" style="color: #1976d2;">
+                <span v-if="getFilteredUsernames(rows).length">Filtered users:
+                 {{ getFilteredUsernames(rows).join(', ') }}</span>
+              </div>
             </div>
             <div v-for="(rows, version) in versions" :key="version" class="mb-4">
               <div style="border: 1px solid #eee; 
@@ -536,7 +543,14 @@ export default {
           // NOVO: buscar estatísticas de votação do backend
           let votingStats = {};
           try {
-            votingStats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/voting-user-stats/`, { params });
+            // Remover filtros perspective_* para voting-user-stats
+            const votingStatsParams = { ...params };
+            Object.keys(votingStatsParams).forEach(key => {
+              if (key.startsWith('perspective_')) {
+                delete votingStatsParams[key];
+              }
+            });
+            votingStats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/voting-user-stats/`, { params: votingStatsParams });
             console.log('votingStats', votingStats);
           } catch (e) {
             votingStats = {};
@@ -563,15 +577,11 @@ export default {
               const member = this.projectMembers.find(
                   u => u.username === vote.user || u.id === vote.user || u.id === vote.user_id);
               if (!member || !member.perspective) return false;
-              // Checar todos os campos de perspectiva filtrados
+              // Checar todos os campos de perspectiva filtrados (igual index.vue)
               return Object.entries(this.filters.perspectiveValues).every(([fieldId, value]) => {
                 if (!value) return true;
-                const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
-                if (!field) return true;
-                const memberValue = member.perspective[field.name] || member.perspective[fieldId];
-                if (Array.isArray(value)) {
-                  return value.includes(memberValue);
-                }
+                const memberValue = member.perspective[fieldId] ||
+                 member.perspective[fieldId.toString()];
                 return memberValue === value;
               });
             });
@@ -855,6 +865,12 @@ export default {
             // Cabeçalho de bloco
             csv += `"Version ${version}";"Users that voted: ${this.getVoteStats(rows).usersVoted}"
 `;
+            // Adicionar lista de usuários filtrados
+            const filteredUsers = this.getFilteredUsernames(rows);
+            if (filteredUsers.length) {
+              csv += `"Filtered users: ${filteredUsers.join(', ')}"
+`;
+            }
             // Cabeçalho de colunas (apenas uma vez por bloco)
             csv += headers.map(h => `"${h}"`).join(';') + '\n';
             // Dados (apenas uma vez por linha)
@@ -983,7 +999,11 @@ export default {
               container.innerHTML += `<div style="border:1px solid #eee;border-radius:6px;padding:12px 8px;margin-bottom:16px;">`;
               container.innerHTML += `<h3 style="color:#333;">Version ${version}</h3>`;
               container.innerHTML += `<div style="margin-bottom:8px;font-weight:bold;">Users that voted: ${this.getVoteStats(rows).usersVoted}</div>`;
-
+              // Adicionar lista de usuários filtrados
+              const filteredUsers = this.getFilteredUsernames(rows);
+              if (filteredUsers.length) {
+                container.innerHTML += `<div style='margin-bottom:8px;font-weight:bold;color:#1976d2;'>Filtered users: ${filteredUsers.join(', ')}</div>`;
+              }
               // tabela
               let table = '<table style="border-collapse:collapse;width:100%;margin-top:12px;">';
               table += '<thead><tr>';
@@ -1120,6 +1140,21 @@ export default {
         return ((totalAbst / voteStats.totalUsers) * 100).toFixed(2) + '%';
       }
       return '0%';
+    },
+    getFilteredUsernames(rows) {
+      // Retorna a lista de usernames dos votos filtrados (sem duplicatas)
+      if (!rows || !rows.length) return [];
+      const usernames = new Set();
+      rows.forEach(row => {
+        if (row.votes && Array.isArray(row.votes)) {
+          row.votes.forEach(vote => {
+            if (vote.user) usernames.add(vote.user);
+          });
+        } else if (row.user) {
+          usernames.add(row.user);
+        }
+      });
+      return Array.from(usernames);
     },
   }
 }
