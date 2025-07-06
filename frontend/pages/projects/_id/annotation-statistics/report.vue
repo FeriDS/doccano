@@ -366,6 +366,17 @@ export default {
         const { items } = await this.$services.example.list(this.$route.params.id, {})
         this.exampleOptions = items
           .filter(ex => ex.is_finished)
+          // Filtro por data de início e fim
+          .filter(ex => {
+            let pass = true;
+            if (this.filters.startDate && ex.annotation_start_date) {
+              pass = pass && (ex.annotation_start_date >= this.filters.startDate);
+            }
+            if (this.filters.endDate && ex.annotation_end_date) {
+              pass = pass && (ex.annotation_end_date <= this.filters.endDate);
+            }
+            return pass;
+          })
           .map(ex => ({
             text: ex.name || ex.content || ex.title || ex.text || `Example ${ex.id}`,
             value: ex.id
@@ -382,7 +393,6 @@ export default {
         const projectId = this.$route.params.id
         const calls = exampleIds.map(id =>
           this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${id}/versions/`).then(res => {
-            console.log(`Versões recebidas para example ${id}:`, res)
             return { id, res }
           })
         )
@@ -391,7 +401,20 @@ export default {
 
         for (const { id, res } of results) {
           const raw = Array.isArray(res.versions) ? res.versions : []
-          const vals = raw.map(v => +v).filter(n => Number.isFinite(n))
+          let filteredVersions = raw
+          if (raw.length && typeof raw[0] === 'object' && (raw[0].created_at || raw[0].annotation_start_date)) {
+            filteredVersions = raw.filter(v => {
+              let pass = true
+              if (this.filters.startDate && v.annotation_start_date) {
+                pass = pass && (v.annotation_start_date >= this.filters.startDate)
+              }
+              if (this.filters.endDate && v.annotation_end_date) {
+                pass = pass && (v.annotation_end_date <= this.filters.endDate)
+              }
+              return pass
+            })
+          }
+          const vals = filteredVersions.map(v => v.version || v).filter(n => Number.isFinite(n))
           this.versionsByExample[id] = vals
 
           const exampleLabel = this.exampleOptions.find(o => o.value === id)?.text || `Example ${id}`
@@ -403,10 +426,8 @@ export default {
           }
         }
 
-        console.log('Objeto versionsByExample final:', this.versionsByExample)
         this.versionOptions = versionOptions
       } catch (e) {
-        console.error('Erro ao buscar versões:', e)
         this.versionOptions = []
       } finally {
         this.loading.versions = false
@@ -496,6 +517,21 @@ export default {
           if (this.filters.startDate) params.start_date = this.filters.startDate;
           if (this.filters.endDate) params.end_date = this.filters.endDate;
           stats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/stats/`, { params })
+
+          // Filtrar votos por data para decidir se a versão deve aparecer
+          let votesInRange = stats.votes || [];
+          if (votesInRange.length && (this.filters.startDate || this.filters.endDate)) {
+            const start = this.filters.startDate ? new Date(this.filters.startDate) : null;
+            const end = this.filters.endDate ? new Date(this.filters.endDate) : null;
+            votesInRange = votesInRange.filter(vote => {
+              const voteDate = new Date(vote.created_at);
+              if (start && voteDate < start) return false;
+              if (end && voteDate > end) return false;
+              return true;
+            });
+          }
+          // Só adiciona a versão se houver pelo menos um voto no intervalo
+          if (!votesInRange.length) continue;
 
           // NOVO: buscar estatísticas de votação do backend
           let votingStats = {};
