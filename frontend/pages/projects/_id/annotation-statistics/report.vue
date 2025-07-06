@@ -732,6 +732,12 @@ export default {
       }
       // Remover o label 'null' dos headers dinâmicos para evitar coluna duplicada
       labelHeaders = labelHeaders.filter(lab => lab.replace(/^label_/, '').toLowerCase() !== 'null');
+      // Ordenar alfabeticamente pelo nome amigável
+      labelHeaders = labelHeaders.sort((a, b) => {
+        const nameA = a.replace(/^label_/, '').toLowerCase();
+        const nameB = b.replace(/^label_/, '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
       // Montar nomes amigáveis para os labels nas colunas
       const labelColumnNames = labelHeaders.map(lab => lab.replace(/^label_/, ''));
       const tableHeaders = [
