@@ -313,6 +313,7 @@ export default {
       exportingCSV: false,
       exportingPDF: false,
       voteStatsByExampleVersion: {},
+      filteredPerspectiveUsers: [],
     }
   },
   computed: {
@@ -357,6 +358,7 @@ export default {
     'filters.perspectiveValues': {
       deep: true,
       handler() {
+        this.fetchFilteredPerspectiveUsers();
         // Filtrar diretamente os membros do projeto pelos valores dos campos de perspectiva
         if (!this.projectMembers || !Object.keys(this.filters.perspectiveValues).length) return;
         const filteredUsers = this.projectMembers.filter(member => {
@@ -748,7 +750,7 @@ export default {
     },
     getTotalLabels(rows) {
       // Soma os percentuais das labels regulares (exclui 'abstention' e 'null')
-      if (!rows || !rows.length) return '0.0';
+      if (!Array.isArray(rows) || !rows.length) return '0.0';
       const labelKeys = this.tableHeaders.filter(h => h !== 'abstention' && h !== 'null' && h !== 'Status' && h !== 'Begin Date' && h !== 'End Date');
       let total = 0;
       for (const row of rows) {
@@ -762,7 +764,7 @@ export default {
     },
     getTotalAbstentionNull(rows) {
       // Soma os percentuais das colunas 'abstention' e 'null'
-      if (!rows || !rows.length) return '0.0';
+      if (!Array.isArray(rows) || !rows.length) return '0.0';
       let total = 0;
       for (const row of rows) {
         ['abstention', 'null'].forEach(key => {
@@ -1112,7 +1114,29 @@ export default {
     },
     // Calcula estatísticas de votos/abstenção/null por versão
     getVoteStats(rows) {
-    if (!rows || !rows.length)
+      if (!Array.isArray(rows) || !rows.length)
+        return {
+          totalUsers: 0,
+          usersVoted: 0,
+          usersNotVoted: 0,
+          usersOnlyAbstention: 0,
+          totalVotes: 0
+        };
+      const row = rows[0];
+      const key = row && row.example !== undefined && row.version !== undefined
+        ? `${row.example}:${row.version}`
+        : null;
+      if (key && this.voteStatsByExampleVersion && this.voteStatsByExampleVersion[key]) {
+        const stats = this.voteStatsByExampleVersion[key];
+        return {
+          totalUsers: stats.total_users || 0,
+          usersVoted: stats.users_voted || 0,
+          usersNotVoted: stats.users_not_voted || 0,
+          usersOnlyAbstention: stats.users_only_abstention || 0,
+          totalVotes: row.total || 0
+        };
+      }
+      // fallback antigo
       return {
         totalUsers: 0,
         usersVoted: 0,
@@ -1120,32 +1144,10 @@ export default {
         usersOnlyAbstention: 0,
         totalVotes: 0
       };
-    const row = rows[0];
-    const key = row && row.example !== undefined && row.version !== undefined
-      ? `${row.example}:${row.version}`
-      : null;
-    if (key && this.voteStatsByExampleVersion && this.voteStatsByExampleVersion[key]) {
-      const stats = this.voteStatsByExampleVersion[key];
-      return {
-        totalUsers: stats.total_users || 0,
-        usersVoted: stats.users_voted || 0,
-        usersNotVoted: stats.users_not_voted || 0,
-        usersOnlyAbstention: stats.users_only_abstention || 0,
-        totalVotes: row.total || 0
-      };
-    }
-    // fallback antigo
-    return {
-      totalUsers: 0,
-      usersVoted: 0,
-      usersNotVoted: 0,
-      usersOnlyAbstention: 0,
-      totalVotes: 0
-    };
-  },
+    },
     getExampleTotalUsers(versions) {
       const firstVersionRows = Object.values(versions)[0];
-      if (!firstVersionRows || !firstVersionRows.length) return 0;
+      if (!Array.isArray(firstVersionRows) || !firstVersionRows.length) return 0;
       return this.getVoteStats(firstVersionRows).totalUsers;
     },
     getAbstentionPercent(stats, voteStats) {
@@ -1158,7 +1160,7 @@ export default {
     },
     getFilteredUsernames(rows) {
       // Retorna a lista de usernames dos votos filtrados (sem duplicatas)
-      if (!rows || !rows.length) return [];
+      if (!Array.isArray(rows) || !rows.length) return [];
       const usernames = new Set();
       rows.forEach(row => {
         if (row.votes && Array.isArray(row.votes)) {
@@ -1170,6 +1172,46 @@ export default {
         }
       });
       return Array.from(usernames);
+    },
+    async fetchFilteredPerspectiveUsers() {
+      // Só busca se houver filtro ativo
+      const perspectiveFieldEntries = 
+        Object.entries(this.filters.perspectiveValues).filter(([_, v]) => v);
+      if (!this.projectPerspective || !perspectiveFieldEntries.length) {
+        this.filteredPerspectiveUsers = [];
+        return;
+      }
+      // FIXME: Forçando o ID correto do ProjectPerspective para teste
+      const projectPerspectiveId = 1;
+      // Suporte apenas para um campo de perspectiva por vez (como no filtro)
+      const [fieldId, value] = perspectiveFieldEntries[0];
+      const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+      const fieldName = field ? field.name : fieldId;
+      try {
+        console.log('URL chamada:', '/v1/users_with_perspective_value/', {
+          project_perspective_id: projectPerspectiveId,
+          field_name: fieldName,
+          value
+        });
+        const response = await this.$axios.$get('/v1/users_with_perspective_value/', {
+          params: {
+            project_perspective_id: projectPerspectiveId,
+            field_name: fieldName,
+            value
+          }
+        });
+        console.log('Resposta completa do backend:', response);
+        let users = [];
+        if (Array.isArray(response)) {
+          users = response;
+        } else if (response && Array.isArray(response.users)) {
+          users = response.users;
+        }
+        this.filteredPerspectiveUsers = users;
+        console.log('Usuários filtrados pelo backend:', users);
+      } catch (e) {
+        this.filteredPerspectiveUsers = [];
+      }
     },
   }
 }
