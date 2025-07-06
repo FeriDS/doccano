@@ -599,6 +599,12 @@ export default {
                voteStats.totalUsers) * 100;
           }
 
+          let abstentionPercent = '0%';
+          if (voteStats.totalUsers > 0 && stats.votes && Array.isArray(stats.votes)) {
+            const totalAbstVotes = stats.votes.filter(v => v.label === null).length;
+            abstentionPercent = ((totalAbstVotes / voteStats.totalUsers) * 100).toFixed(2) + '%';
+          }
+
           groupedData[exampleName][ver].push({
             example: ex,
             version: ver,
@@ -607,8 +613,7 @@ export default {
             ...(this.filters.status !== null ? { Status: statusValue } : {}),
             ...(this.filters.startDate ? { 'Begin Date': this.filters.startDate } : {}),
             ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
-            abstention: (stats.abstention !== undefined && 
-              stats.abstention !== null) ? stats.abstention : 0,
+            abstention: abstentionPercent,
             null: nullPercent.toFixed(2) + '%'
           });
         } catch {
@@ -646,6 +651,8 @@ export default {
         // Se não encontrar nenhum, mostra todos como fallback
         if (labelHeaders.length === 0) labelHeaders = allLabels;
       }
+      // Remover o label 'null' dos headers dinâmicos para evitar coluna duplicada
+      labelHeaders = labelHeaders.filter(lab => lab.replace(/^label_/, '').toLowerCase() !== 'null');
       // Montar nomes amigáveis para os labels nas colunas
       const labelColumnNames = labelHeaders.map(lab => lab.replace(/^label_/, ''));
       const tableHeaders = [
@@ -913,6 +920,14 @@ export default {
       const firstVersionRows = Object.values(versions)[0];
       if (!firstVersionRows || !firstVersionRows.length) return 0;
       return this.getVoteStats(firstVersionRows).totalUsers;
+    },
+    getAbstentionPercent(stats, voteStats) {
+      // Lógica igual ao discrepancy_automatic.vue: soma dos valores de stats.abstencao
+      if (stats && stats.abstencao && voteStats && voteStats.totalUsers > 0) {
+        const totalAbst = Object.values(stats.abstencao).reduce((a, b) => a + Number(b), 0);
+        return ((totalAbst / voteStats.totalUsers) * 100).toFixed(2) + '%';
+      }
+      return '0%';
     },
   }
 }
