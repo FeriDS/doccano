@@ -242,6 +242,12 @@
           </v-card>
         </div>
       </div>
+      <div class="d-flex justify-end mt-8">
+        <v-btn text aria-label="Return" @click="$router.back()">
+          <v-icon left>{{ mdiArrowLeft }}</v-icon>
+          Return
+        </v-btn>
+      </div>
     </v-card>
   </v-container>
 </template>
