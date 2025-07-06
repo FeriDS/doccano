@@ -577,7 +577,7 @@ export default {
             perspectiveData[field] = stats.perspective_fields ? stats.perspective_fields[field] : ''
           })
           const labelData = {}
-          const labelHeaders = allLabels;
+          const labelHeaders = Array.from(allLabels)
           labelHeaders.forEach((label) => {
             let val = stats[label];
             if (!val || val === '0%' || val === 0) val = '0%';
@@ -737,6 +737,78 @@ export default {
         // Geração de CSV a partir dos dados do frontend
         const headers = this.tableHeaders;
         let csv = '';
+        // Descrição dos filtros
+        let filterDesc = '';
+        if (this.hasActiveFilters) {
+          filterDesc = 'Filters applied: ';
+          const parts = [];
+          // Examples nomes
+          if (this.filters.examples && this.filters.examples.length) {
+            const exampleNames = this.exampleOptions
+              .filter(opt => this.filters.examples.includes(opt.value))
+              .map(opt => opt.text)
+              .join(', ');
+            parts.push(`Examples: ${exampleNames}`);
+          }
+          // Versions nomes
+          if (this.filters.versions && this.filters.versions.length) {
+            const versionNames = this.versionOptions
+              .filter(opt => this.filters.versions.includes(opt.value))
+              .map(opt => opt.text || opt.header)
+              .join(', ');
+            parts.push(`Versions: ${versionNames}`);
+          }
+          // Categories nomes
+          if (this.filters.category && this.filters.category.length) {
+            const catNames = this.categoryOptions
+              .filter(opt => this.filters.category.includes(opt.value))
+              .map(opt => opt.text)
+              .join(', ');
+            parts.push(`Categories: ${catNames}`);
+          }
+          // Status nome
+          if (this.filters.status !== null && this.filters.status !== undefined) {
+            const statusName = (this.statusOptions.find(
+              opt => opt.value === this.filters.status) || {}).text || this.filters.status;
+            parts.push(`Status: ${statusName}`);
+          }
+          if (this.filters.startDate) parts.push(`Start Date: ${this.filters.startDate}`);
+          if (this.filters.endDate) parts.push(`End Date: ${this.filters.endDate}`);
+          // Perspective nome
+          if (this.filters.perspective) {
+            const perspName = (this.perspectives.find(
+              p => p.id === this.filters.perspective) || {}).name || this.filters.perspective;
+            parts.push(`Perspective: ${perspName}`);
+          }
+          // Perspective Values nomes
+          if (this.filters.perspectiveValues &&
+             Object.keys(this.filters.perspectiveValues).length) {
+            const pvParts = Object.entries(this.filters.perspectiveValues).map(([fid, val]) => {
+              const field = this.perspectiveFields.find(f => String(f.id) === String(fid));
+              const label = field ? field.name : fid;
+              let valueLabel = val;
+              if (field && field.choices && Array.isArray(val)) {
+                valueLabel = val.map(v => {
+                  const choice = field.choices.find(
+                    c => c === v || (c.value !== undefined && c.value === v));
+                  return choice && choice.text ? choice.text : v;
+                }).join(', ');
+              } else if (field && field.choices) {
+                const choice = field.choices.find(
+                  c => c === val || (c.value !== undefined && c.value === val));
+                valueLabel = choice && choice.text ? choice.text : val;
+              }
+              return `${label}: ${valueLabel}`;
+            });
+            parts.push(`Perspective Values: ${pvParts.join(' | ')}`);
+          }
+          filterDesc += parts.join(' | ');
+        } else {
+          filterDesc = 'No filters applied. Showing all perspectives and options.';
+        }
+        csv += `"${filterDesc}"
+
+`;
         // Para cada exemplo
         Object.entries(this.reportData).forEach(([exampleName, versions]) => {
           // Total de usuários por exemplo
@@ -794,6 +866,77 @@ export default {
           container.style.padding = '16px';
           container.style.fontFamily = 'sans-serif';
           container.innerHTML = '';
+
+          // Descrição dos filtros
+          let filterDesc = '';
+          if (this.hasActiveFilters) {
+            filterDesc = '<div style="font-weight:bold;margin-bottom:12px;">Filters applied: ';
+            const parts = [];
+            // Examples nomes
+            if (this.filters.examples && this.filters.examples.length) {
+              const exampleNames = this.exampleOptions
+                .filter(opt => this.filters.examples.includes(opt.value))
+                .map(opt => opt.text)
+                .join(', ');
+              parts.push(`Examples: ${exampleNames}`);
+            }
+            // Versions nomes
+            if (this.filters.versions && this.filters.versions.length) {
+              const versionNames = this.versionOptions
+                .filter(opt => this.filters.versions.includes(opt.value))
+                .map(opt => opt.text || opt.header)
+                .join(', ');
+              parts.push(`Versions: ${versionNames}`);
+            }
+            // Categories nomes
+            if (this.filters.category && this.filters.category.length) {
+              const catNames = this.categoryOptions
+                .filter(opt => this.filters.category.includes(opt.value))
+                .map(opt => opt.text)
+                .join(', ');
+              parts.push(`Categories: ${catNames}`);
+            }
+            // Status nome
+            if (this.filters.status !== null && this.filters.status !== undefined) {
+              const statusName = (this.statusOptions.find(
+                opt => opt.value === this.filters.status) || {}).text || this.filters.status;
+              parts.push(`Status: ${statusName}`);
+            }
+            if (this.filters.startDate) parts.push(`Start Date: ${this.filters.startDate}`);
+            if (this.filters.endDate) parts.push(`End Date: ${this.filters.endDate}`);
+            // Perspective nome
+            if (this.filters.perspective) {
+              const perspName = (this.perspectives.find(
+                  p => p.id === this.filters.perspective) || {}).name || this.filters.perspective;
+              parts.push(`Perspective: ${perspName}`);
+            }
+            // Perspective Values nomes
+            if (this.filters.perspectiveValues &&
+               Object.keys(this.filters.perspectiveValues).length) {
+              const pvParts = Object.entries(this.filters.perspectiveValues).map(([fid, val]) => {
+                const field = this.perspectiveFields.find(f => String(f.id) === String(fid));
+                const label = field ? field.name : fid;
+                let valueLabel = val;
+                if (field && field.choices && Array.isArray(val)) {
+                  valueLabel = val.map(v => {
+                    const choice = field.choices.find(
+                      c => c === v || (c.value !== undefined && c.value === v));
+                    return choice && choice.text ? choice.text : v;
+                  }).join(', ');
+                } else if (field && field.choices) {
+                  const choice = field.choices.find(
+                    c => c === val || (c.value !== undefined && c.value === val));
+                  valueLabel = choice && choice.text ? choice.text : val;
+                }
+                return `${label}: ${valueLabel}`;
+              });
+              parts.push(`Perspective Values: ${pvParts.join(' | ')}`);
+            }
+            filterDesc += parts.join(' | ') + '</div>';
+          } else {
+            filterDesc = '<div style="font-weight:bold;margin-bottom:12px;">No filters applied. Showing all perspectives and options.</div>';
+          }
+          container.innerHTML += filterDesc;
 
           Object.entries(this.reportData).forEach(([exampleName, versions]) => {
             const totalUsers = this.getExampleTotalUsers(versions);
