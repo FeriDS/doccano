@@ -168,11 +168,22 @@
       <div class="d-flex align-center justify-space-between">
         <div>
           <v-btn color="primary" class="mr-2" @click="fetchReport">
-        GENERATE REPORT
-      </v-btn>
-      <v-btn color="error" text class="mt-2" @click="clearFilters">
-        CLEAR ALL FILTERS
-      </v-btn>
+            GENERATE REPORT
+          </v-btn>
+          <v-btn color="error" text class="mt-2 mr-2" @click="clearFilters">
+            CLEAR ALL FILTERS
+          </v-btn>
+          <v-chip
+            v-if="hasActiveFilters"
+            small
+            color="grey lighten-3"
+            text-color="primary"
+            class="ml-1"
+            style="font-weight: 600;"
+          >
+            <v-icon left small>mdi-filter</v-icon>
+            {{ activeFiltersCount }} filter(s) selected
+          </v-chip>
         </div>
         <div>
           <v-btn color="success" :loading="exportingCSV" class="mr-2" @click="exportReportCSV">
@@ -219,7 +230,10 @@
         <v-simple-table>
           <thead>
             <tr>
-              <th v-for="header in tableHeaders" :key="header">{{ header }}</th>
+              <th v-for="header in tableHeaders" :key="header">
+                {{ header === 'X (no vote)' ? 'X (no vote)' : 
+                  (header === 'abstention' ? 'Abstention' : header) }}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -227,8 +241,8 @@
                       :key="idx">
                       <td v-for="header in tableHeaders" :key="header"
                         :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
-                        <template v-if="header === 'abstention' || header === 'null'">
-                          {{ formatPercent(row[header]) }}
+                        <template v-if="header === 'abstention' || header === 'X (no vote)'">
+                          {{ formatPercent(row[header === 'X (no vote)' ? 'null' : header]) }}
                         </template>
                         <template v-else>
                 {{ row[header] }}
@@ -241,6 +255,12 @@
             </div>
           </v-card>
         </div>
+      </div>
+      <div class="d-flex justify-end mt-8">
+        <v-btn text aria-label="Return" @click="$router.back()">
+          <v-icon left>{{ mdiArrowLeft }}</v-icon>
+          Return
+        </v-btn>
       </div>
     </v-card>
   </v-container>
@@ -297,6 +317,31 @@ export default {
   computed: {
     finalizedExamplesCount() {
       return this.exampleOptions.length
+    },
+    activeFiltersCount() {
+      let count = 0;
+      if (this.filters.examples && 
+      Array.isArray(this.filters.examples)) 
+      count += this.filters.examples.length;
+      if (this.filters.versions && 
+      Array.isArray(this.filters.versions)) 
+      count += this.filters.versions.length;
+      if (this.filters.category && 
+      Array.isArray(this.filters.category)) 
+      count += this.filters.category.length;
+      if (this.filters.status !== null && this.filters.status !== undefined) count += 1;
+      if (this.filters.startDate) count += 1;
+      if (this.filters.endDate) count += 1;
+      if (this.filters.perspectiveValues && typeof this.filters.perspectiveValues === 'object') {
+        Object.values(this.filters.perspectiveValues).forEach(val => {
+          if (Array.isArray(val)) count += val.length;
+          else if (val) count += 1;
+        });
+      }
+      return count;
+    },
+    hasActiveFilters() {
+      return this.activeFiltersCount > 0;
     }
   },
   watch: {
@@ -548,6 +593,21 @@ export default {
           const exampleName = this.exampleOptions.find(o => o.value === ex)?.text || `Example ${ex}`;
           if (!groupedData[exampleName]) groupedData[exampleName] = {};
           if (!groupedData[exampleName][ver]) groupedData[exampleName][ver] = [];
+
+          // Novo cálculo para null
+          const voteStats = this.getVoteStats([{ example: ex, version: ver }]);
+          let nullPercent = 0;
+          if (voteStats.totalUsers > 0) {
+            nullPercent = ((voteStats.totalUsers - voteStats.usersVoted) /
+               voteStats.totalUsers) * 100;
+          }
+
+          let abstentionPercent = '0%';
+          if (voteStats.totalUsers > 0 && stats.votes && Array.isArray(stats.votes)) {
+            const totalAbstVotes = stats.votes.filter(v => v.label === null).length;
+            abstentionPercent = ((totalAbstVotes / voteStats.totalUsers) * 100).toFixed(2) + '%';
+          }
+
           groupedData[exampleName][ver].push({
             example: ex,
             version: ver,
@@ -556,9 +616,8 @@ export default {
             ...(this.filters.status !== null ? { Status: statusValue } : {}),
             ...(this.filters.startDate ? { 'Begin Date': this.filters.startDate } : {}),
             ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
-            abstention: (stats.abstention !== undefined && 
-              stats.abstention !== null) ? stats.abstention : 0,
-            null: (stats.null !== undefined && stats.null !== null) ? stats.null : 0
+            abstention: abstentionPercent,
+            null: nullPercent.toFixed(2) + '%'
           });
         } catch {
           rows.push({
@@ -595,6 +654,8 @@ export default {
         // Se não encontrar nenhum, mostra todos como fallback
         if (labelHeaders.length === 0) labelHeaders = allLabels;
       }
+      // Remover o label 'null' dos headers dinâmicos para evitar coluna duplicada
+      labelHeaders = labelHeaders.filter(lab => lab.replace(/^label_/, '').toLowerCase() !== 'null');
       // Montar nomes amigáveis para os labels nas colunas
       const labelColumnNames = labelHeaders.map(lab => lab.replace(/^label_/, ''));
       const tableHeaders = [
@@ -604,7 +665,7 @@ export default {
         ...(this.filters.startDate ? ['Begin Date'] : []),
         ...(this.filters.endDate ? ['End Date'] : []),
         'abstention',
-        'null'
+        'X (no vote)'
       ]
       // Ordenar rows por exampleName
       rows.sort((a, b) => (a.exampleName || '').localeCompare(b.exampleName || ''));
@@ -686,13 +747,18 @@ export default {
             // Cabeçalho de bloco
             csv += `"Version ${version}";"Users that voted: ${this.getVoteStats(rows).usersVoted}"
 `;
-            // Cabeçalho de colunas
+            // Cabeçalho de colunas (apenas uma vez por bloco)
             csv += headers.map(h => `"${h}"`).join(';') + '\n';
-            // Dados
+            // Dados (apenas uma vez por linha)
             rows.forEach(row => {
               csv += headers.map(h => {
-                let val = row[h];
-                if (h === 'abstention' || h === 'null') val = this.formatPercent(val);
+                let val;
+                if (h === 'X (no vote)') {
+                  val = row.null;
+                } else {
+                  val = row[h];
+                }
+                if (h === 'abstention' || h === 'X (no vote)') val = this.formatPercent(val);
                 if (val === undefined || val === null) val = '';
                 const safeVal = String(val).replace(/"/g, '""');
                 return `"${safeVal}"`;
@@ -750,8 +816,13 @@ export default {
               rows.forEach(row => {
                 table += '<tr>';
                 this.tableHeaders.forEach(h => {
-                  let val = row[h];
-                  if (h === 'abstention' || h === 'null') val = this.formatPercent(val);
+                  let val;
+                  if (h === 'X (no vote)') {
+                    val = row.null;
+                  } else {
+                    val = row[h];
+                  }
+                  if (h === 'abstention' || h === 'X (no vote)') val = this.formatPercent(val);
                   if (val === undefined || val === null) val = '';
                   table += `<td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${val}</td>`;
                 });
@@ -862,6 +933,14 @@ export default {
       const firstVersionRows = Object.values(versions)[0];
       if (!firstVersionRows || !firstVersionRows.length) return 0;
       return this.getVoteStats(firstVersionRows).totalUsers;
+    },
+    getAbstentionPercent(stats, voteStats) {
+      // Lógica igual ao discrepancy_automatic.vue: soma dos valores de stats.abstencao
+      if (stats && stats.abstencao && voteStats && voteStats.totalUsers > 0) {
+        const totalAbst = Object.values(stats.abstencao).reduce((a, b) => a + Number(b), 0);
+        return ((totalAbst / voteStats.totalUsers) * 100).toFixed(2) + '%';
+      }
+      return '0%';
     },
   }
 }

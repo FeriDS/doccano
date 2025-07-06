@@ -328,7 +328,7 @@ export default {
              this.filters.endDate || 
              this.filters.perspective || 
              this.filters.label.length > 0 || 
-             this.filters.resolved !== null ||
+             this.filters.resolved !== null || 
              Object.keys(this.filters.perspectiveValues).length > 0
     },
     activeFiltersCount() {

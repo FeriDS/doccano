@@ -158,7 +158,7 @@ class Segmentation(Label):
 
 class DatasetVersion(models.Model):
     example = models.ForeignKey(to=Example, on_delete=models.CASCADE, related_name="dataset_versions")
-    label = models.ForeignKey(to=CategoryType, on_delete=models.CASCADE)
+    label = models.ForeignKey(to=CategoryType, on_delete=models.CASCADE, null=True, blank=True)
     user = models.ForeignKey(to=User, on_delete=models.CASCADE)
     version = models.IntegerField(default=1, help_text="Version number of this dataset response")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -199,7 +199,10 @@ class DatasetVersion(models.Model):
         total = qs.count()
         labels = {}
         for dv in qs:
-            label_name = f'label_{dv.label.text}'
+            if dv.label is None:
+                label_name = 'abstencao'
+            else:
+                label_name = f'label_{dv.label.text}'
             labels[label_name] = labels.get(label_name, 0) + 1
         # Converter para percentagem com símbolo %
         percent_labels = {}
@@ -208,7 +211,7 @@ class DatasetVersion(models.Model):
         # NOVO: lista de votos
         votes = [
             {
-                "label": dv.label.text,
+                "label": dv.label.text if dv.label else None,
                 "user": dv.user.username,
                 "created_at": dv.created_at.isoformat()
             }
@@ -243,21 +246,29 @@ class DatasetVersion(models.Model):
         votes_by_user = {}
         for dv in qs.select_related('user', 'label'):
             uname = dv.user.username
-            label = dv.label.text.lower()
+            if dv.label is None:
+                label = None
+            else:
+                label = dv.label.text.lower()
             votes_by_user.setdefault(uname, []).append(label)
-        users_voted = set(votes_by_user.keys())
-        users_only_abstention = set(
+        # Usuários que votaram em pelo menos uma label regular
+        users_voted = set(
             uname for uname, labels in votes_by_user.items()
-            if all(lab in abstention_labels for lab in labels)
+            if any(lab is not None and lab not in abstention_labels for lab in labels)
+        )
+        # Usuários que votaram pelo menos uma vez em branco
+        users_with_abstention = set(
+            uname for uname, labels in votes_by_user.items()
+            if any(lab is None for lab in labels)
         )
         users_not_voted = usernames - users_voted
         return {
             'total_users': len(usernames),
-            'users_voted': len(users_voted - users_only_abstention),
-            'users_only_abstention': len(users_only_abstention),
+            'users_voted': len(users_voted),
+            'users_only_abstention': len(users_with_abstention),
             'users_not_voted': len(users_not_voted),
             'usernames': list(usernames),
-            'usernames_voted': list(users_voted - users_only_abstention),
-            'usernames_only_abstention': list(users_only_abstention),
+            'usernames_voted': list(users_voted),
+            'usernames_only_abstention': list(users_with_abstention),
             'usernames_not_voted': list(users_not_voted),
         }
