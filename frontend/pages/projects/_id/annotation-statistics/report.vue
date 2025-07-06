@@ -590,6 +590,15 @@ export default {
           const exampleName = this.exampleOptions.find(o => o.value === ex)?.text || `Example ${ex}`;
           if (!groupedData[exampleName]) groupedData[exampleName] = {};
           if (!groupedData[exampleName][ver]) groupedData[exampleName][ver] = [];
+
+          // Novo cálculo para null
+          const voteStats = this.getVoteStats([{ example: ex, version: ver }]);
+          let nullPercent = 0;
+          if (voteStats.totalUsers > 0) {
+            nullPercent = ((voteStats.totalUsers - voteStats.usersVoted) /
+               voteStats.totalUsers) * 100;
+          }
+
           groupedData[exampleName][ver].push({
             example: ex,
             version: ver,
@@ -600,7 +609,7 @@ export default {
             ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
             abstention: (stats.abstention !== undefined && 
               stats.abstention !== null) ? stats.abstention : 0,
-            null: (stats.null !== undefined && stats.null !== null) ? stats.null : 0
+            null: nullPercent.toFixed(2) + '%'
           });
         } catch {
           rows.push({
