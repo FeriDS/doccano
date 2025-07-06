@@ -271,6 +271,7 @@
 import { mdiArrowLeft } from '@mdi/js'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
+import user from '~/i18n/de/user'
 
 export default {
   name: 'AnnotationReportView',
@@ -598,31 +599,20 @@ export default {
               return true;
             });
           }
-          // Filtrar por perspectiva
-          if (
-            filteredVotes.length &&
-            this.perspectiveFields &&
-            Object.keys(this.filters.perspectiveValues).length > 0 &&
-            this.filteredPerspectiveUsers &&
-            this.filteredPerspectiveUsers.length > 0
-          ) {
-            const allowedUserIds = new Set(this.filteredPerspectiveUsers.map(u => u.id));
-            filteredVotes = filteredVotes.filter(
-              vote => allowedUserIds.has(vote.user) || allowedUserIds.has(vote.user_id)
-            );
-            filteredVotes = filteredVotes.filter(vote => {
-              const user = this.projectMembers.find(
-                  u => u.username === vote.user || u.id === vote.user || u.id === vote.user_id);
-              if (!user || !user.perspective) return false;
-              for (const [fieldId, value] of Object.entries(this.filters.perspectiveValues)) {
-                if (value && (!user.perspective[fieldId] || user.perspective[fieldId] !== value)) {
-                  return false;
-                }
-              }
-              return true;
-            });
-            console.log('Usuários considerados no relatório:', filteredVotes.map(v => v.user || v.user_id));
-          }
+          // Filtrar por perspectiva: só entram votos dos usuários filtrados (interseção)
+          const allowedUserIds = new Set(this.filteredPerspectiveUsers.map(u => u.id));
+          filteredVotes = filteredVotes.filter(
+            vote => allowedUserIds.has(vote.user) || allowedUserIds.has(vote.user_id)
+          );
+          // Log detalhado: usuários filtrados e suas respostas (sempre imprime, mesmo se vazio)
+          const userMap = {};
+          this.filteredPerspectiveUsers.forEach(u => { userMap[u.id] = { user: u, votes: [] }; });
+          filteredVotes.forEach(vote => {
+            const uid = allowedUserIds.has(vote.user) ? vote.user : vote.user_id;
+            if (userMap[uid]) userMap[uid].votes.push(vote);
+          });
+          console.log('DEBUG - Usuários filtrados (interseção das perspectivas):', this.filteredPerspectiveUsers);
+          console.log('DEBUG - Respostas dos usuários filtrados:', Object.values(userMap));
           // Se filtrou, recalcula os percentuais
           const labelCounts = {};
           const totalVotes = filteredVotes.length;
@@ -1204,12 +1194,13 @@ export default {
         this.filteredPerspectiveUsers = [];
         return;
       }
-      // FIXME: Forçando o ID correto do ProjectPerspective para teste
-      const projectPerspectiveId = 1;
+      // Corrigir para enviar o NOME do campo (field.name) como field_name
+      const projectPerspectiveId = this.projectPerspective?.id;
       // Se só um campo, lógica antiga
       if (perspectiveFieldEntries.length === 1) {
         const [fieldId, value] = perspectiveFieldEntries[0];
         const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+        // Enviar o nome do campo, não o id
         const fieldName = field ? field.name : fieldId;
         try {
           console.log('URL chamada:', '/api/v1/users_with_perspective_value/', {
@@ -1242,17 +1233,19 @@ export default {
         const userSets = [];
         for (const [fieldId, value] of perspectiveFieldEntries) {
           const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+          // Enviar o nome do campo, não o id
           const fieldName = field ? field.name : fieldId;
           console.log('URL chamada:', '/api/v1/users_with_perspective_value/', {
             project_perspective_id: projectPerspectiveId,
             field_name: fieldName,
-            value
+            value,
           });
           const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
             params: {
               project_perspective_id: projectPerspectiveId,
               field_name: fieldName,
-              value
+              value,
+              user
             }
           });
           let users = [];
@@ -1275,6 +1268,7 @@ export default {
           // Pegue todos os users do primeiro campo
           const firstField = perspectiveFieldEntries[0];
           const field = this.perspectiveFields.find(f => String(f.id) === String(firstField[0]));
+          // Enviar o nome do campo, não o id
           const fieldName = field ? field.name : firstField[0];
           const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
             params: {
