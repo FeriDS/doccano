@@ -566,7 +566,7 @@ class AnnotationStatisticsAPI(APIView):
         
         # Seção 1: Resumo Geral
         elements.append(Paragraph("Resumo Geral", styles['Heading2']))
-            elements.append(Spacer(1, 10))
+        elements.append(Spacer(1, 10))
         
         # Montar descrição dos filtros aplicados
         filtros = statistics_data.get('applied_filters', {})
@@ -1050,9 +1050,9 @@ class ExportStatisticsAPI(APIView):
             )
 
     def export_csv(self, request):
-            statistics_view = AnnotationStatisticsAPI()
-            statistics_view.kwargs = self.kwargs
-            statistics_data = statistics_view.get_statistics(request).data
+        statistics_view = AnnotationStatisticsAPI()
+        statistics_view.kwargs = self.kwargs
+        statistics_data = statistics_view.get_statistics(request).data
         screenExamples = request.data.get('screenExamples') if hasattr(request, 'data') else None
         return statistics_view.export_to_csv(statistics_data, screenExamples)
 
