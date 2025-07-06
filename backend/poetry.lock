@@ -3285,6 +3285,18 @@ files = [
 [package.extras]
 brotli = ["Brotli"]
 
+[[package]]
+name = "xlsxwriter"
+version = "3.2.5"
+description = "A Python module for creating Excel XLSX files."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "xlsxwriter-3.2.5-py3-none-any.whl", hash = "sha256:4f4824234e1eaf9d95df9a8fe974585ff91d0f5e3d3f12ace5b71e443c1c6abd"},
+    {file = "xlsxwriter-3.2.5.tar.gz", hash = "sha256:7e88469d607cdc920151c0ab3ce9cf1a83992d4b7bc730c5ffdd1a12115a7dbe"},
+]
+
 [extras]
 mssql = []
 postgresql = ["psycopg2-binary"]
@@ -3292,4 +3304,4 @@ postgresql = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "4a8bc15a31f7af86ba28402e79161579ad91d15e5dfdfb9322e01bf40c1fa889"
+content-hash = "ae033308e87d83f1146f4b8c26a1038e831924ddb2844038f4bd83dc08b4ef67"

@@ -22,22 +22,29 @@
           <v-icon left>mdi-file-pdf</v-icon>
           Exportar PDF
         </v-btn>
+        <v-btn color="info" :loading="exportingXLSX" class="mr-2" @click="exportXLSX">
+          <v-icon left>mdi-file-excel</v-icon>
+          Exportar XLSX
+        </v-btn>
       </v-col>
     </v-row>
-    <v-alert
-      type="info"
-      class="mb-4"
-      :value="true"
-    >
-      <strong>Nota:</strong> Apenas datasets finalizados 
-      são exibidos nesta página.
-      <br>
-      <strong>Total de datasets finalizados:</strong> {{ examples.length }}
-      <br>
-      <strong>Exportação:</strong> Os relatórios CSV e
-       PDF incluem a distribuição de labels por exemplo, 
-      totais de labels regulares vs non-voted, e estatísticas gerais do projeto.
-    </v-alert>
+          <v-alert
+        type="info"
+        class="mb-4"
+        :value="true"
+      >
+        <strong>Nota:</strong> Apenas datasets finalizados 
+        são exibidos nesta página.
+        <br>
+        <strong>Total de datasets finalizados:</strong> {{ examples.length }}
+        <br>
+        <strong>Exportação:</strong> 
+        <ul>
+          <li><strong>CSV:</strong> Dados tabulares com distribuição de labels por exemplo</li>
+          <li><strong>XLSX:</strong> Dados tabulares + gráficos visuais dos dados</li>
+          <li><strong>PDF:</strong> Relatório completo com gráficos e estatísticas detalhadas</li>
+        </ul>
+      </v-alert>
 
     <!-- Filtros -->
     <v-card class="mb-6">
@@ -301,7 +308,8 @@ export default {
       useLocalFiltering: false,
       allExamples: [], // Para armazenar todos os exemplos quando usar filtro local
       exportingCSV: false,
-      exportingPDF: false
+      exportingPDF: false,
+      exportingXLSX: false
     }
   },
 
@@ -335,6 +343,20 @@ export default {
     },
     filteredCategories() {
       return this.categories;
+    },
+    screenExamples() {
+      return this.examples.map(e => ({
+        id: e.id,
+        text: e.text,
+        labelsChartData: {
+          labels: this.labelsCharts[e.id]?.data.labels || [],
+          data: this.labelsCharts[e.id]?.data.datasets[0]?.data || []
+        },
+        abstractionChartData: {
+          labels: this.abstractionCharts[e.id]?.data.labels || [],
+          data: this.abstractionCharts[e.id]?.data.datasets[0]?.data || []
+        }
+      }));
     }
   },
 
@@ -1342,6 +1364,73 @@ export default {
       const perspective = this.perspectives.find(p => p.id === perspectiveId)
       console.log('Perspective:', perspective)
       return perspective && perspective.fields ? perspective.fields : []
+    },
+
+    async exportXLSX() {
+      this.exportingXLSX = true
+      try {
+        await this.$nextTick(); // Garante que os gráficos estejam renderizados
+        
+        // Capturar imagens dos gráficos para incluir no XLSX
+        const chartImages = {};
+        const blankImg = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2ZkAAAAASUVORK5CYII=';
+        
+        for (const example of this.examples) {
+          let labelsImg = null;
+          let abstractionImg = null;
+          
+          if (this.labelsCharts[example.id]) {
+            try {
+              labelsImg = this.labelsCharts[example.id].toBase64Image();
+            } catch (e) { 
+              labelsImg = null; 
+            }
+          }
+          
+          if (this.abstractionCharts[example.id]) {
+            try {
+              abstractionImg = this.abstractionCharts[example.id].toBase64Image();
+            } catch (e) { 
+              abstractionImg = null; 
+            }
+          }
+          
+          if (!labelsImg) labelsImg = blankImg;
+          if (!abstractionImg) abstractionImg = blankImg;
+          
+          chartImages[example.id] = {
+            labels: labelsImg,
+            abstraction: abstractionImg
+          };
+        }
+        
+        const params = this.buildExportParams();
+        const url = `/v1/projects/${this.projectId}/statistics/export/xlsx?${params}`;
+        const response = await this.$axios.post(url, { 
+          chartImages, 
+          screenExamples: this.screenExamples 
+        }, { responseType: 'blob' });
+        
+        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const link = document.createElement('a')
+        link.href = window.URL.createObjectURL(blob)
+        link.download = `estatisticas_por_texto_${this.projectId}_${new Date().toISOString().split('T')[0]}.xlsx`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(link.href)
+        
+        if (this.$toast && this.$toast.success) {
+          this.$toast.success('Relatório XLSX exportado com sucesso!')
+        }
+      } catch (error) {
+        console.error('Erro ao exportar XLSX:', error)
+        if (this.$toast && this.$toast.error) {
+          this.$toast.error('Erro ao exportar relatório XLSX')
+        }
+      } finally {
+        this.exportingXLSX = false
+      }
     }
   }
 }

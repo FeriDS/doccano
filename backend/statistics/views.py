@@ -14,6 +14,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import base64
 from django.http import HttpResponse
+import xlsxwriter
+import logging
 
 from examples.models import Example
 from labels.models import Category, Span, Relation
@@ -463,6 +465,8 @@ class AnnotationStatisticsAPI(APIView):
             return self.export_to_csv(statistics_data, screenExamples)
         elif export_format == 'pdf':
             return self.export_to_pdf(statistics_data, chartImages, screenExamples)
+        elif export_format == 'xlsx':
+            return self.export_to_xlsx(statistics_data, screenExamples, chartImages)
         else:
             return Response({"error": "Unsupported export format"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -711,6 +715,211 @@ class AnnotationStatisticsAPI(APIView):
             content_type='application/pdf'
         )
         response['Content-Disposition'] = 'attachment; filename=estatisticas_por_texto.pdf'
+        return response
+
+    def export_to_xlsx(self, statistics_data, screenExamples=None, chartImages=None):
+        import xlsxwriter
+        import io
+        import base64
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        
+        # DEBUG: logar chartImages recebido
+        print('DEBUG chartImages recebido no XLSX:', chartImages)
+        
+        # Formatações
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#4F81BD',
+            'font_color': 'white',
+            'border': 1,
+            'align': 'center'
+        })
+        
+        data_format = workbook.add_format({
+            'border': 1,
+            'align': 'left'
+        })
+        
+        percent_format = workbook.add_format({
+            'border': 1,
+            'align': 'right',
+            'num_format': '0.0%'
+        })
+        
+        # Planilha 1: Resumo Geral
+        ws1 = workbook.add_worksheet('Resumo')
+        ws1.set_column('A:A', 25)
+        ws1.set_column('B:B', 40)
+        
+        ws1.write('A1', 'Métrica', header_format)
+        ws1.write('B1', 'Valor', header_format)
+        
+        row = 1
+        ws1.write(row, 0, 'Total de Exemplos Finalizados', data_format)
+        ws1.write(row, 1, len(statistics_data.get("examples", [])), data_format)
+        
+        # Filtros aplicados
+        filtros = statistics_data.get('applied_filters', {})
+        filtros_strs = []
+        for k, v in filtros.items():
+            if v:
+                filtros_strs.append(f"{k}: {v}")
+        filtros_descr = '; '.join(filtros_strs) if filtros_strs else 'Nenhum filtro aplicado'
+        
+        row += 1
+        ws1.write(row, 0, 'Filtros Aplicados', data_format)
+        ws1.write(row, 1, filtros_descr, data_format)
+        
+        # Descobrir todas as labels possíveis (labels + abstenção/null)
+        all_labels = set()
+        all_abst_labels = set()
+        if screenExamples:
+            for ex in screenExamples:
+                labels_data = ex.get('labelsChartData', {})
+                abstraction_data = ex.get('abstractionChartData', {})
+                for l in labels_data.get('labels', []):
+                    all_labels.add(l)
+                for l in abstraction_data.get('labels', []):
+                    all_abst_labels.add(l)
+        all_labels = sorted(list(all_labels))
+        all_abst_labels = sorted(list(all_abst_labels))
+        all_possible_labels = all_labels + [l for l in all_abst_labels if l not in all_labels]
+
+        # Aba Exemplos: mostrar apenas labels existentes para cada exemplo, sem replicar texto
+        if screenExamples:
+            ws2 = workbook.add_worksheet('Exemplos')
+            ws2.set_column('A:A', 10)
+            ws2.set_column('B:B', 60)
+            ws2.set_column('C:C', 20)
+            ws2.set_column('D:D', 15)
+            ws2.write('A1', 'ID Exemplo', header_format)
+            ws2.write('B1', 'Texto', header_format)
+            ws2.write('C1', 'Label', header_format)
+            ws2.write('D1', 'Percentagem', header_format)
+            row = 1
+            for ex in screenExamples:
+                example_id = ex.get('id')
+                example_text = ex.get('text')
+                # Juntar labels e valores reais (labelsChartData + abstractionChartData)
+                labels = []
+                values = []
+                if ex.get('labelsChartData', {}):
+                    labels += ex['labelsChartData'].get('labels', [])
+                    values += ex['labelsChartData'].get('data', [])
+                if ex.get('abstractionChartData', {}):
+                    labels += ex['abstractionChartData'].get('labels', [])
+                    values += ex['abstractionChartData'].get('data', [])
+                # Mostrar apenas labels com valor > 0
+                first = True
+                for label, value in zip(labels, values):
+                    if value > 0:
+                        row += 1
+                        ws2.write(row, 0, example_id if first else '', data_format)
+                        ws2.write(row, 1, example_text if first else '', data_format)
+                        ws2.write(row, 2, label, data_format)
+                        ws2.write(row, 3, value / 100, percent_format)
+                        first = False
+
+        # Planilha 3: Gráficos (se chartImages for fornecido)
+        if chartImages:
+            ws3 = workbook.add_worksheet('Gráficos')
+            ws3.set_column('A:A', 15)  # ID do exemplo
+            ws3.set_column('B:B', 50)  # Descrição
+            ws3.set_column('C:C', 60)  # Gráfico Labels
+            ws3.set_column('G:G', 60)  # Gráfico Abstenção/Null
+            ws3.write('A1', 'ID Exemplo', header_format)
+            ws3.write('B1', 'Tipo de Gráfico', header_format)
+            ws3.write('C1', 'Labels', header_format)
+            ws3.write('G1', 'Abstenção/Null', header_format)
+            
+            row = 1
+            data_start_row = 1000  # Linha auxiliar para dados dos gráficos
+            for example_id, images in chartImages.items():
+                example = None
+                if screenExamples:
+                    for ex in screenExamples:
+                        if str(ex.get('id')) == str(example_id):
+                            example = ex
+                            break
+                if not example:
+                    continue
+                labels_data = example.get('labelsChartData', {})
+                abstraction_data = example.get('abstractionChartData', {})
+                reg_labels = labels_data.get('labels', [])
+                reg_values = labels_data.get('data', [])
+                abs_labels = abstraction_data.get('labels', [])
+                abs_values = abstraction_data.get('data', [])
+                # Gráfico 1: Labels regulares
+                chart1 = None
+                if reg_labels and reg_values:
+                    for i, label in enumerate(reg_labels):
+                        ws3.write(data_start_row + i, 0, label)
+                        ws3.write(data_start_row + i, 1, reg_values[i])
+                    chart1 = workbook.add_chart({'type': 'column'})
+                    chart1.add_series({
+                        'name': f'Labels - Exemplo {example_id}',
+                        'categories': ['Gráficos', data_start_row, 0, data_start_row + len(reg_labels) - 1, 0],
+                        'values':     ['Gráficos', data_start_row, 1, data_start_row + len(reg_labels) - 1, 1],
+                        'data_labels': {'value': True},
+                        'fill': {'color': '#42a5f5'},  # Azul
+                        'border': {'color': '#1976d2'},
+                    })
+                    chart1.set_title({'name': f'Distribuição de Labels - Exemplo {example_id}'})
+                    chart1.set_x_axis({'name': 'Label'})
+                    chart1.set_y_axis({'name': 'Percentual (%)', 'min': 0, 'max': 100})
+                    chart1.set_legend({'none': True})
+                # Gráfico 2: Abstenção/Null (sempre inserir, mesmo vazio)
+                chart2 = workbook.add_chart({'type': 'column'})
+                if abs_labels and abs_values:
+                    for i, label in enumerate(abs_labels):
+                        ws3.write(data_start_row + 10 + i, 0, label)
+                        ws3.write(data_start_row + 10 + i, 1, abs_values[i])
+                    chart2.add_series({
+                        'name': f'Abstenção/Null - Exemplo {example_id}',
+                        'categories': ['Gráficos', data_start_row + 10, 0, data_start_row + 10 + len(abs_labels) - 1, 0],
+                        'values':     ['Gráficos', data_start_row + 10, 1, data_start_row + 10 + len(abs_labels) - 1, 1],
+                        'data_labels': {'value': True},
+                        'fill': {'color': '#ec407a'},  # Rosa
+                        'border': {'color': '#ad1457'},
+                    })
+                else:
+                    # Adiciona série dummy para evitar erro EmptyChartSeries
+                    ws3.write(data_start_row + 10, 0, "Sem dados")
+                    ws3.write(data_start_row + 10, 1, 0)
+                    chart2.add_series({
+                        'name': f'Abstenção/Null - Exemplo {example_id}',
+                        'categories': ['Gráficos', data_start_row + 10, 0, data_start_row + 10, 0],
+                        'values':     ['Gráficos', data_start_row + 10, 1, data_start_row + 10, 1],
+                        'data_labels': {'value': True},
+                        'fill': {'color': '#ec407a'},
+                        'border': {'color': '#ad1457'},
+                    })
+                # Mesmo sem dados, configurar título e eixos
+                chart2.set_title({'name': f'Abstenção e Null - Exemplo {example_id}'})
+                chart2.set_x_axis({'name': 'Non Voted'})
+                chart2.set_y_axis({'name': 'Percentual (%)', 'min': 0, 'max': 100})
+                chart2.set_legend({'none': True})
+                # Inserir ambos na mesma linha, lado a lado
+                row += 1
+                ws3.write(row, 0, example_id, data_format)
+                ws3.write(row, 1, 'Distribuição de Labels', data_format)
+                if chart1:
+                    ws3.insert_chart(row, 2, chart1, {'x_offset': 0, 'y_offset': 0})
+                ws3.insert_chart(row, 6, chart2, {'x_offset': 0, 'y_offset': 0})
+                data_start_row += 30
+                row += 20
+        else:
+            ws3 = workbook.add_worksheet('Gráficos')
+            ws3.write('A1', 'Nenhum dado recebido para gráficos', data_format)
+        
+        workbook.close()
+        output.seek(0)
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename=estatisticas_por_texto.xlsx'
         return response
 
     @action(detail=True, methods=['get'])
@@ -1043,9 +1252,11 @@ class ExportStatisticsAPI(APIView):
             return self.export_csv(request)
         elif path.endswith('/pdf'):
             return self.export_pdf(request)
+        elif path.endswith('/xlsx'):
+            return self.export_xlsx(request)
         else:
             return Response(
-                {"error": "Formato de exportação não especificado. Use /csv ou /pdf"},
+                {"error": "Formato de exportação não especificado. Use /csv, /pdf ou /xlsx"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1069,6 +1280,14 @@ class ExportStatisticsAPI(APIView):
                 {"error": f"Erro ao exportar PDF: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    def export_xlsx(self, request):
+        statistics_view = AnnotationStatisticsAPI()
+        statistics_view.kwargs = self.kwargs
+        statistics_data = statistics_view.get_statistics(request).data
+        chartImages = request.data.get('chartImages') if request.method == 'POST' else None
+        screenExamples = request.data.get('screenExamples') if request.method == 'POST' else None
+        return statistics_view.export_to_xlsx(statistics_data, screenExamples, chartImages)
 
     def post(self, request, *args, **kwargs):
         """
