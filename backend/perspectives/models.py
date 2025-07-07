@@ -105,3 +105,18 @@ class UserPerspectiveAnswer(models.Model):
     def save(self, *args, **kwargs):
         self.is_complete = self.validate_field_values()
         super().save(*args, **kwargs)
+
+def get_users_with_perspective_value(project_perspective, field_name, value):
+    """
+    Retorna uma lista de usuários que têm o valor 'value' no campo 'field_name'
+    para o ProjectPerspective informado.
+    """
+    answers = UserPerspectiveAnswer.objects.filter(
+        project_perspective=project_perspective,
+        is_complete=True
+    )
+    users = []
+    for answer in answers:
+        if answer.field_values.get(field_name) == value:
+            users.append(answer.user)
+    return users

@@ -249,7 +249,7 @@ class DatasetVersion(models.Model):
             if dv.label is None:
                 label = None
             else:
-                label = dv.label.text.lower()
+             label = dv.label.text.lower()
             votes_by_user.setdefault(uname, []).append(label)
         # Usuários que votaram em pelo menos uma label regular
         users_voted = set(

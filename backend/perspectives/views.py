@@ -6,7 +6,7 @@ from rest_framework.renderers import JSONRenderer
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from projects.permissions import IsProjectMember
-from .models import Perspective, PerspectiveField, ProjectPerspective, UserPerspectiveAnswer
+from .models import Perspective, PerspectiveField, ProjectPerspective, UserPerspectiveAnswer, get_users_with_perspective_value
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 
@@ -197,3 +197,27 @@ class UserPerspectiveAnswerViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def users_with_perspective_value(request):
+    """
+    Endpoint para retornar usuários que têm um valor específico em um campo de perspectiva.
+    Parâmetros esperados (GET):
+      - project_perspective_id: ID do ProjectPerspective
+      - field_name: nome do campo
+      - value: valor a ser filtrado
+    """
+    project_perspective_id = request.GET.get('project_perspective_id')
+    field_name = request.GET.get('field_name')
+    value = request.GET.get('value')
+    if not (project_perspective_id and field_name and value):
+        return Response({'error': 'project_perspective_id, field_name e value são obrigatórios.'}, status=400)
+    try:
+        project_perspective = ProjectPerspective.objects.get(id=project_perspective_id)
+    except ProjectPerspective.DoesNotExist:
+        return Response({'error': 'ProjectPerspective não encontrado.'}, status=404)
+    users = get_users_with_perspective_value(project_perspective, field_name, value)
+    # Retornar lista de usernames e ids
+    data = [{'id': u.id, 'username': u.username} for u in users]
+    return Response({'users': data})

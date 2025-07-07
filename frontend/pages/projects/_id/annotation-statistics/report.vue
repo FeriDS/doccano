@@ -66,8 +66,6 @@
                       v-model="filters.perspectiveValues[field.id]"
                       :items="field.choices"
                       :label="field.name"
-                      multiple
-                      chips
                       clearable
                       color="primary"
                       class="mb-4"
@@ -226,31 +224,34 @@
                   <div class="text-body-1">
                     Users that voted: {{ getVoteStats(rows).usersVoted }}
                   </div>
+                  <div class="text-body-2" style="color: #1976d2;">
+                    <span v-if="getFilteredUsernames(rows).length">Filtered users:
+                     {{ getFilteredUsernames(rows).join(', ') }}</span>
+                  </div>
                 </div>
-        <v-simple-table>
-          <thead>
-            <tr>
-              <th v-for="header in tableHeaders" :key="header">
-                {{ header === 'X (no vote)' ? 'X (no vote)' : 
-                  (header === 'abstention' ? 'Abstention' : header) }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-                    <tr v-for="(row, idx) in rows" 
-                      :key="idx">
+                <v-simple-table>
+                  <thead>
+                    <tr>
+                      <th v-for="header in tableHeaders" :key="header">
+                        {{ header === 'X (no vote)' ? 'X (no vote)' : 
+                          (header === 'abstention' ? 'Abstention' : header) }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, idx) in rows" :key="idx">
                       <td v-for="header in tableHeaders" :key="header"
                         :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
                         <template v-if="header === 'abstention' || header === 'X (no vote)'">
                           {{ formatPercent(row[header === 'X (no vote)' ? 'null' : header]) }}
                         </template>
                         <template v-else>
-                {{ row[header] }}
+                          {{ row[header] }}
                         </template>
-              </td>
-            </tr>
-          </tbody>
-        </v-simple-table>
+                      </td>
+                    </tr>
+                  </tbody>
+                </v-simple-table>
               </div>
             </div>
           </v-card>
@@ -270,6 +271,7 @@
 import { mdiArrowLeft } from '@mdi/js'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
+import user from '~/i18n/de/user'
 
 export default {
   name: 'AnnotationReportView',
@@ -312,6 +314,7 @@ export default {
       exportingCSV: false,
       exportingPDF: false,
       voteStatsByExampleVersion: {},
+      filteredPerspectiveUsers: [],
     }
   },
   computed: {
@@ -352,7 +355,25 @@ export default {
     },
     'filters.versions'() {
       if (this.filters.versions.length) this.fetchPerspectives()
-    }
+    },
+    'filters.perspectiveValues': {
+      deep: true,
+      handler() {
+        this.fetchFilteredPerspectiveUsers();
+        // Filtrar diretamente os membros do projeto pelos valores dos campos de perspectiva
+        if (!this.projectMembers || !Object.keys(this.filters.perspectiveValues).length) return;
+        const filteredUsers = this.projectMembers.filter(member => {
+          if (!member.perspective) return false;
+          for (const [fieldId, value] of Object.entries(this.filters.perspectiveValues)) {
+            if (value && (!member.perspective[fieldId] || member.perspective[fieldId] !== value)) {
+              return false;
+            }
+          }
+          return true;
+        }).map(u => u.username || u.id);
+        console.log('Utilizadores filtrados por perspectiva (após seleção):', filteredUsers);
+      }
+    },
   },
   mounted() {
     this.fetchExamples()
@@ -366,6 +387,17 @@ export default {
         const { items } = await this.$services.example.list(this.$route.params.id, {})
         this.exampleOptions = items
           .filter(ex => ex.is_finished)
+          // Filtro por data de início e fim
+          .filter(ex => {
+            let pass = true;
+            if (this.filters.startDate && ex.annotation_start_date) {
+              pass = pass && (ex.annotation_start_date >= this.filters.startDate);
+            }
+            if (this.filters.endDate && ex.annotation_end_date) {
+              pass = pass && (ex.annotation_end_date <= this.filters.endDate);
+            }
+            return pass;
+          })
           .map(ex => ({
             text: ex.name || ex.content || ex.title || ex.text || `Example ${ex.id}`,
             value: ex.id
@@ -382,7 +414,6 @@ export default {
         const projectId = this.$route.params.id
         const calls = exampleIds.map(id =>
           this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${id}/versions/`).then(res => {
-            console.log(`Versões recebidas para example ${id}:`, res)
             return { id, res }
           })
         )
@@ -391,7 +422,20 @@ export default {
 
         for (const { id, res } of results) {
           const raw = Array.isArray(res.versions) ? res.versions : []
-          const vals = raw.map(v => +v).filter(n => Number.isFinite(n))
+          let filteredVersions = raw
+          if (raw.length && typeof raw[0] === 'object' && (raw[0].created_at || raw[0].annotation_start_date)) {
+            filteredVersions = raw.filter(v => {
+              let pass = true
+              if (this.filters.startDate && v.annotation_start_date) {
+                pass = pass && (v.annotation_start_date >= this.filters.startDate)
+              }
+              if (this.filters.endDate && v.annotation_end_date) {
+                pass = pass && (v.annotation_end_date <= this.filters.endDate)
+              }
+              return pass
+            })
+          }
+          const vals = filteredVersions.map(v => v.version || v).filter(n => Number.isFinite(n))
           this.versionsByExample[id] = vals
 
           const exampleLabel = this.exampleOptions.find(o => o.value === id)?.text || `Example ${id}`
@@ -403,10 +447,8 @@ export default {
           }
         }
 
-        console.log('Objeto versionsByExample final:', this.versionsByExample)
         this.versionOptions = versionOptions
       } catch (e) {
-        console.error('Erro ao buscar versões:', e)
         this.versionOptions = []
       } finally {
         this.loading.versions = false
@@ -444,6 +486,21 @@ export default {
       }
     },
     async fetchReport() {
+      // Aguarde a atualização dos usuários filtrados, se houver filtro de perspectiva
+      if (Object.keys(this.filters.perspectiveValues).length > 0) {
+        await this.fetchFilteredPerspectiveUsers();
+        await this.$nextTick();
+      }
+      // Lógica de geração do relatório (original)
+      await this._generateReportCore();
+      // Chame novamente para garantir atualização total
+      if (Object.keys(this.filters.perspectiveValues).length > 0) {
+        await this.fetchFilteredPerspectiveUsers();
+        await this.$nextTick();
+      }
+      await this._generateReportCore();
+    },
+    async _generateReportCore() {
       let { examples } = this.filters;
       const { versions, perspective, perspectiveValues } = this.filters;
       // Se nenhum exemplo for selecionado, usar todos os exemplos disponíveis
@@ -497,10 +554,32 @@ export default {
           if (this.filters.endDate) params.end_date = this.filters.endDate;
           stats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/stats/`, { params })
 
+          // Filtrar votos por data para decidir se a versão deve aparecer
+          let votesInRange = stats.votes || [];
+          if (votesInRange.length && (this.filters.startDate || this.filters.endDate)) {
+            const start = this.filters.startDate ? new Date(this.filters.startDate) : null;
+            const end = this.filters.endDate ? new Date(this.filters.endDate) : null;
+            votesInRange = votesInRange.filter(vote => {
+              const voteDate = new Date(vote.created_at);
+              if (start && voteDate < start) return false;
+              if (end && voteDate > end) return false;
+              return true;
+            });
+          }
+          // Só adiciona a versão se houver pelo menos um voto no intervalo
+          if (!votesInRange.length) continue;
+
           // NOVO: buscar estatísticas de votação do backend
           let votingStats = {};
           try {
-            votingStats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/voting-user-stats/`, { params });
+            // Remover filtros perspective_* para voting-user-stats
+            const votingStatsParams = { ...params };
+            Object.keys(votingStatsParams).forEach(key => {
+              if (key.startsWith('perspective_')) {
+                delete votingStatsParams[key];
+              }
+            });
+            votingStats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/voting-user-stats/`, { params: votingStatsParams });
             console.log('votingStats', votingStats);
           } catch (e) {
             votingStats = {};
@@ -520,26 +599,20 @@ export default {
               return true;
             });
           }
-          // Filtrar por perspectiva
-          if (filteredVotes.length && this.perspectiveFields 
-            && Object.keys(this.filters.perspectiveValues).length > 0) {
-            filteredVotes = filteredVotes.filter(vote => {
-              const member = this.projectMembers.find(
-                  u => u.username === vote.user || u.id === vote.user || u.id === vote.user_id);
-              if (!member || !member.perspective) return false;
-              // Checar todos os campos de perspectiva filtrados
-              return Object.entries(this.filters.perspectiveValues).every(([fieldId, value]) => {
-                if (!value) return true;
-                const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
-                if (!field) return true;
-                const memberValue = member.perspective[field.name] || member.perspective[fieldId];
-                if (Array.isArray(value)) {
-                  return value.includes(memberValue);
-                }
-                return memberValue === value;
-              });
-            });
-          }
+          // Filtrar por perspectiva: só entram votos dos usuários filtrados (interseção)
+          const allowedUserIds = new Set(this.filteredPerspectiveUsers.map(u => u.id));
+          filteredVotes = filteredVotes.filter(
+            vote => allowedUserIds.has(vote.user) || allowedUserIds.has(vote.user_id)
+          );
+          // Log detalhado: usuários filtrados e suas respostas (sempre imprime, mesmo se vazio)
+          const userMap = {};
+          this.filteredPerspectiveUsers.forEach(u => { userMap[u.id] = { user: u, votes: [] }; });
+          filteredVotes.forEach(vote => {
+            const uid = allowedUserIds.has(vote.user) ? vote.user : vote.user_id;
+            if (userMap[uid]) userMap[uid].votes.push(vote);
+          });
+          console.log('DEBUG - Usuários filtrados (interseção das perspectivas):', this.filteredPerspectiveUsers);
+          console.log('DEBUG - Respostas dos usuários filtrados:', Object.values(userMap));
           // Se filtrou, recalcula os percentuais
           const labelCounts = {};
           const totalVotes = filteredVotes.length;
@@ -572,12 +645,16 @@ export default {
             if (k.startsWith('label_')) allLabels.add(k)
           })
           // Preencher os campos de perspectiva na linha
-          const perspectiveData = {}
-          allPerspectiveFields.forEach(field => {
-            perspectiveData[field] = stats.perspective_fields ? stats.perspective_fields[field] : ''
-          })
+          const perspectiveData = {};
+          this.tableHeaders.forEach(header => {
+            const field = this.perspectiveFields.find(
+              f => f.name === header || String(f.id) === String(header));
+            if (field && this.filters.perspectiveValues[field.id]) {
+              perspectiveData[header] = this.filters.perspectiveValues[field.id];
+            }
+          });
           const labelData = {}
-          const labelHeaders = allLabels;
+          const labelHeaders = Array.from(allLabels)
           labelHeaders.forEach((label) => {
             let val = stats[label];
             if (!val || val === '0%' || val === 0) val = '0%';
@@ -634,13 +711,12 @@ export default {
       allPerspectiveFields = [...new Set(allPerspectiveFields)]
       allLabels = Array.from(allLabels)
       // Determinar os campos de perspectiva filtrados
-      const filteredPerspectiveFields = 
-        Object.keys(perspectiveValues).filter(k => perspectiveValues[k])
-      // Mapear ids para nomes amigáveis
+      const filteredPerspectiveFields = Object.keys(
+          this.filters.perspectiveValues).filter(k => this.filters.perspectiveValues[k]);
       const perspectiveFieldHeaders = filteredPerspectiveFields.map(id => {
-        const field = this.perspectiveFields.find(f => String(f.id) === String(id))
-        return field ? field.name : id
-      })
+        const field = this.perspectiveFields.find(f => String(f.id) === String(id));
+        return field ? field.name : id;
+      });
       // Determinar labels a exibir: todos ou apenas os escolhidos
       let labelHeaders = allLabels;
       if (this.filters.category && this.filters.category.length > 0) {
@@ -656,6 +732,12 @@ export default {
       }
       // Remover o label 'null' dos headers dinâmicos para evitar coluna duplicada
       labelHeaders = labelHeaders.filter(lab => lab.replace(/^label_/, '').toLowerCase() !== 'null');
+      // Ordenar alfabeticamente pelo nome amigável
+      labelHeaders = labelHeaders.sort((a, b) => {
+        const nameA = a.replace(/^label_/, '').toLowerCase();
+        const nameB = b.replace(/^label_/, '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
       // Montar nomes amigáveis para os labels nas colunas
       const labelColumnNames = labelHeaders.map(lab => lab.replace(/^label_/, ''));
       const tableHeaders = [
@@ -687,7 +769,7 @@ export default {
     },
     getTotalLabels(rows) {
       // Soma os percentuais das labels regulares (exclui 'abstention' e 'null')
-      if (!rows || !rows.length) return '0.0';
+      if (!Array.isArray(rows) || !rows.length) return '0.0';
       const labelKeys = this.tableHeaders.filter(h => h !== 'abstention' && h !== 'null' && h !== 'Status' && h !== 'Begin Date' && h !== 'End Date');
       let total = 0;
       for (const row of rows) {
@@ -701,7 +783,7 @@ export default {
     },
     getTotalAbstentionNull(rows) {
       // Soma os percentuais das colunas 'abstention' e 'null'
-      if (!rows || !rows.length) return '0.0';
+      if (!Array.isArray(rows) || !rows.length) return '0.0';
       let total = 0;
       for (const row of rows) {
         ['abstention', 'null'].forEach(key => {
@@ -737,6 +819,78 @@ export default {
         // Geração de CSV a partir dos dados do frontend
         const headers = this.tableHeaders;
         let csv = '';
+        // Descrição dos filtros
+        let filterDesc = '';
+        if (this.hasActiveFilters) {
+          filterDesc = 'Filters applied: ';
+          const parts = [];
+          // Examples nomes
+          if (this.filters.examples && this.filters.examples.length) {
+            const exampleNames = this.exampleOptions
+              .filter(opt => this.filters.examples.includes(opt.value))
+              .map(opt => opt.text)
+              .join(', ');
+            parts.push(`Examples: ${exampleNames}`);
+          }
+          // Versions nomes
+          if (this.filters.versions && this.filters.versions.length) {
+            const versionNames = this.versionOptions
+              .filter(opt => this.filters.versions.includes(opt.value))
+              .map(opt => opt.text || opt.header)
+              .join(', ');
+            parts.push(`Versions: ${versionNames}`);
+          }
+          // Categories nomes
+          if (this.filters.category && this.filters.category.length) {
+            const catNames = this.categoryOptions
+              .filter(opt => this.filters.category.includes(opt.value))
+              .map(opt => opt.text)
+              .join(', ');
+            parts.push(`Labels: ${catNames}`);
+          }
+          // Status nome
+          if (this.filters.status !== null && this.filters.status !== undefined) {
+            const statusName = (this.statusOptions.find(
+              opt => opt.value === this.filters.status) || {}).text || this.filters.status;
+            parts.push(`Status: ${statusName}`);
+          }
+          if (this.filters.startDate) parts.push(`Start Date: ${this.filters.startDate}`);
+          if (this.filters.endDate) parts.push(`End Date: ${this.filters.endDate}`);
+          // Perspective nome
+          if (this.filters.perspective) {
+            const perspName = (this.perspectives.find(
+              p => p.id === this.filters.perspective) || {}).name || this.filters.perspective;
+            parts.push(`Perspective: ${perspName}`);
+          }
+          // Perspective Values nomes
+          if (this.filters.perspectiveValues &&
+             Object.keys(this.filters.perspectiveValues).length) {
+            const pvParts = Object.entries(this.filters.perspectiveValues).map(([fid, val]) => {
+              const field = this.perspectiveFields.find(f => String(f.id) === String(fid));
+              const label = field ? field.name : fid;
+              let valueLabel = val;
+              if (field && field.choices && Array.isArray(val)) {
+                valueLabel = val.map(v => {
+                  const choice = field.choices.find(
+                    c => c === v || (c.value !== undefined && c.value === v));
+                  return choice && choice.text ? choice.text : v;
+                }).join(', ');
+              } else if (field && field.choices) {
+                const choice = field.choices.find(
+                  c => c === val || (c.value !== undefined && c.value === val));
+                valueLabel = choice && choice.text ? choice.text : val;
+              }
+              return `${label}: ${valueLabel}`;
+            });
+            parts.push(`Perspective Values: ${pvParts.join(' | ')}`);
+          }
+          filterDesc += parts.join(' | ');
+        } else {
+          filterDesc = 'No filters applied. Showing all perspectives and options.';
+        }
+        csv += `"${filterDesc}"
+
+`;
         // Para cada exemplo
         Object.entries(this.reportData).forEach(([exampleName, versions]) => {
           // Total de usuários por exemplo
@@ -747,6 +901,12 @@ export default {
             // Cabeçalho de bloco
             csv += `"Version ${version}";"Users that voted: ${this.getVoteStats(rows).usersVoted}"
 `;
+            // Adicionar lista de usuários filtrados
+            const filteredUsers = this.getFilteredUsernames(rows);
+            if (filteredUsers.length) {
+              csv += `"Filtered users: ${filteredUsers.join(', ')}"
+`;
+            }
             // Cabeçalho de colunas (apenas uma vez por bloco)
             csv += headers.map(h => `"${h}"`).join(';') + '\n';
             // Dados (apenas uma vez por linha)
@@ -795,6 +955,77 @@ export default {
           container.style.fontFamily = 'sans-serif';
           container.innerHTML = '';
 
+          // Descrição dos filtros
+          let filterDesc = '';
+          if (this.hasActiveFilters) {
+            filterDesc = '<div style="font-weight:bold;margin-bottom:12px;">Filters applied: ';
+            const parts = [];
+            // Examples nomes
+            if (this.filters.examples && this.filters.examples.length) {
+              const exampleNames = this.exampleOptions
+                .filter(opt => this.filters.examples.includes(opt.value))
+                .map(opt => opt.text)
+                .join(', ');
+              parts.push(`Examples: ${exampleNames}`);
+            }
+            // Versions nomes
+            if (this.filters.versions && this.filters.versions.length) {
+              const versionNames = this.versionOptions
+                .filter(opt => this.filters.versions.includes(opt.value))
+                .map(opt => opt.text || opt.header)
+                .join(', ');
+              parts.push(`Versions: ${versionNames}`);
+            }
+            // Categories nomes
+            if (this.filters.category && this.filters.category.length) {
+              const catNames = this.categoryOptions
+                .filter(opt => this.filters.category.includes(opt.value))
+                .map(opt => opt.text)
+                .join(', ');
+              parts.push(`Labels: ${catNames}`);
+            }
+            // Status nome
+            if (this.filters.status !== null && this.filters.status !== undefined) {
+              const statusName = (this.statusOptions.find(
+                opt => opt.value === this.filters.status) || {}).text || this.filters.status;
+              parts.push(`Status: ${statusName}`);
+            }
+            if (this.filters.startDate) parts.push(`Start Date: ${this.filters.startDate}`);
+            if (this.filters.endDate) parts.push(`End Date: ${this.filters.endDate}`);
+            // Perspective nome
+            if (this.filters.perspective) {
+              const perspName = (this.perspectives.find(
+                  p => p.id === this.filters.perspective) || {}).name || this.filters.perspective;
+              parts.push(`Perspective: ${perspName}`);
+            }
+            // Perspective Values nomes
+            if (this.filters.perspectiveValues &&
+               Object.keys(this.filters.perspectiveValues).length) {
+              const pvParts = Object.entries(this.filters.perspectiveValues).map(([fid, val]) => {
+                const field = this.perspectiveFields.find(f => String(f.id) === String(fid));
+                const label = field ? field.name : fid;
+                let valueLabel = val;
+                if (field && field.choices && Array.isArray(val)) {
+                  valueLabel = val.map(v => {
+                    const choice = field.choices.find(
+                      c => c === v || (c.value !== undefined && c.value === v));
+                    return choice && choice.text ? choice.text : v;
+                  }).join(', ');
+                } else if (field && field.choices) {
+                  const choice = field.choices.find(
+                    c => c === val || (c.value !== undefined && c.value === val));
+                  valueLabel = choice && choice.text ? choice.text : val;
+                }
+                return `${label}: ${valueLabel}`;
+              });
+              parts.push(`Perspective Values: ${pvParts.join(' | ')}`);
+            }
+            filterDesc += parts.join(' | ') + '</div>';
+          } else {
+            filterDesc = '<div style="font-weight:bold;margin-bottom:12px;">No filters applied. Showing all perspectives and options.</div>';
+          }
+          container.innerHTML += filterDesc;
+
           Object.entries(this.reportData).forEach(([exampleName, versions]) => {
             const totalUsers = this.getExampleTotalUsers(versions);
             container.innerHTML += `<h2 style="color:#1976d2;">${exampleName}</h2>`;
@@ -804,7 +1035,11 @@ export default {
               container.innerHTML += `<div style="border:1px solid #eee;border-radius:6px;padding:12px 8px;margin-bottom:16px;">`;
               container.innerHTML += `<h3 style="color:#333;">Version ${version}</h3>`;
               container.innerHTML += `<div style="margin-bottom:8px;font-weight:bold;">Users that voted: ${this.getVoteStats(rows).usersVoted}</div>`;
-
+              // Adicionar lista de usuários filtrados
+              const filteredUsers = this.getFilteredUsernames(rows);
+              if (filteredUsers.length) {
+                container.innerHTML += `<div style='margin-bottom:8px;font-weight:bold;color:#1976d2;'>Filtered users: ${filteredUsers.join(', ')}</div>`;
+              }
               // tabela
               let table = '<table style="border-collapse:collapse;width:100%;margin-top:12px;">';
               table += '<thead><tr>';
@@ -898,7 +1133,29 @@ export default {
     },
     // Calcula estatísticas de votos/abstenção/null por versão
     getVoteStats(rows) {
-    if (!rows || !rows.length)
+      if (!Array.isArray(rows) || !rows.length)
+        return {
+          totalUsers: 0,
+          usersVoted: 0,
+          usersNotVoted: 0,
+          usersOnlyAbstention: 0,
+          totalVotes: 0
+        };
+      const row = rows[0];
+      const key = row && row.example !== undefined && row.version !== undefined
+        ? `${row.example}:${row.version}`
+        : null;
+      if (key && this.voteStatsByExampleVersion && this.voteStatsByExampleVersion[key]) {
+        const stats = this.voteStatsByExampleVersion[key];
+        return {
+          totalUsers: stats.total_users || 0,
+          usersVoted: stats.users_voted || 0,
+          usersNotVoted: stats.users_not_voted || 0,
+          usersOnlyAbstention: stats.users_only_abstention || 0,
+          totalVotes: row.total || 0
+        };
+      }
+      // fallback antigo
       return {
         totalUsers: 0,
         usersVoted: 0,
@@ -906,32 +1163,10 @@ export default {
         usersOnlyAbstention: 0,
         totalVotes: 0
       };
-    const row = rows[0];
-    const key = row && row.example !== undefined && row.version !== undefined
-      ? `${row.example}:${row.version}`
-      : null;
-    if (key && this.voteStatsByExampleVersion && this.voteStatsByExampleVersion[key]) {
-      const stats = this.voteStatsByExampleVersion[key];
-      return {
-        totalUsers: stats.total_users || 0,
-        usersVoted: stats.users_voted || 0,
-        usersNotVoted: stats.users_not_voted || 0,
-        usersOnlyAbstention: stats.users_only_abstention || 0,
-        totalVotes: row.total || 0
-      };
-    }
-    // fallback antigo
-    return {
-      totalUsers: 0,
-      usersVoted: 0,
-      usersNotVoted: 0,
-      usersOnlyAbstention: 0,
-      totalVotes: 0
-    };
-  },
+    },
     getExampleTotalUsers(versions) {
       const firstVersionRows = Object.values(versions)[0];
-      if (!firstVersionRows || !firstVersionRows.length) return 0;
+      if (!Array.isArray(firstVersionRows) || !firstVersionRows.length) return 0;
       return this.getVoteStats(firstVersionRows).totalUsers;
     },
     getAbstentionPercent(stats, voteStats) {
@@ -941,6 +1176,126 @@ export default {
         return ((totalAbst / voteStats.totalUsers) * 100).toFixed(2) + '%';
       }
       return '0%';
+    },
+    getFilteredUsernames(rows) {
+      // Retorna a lista de usernames dos votos filtrados (sem duplicatas)
+      if (!Array.isArray(rows) || !rows.length) return [];
+      const usernames = new Set();
+      rows.forEach(row => {
+        if (row.votes && Array.isArray(row.votes)) {
+          row.votes.forEach(vote => {
+            if (vote.user) usernames.add(vote.user);
+          });
+        } else if (row.user) {
+          usernames.add(row.user);
+        }
+      });
+      return Array.from(usernames);
+    },
+    async fetchFilteredPerspectiveUsers() {
+      // Só busca se houver filtro ativo
+      const perspectiveFieldEntries = 
+        Object.entries(this.filters.perspectiveValues).filter(([_, v]) => v);
+      if (!this.projectPerspective || !perspectiveFieldEntries.length) {
+        this.filteredPerspectiveUsers = [];
+        return;
+      }
+      // Corrigir para enviar o NOME do campo (field.name) como field_name
+      const projectPerspectiveId = this.projectPerspective?.id;
+      // Se só um campo, lógica antiga
+      if (perspectiveFieldEntries.length === 1) {
+        const [fieldId, value] = perspectiveFieldEntries[0];
+        const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+        // Enviar o nome do campo, não o id
+        const fieldName = field ? field.name : fieldId;
+        try {
+          console.log('URL chamada:', '/api/v1/users_with_perspective_value/', {
+            project_perspective_id: projectPerspectiveId,
+            field_name: fieldName,
+            value
+          });
+          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
+            params: {
+              project_perspective_id: projectPerspectiveId,
+              field_name: fieldName,
+              value
+            }
+          });
+          let users = [];
+          if (Array.isArray(response)) {
+            users = response;
+          } else if (response && Array.isArray(response.users)) {
+            users = response.users;
+          }
+          this.filteredPerspectiveUsers = users;
+          console.log('Usuários filtrados pelo backend:', users);
+        } catch (e) {
+          this.filteredPerspectiveUsers = [];
+        }
+        return;
+      }
+      // Múltiplos campos: buscar todos e fazer interseção
+      try {
+        const userSets = [];
+        for (const [fieldId, value] of perspectiveFieldEntries) {
+          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+          // Enviar o nome do campo, não o id
+          const fieldName = field ? field.name : fieldId;
+          console.log('URL chamada:', '/api/v1/users_with_perspective_value/', {
+            project_perspective_id: projectPerspectiveId,
+            field_name: fieldName,
+            value,
+          });
+          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
+            params: {
+              project_perspective_id: projectPerspectiveId,
+              field_name: fieldName,
+              value,
+              user
+            }
+          });
+          let users = [];
+          if (Array.isArray(response)) {
+            users = response;
+          } else if (response && Array.isArray(response.users)) {
+            users = response.users;
+          }
+          userSets.push(new Set(users.map(u => u.id)));
+        }
+        // Interseção dos conjuntos
+        const filteredUserIds = userSets.reduce((acc, set) => {
+          if (acc === null) return set;
+          return new Set([...acc].filter(x => set.has(x)));
+        }, null);
+        // Buscar dados completos dos usuários (opcional)
+        // Aqui, pegue os dados do primeiro conjunto que bater com o id
+        let allUsers = [];
+        if (userSets.length > 0) {
+          // Pegue todos os users do primeiro campo
+          const firstField = perspectiveFieldEntries[0];
+          const field = this.perspectiveFields.find(f => String(f.id) === String(firstField[0]));
+          // Enviar o nome do campo, não o id
+          const fieldName = field ? field.name : firstField[0];
+          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
+            params: {
+              project_perspective_id: projectPerspectiveId,
+              field_name: fieldName,
+              value: firstField[1]
+            }
+          });
+          if (Array.isArray(response)) {
+            allUsers = response;
+          } else if (response && Array.isArray(response.users)) {
+            allUsers = response.users;
+          }
+        }
+        // Filtrar os dados completos para manter só os que estão na interseção
+        const filteredUsers = allUsers.filter(u => filteredUserIds.has(u.id));
+        console.log('Lista final de usuários filtrados por perspectiva:', filteredUsers);
+        this.filteredPerspectiveUsers = filteredUsers;
+      } catch (e) {
+        this.filteredPerspectiveUsers = [];
+      }
     },
   }
 }
