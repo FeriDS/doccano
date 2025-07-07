@@ -1142,71 +1142,37 @@ export default {
     },
 
     renderLabelsChart(exampleId, distribution) {
-      // Compatível com novo e antigo formato
       const isNewFormat = distribution && typeof distribution === 'object' && 'labels' in distribution;
-      const allLabels = isNewFormat ? Object.keys(distribution.labels || {}) :
-       Object.keys(distribution || {});
-      const allData = isNewFormat ? Object.values(distribution.labels ||
-       {}).map(Number) : Object.values(distribution || {}).map(Number);
-      
-      // Filtrar apenas labels regulares (excluir abstração e null)
-      let regularLabels = [];
-      let regularData = [];
-      
-      allLabels.forEach((label, index) => {
-        const value = allData[index];
-        // Excluir se contém palavras-chave de abstração ou é null
-        if (!label.toLowerCase().includes('abstração') && 
-            !label.toLowerCase().includes('abstraction') && 
-            !label.toLowerCase().includes('abstenção') &&
-            !label.toLowerCase().includes('abstention') &&
-            !label.toLowerCase().includes('null') &&
-            label !== 'Null' &&
-            label !== 'null') {
+      const allLabels = isNewFormat ? Object.keys(distribution.labels
+       || {}) : Object.keys(distribution || {});
+      const allData = isNewFormat ? Object.values(distribution.labels
+       || {}).map(Number) : Object.values(distribution || {}).map(Number);
+
+      // Filtrar apenas labels regulares
+      const regularLabels = [];
+      const regularData = [];
+      allLabels.forEach((label, i) => {
+        if (!['null', 'Null', 'abstention', 'Abstention', 'abstenção', 'Abstração'].includes(label.toLowerCase())) {
           regularLabels.push(label);
-          regularData.push(value);
+          regularData.push(allData[i]);
         }
       });
-      
-      // NOVO: Se houver filtro de label, mostrar só ele
-      if (this.filters.label.length > 0) {
-        const selectedCategories = this.categories.filter(
-          cat => this.filters.label.includes(cat.id) || this.filters.label.includes(cat.text)
-        );
-        const selectedLabels = selectedCategories.map(cat => String(cat.text));
-        // Filtra todos os labels selecionados
-        const filteredRegularLabels = [];
-        const filteredRegularData = [];
-        regularLabels.forEach((l, i) => {
-          if (selectedLabels.includes(l)) {
-            filteredRegularLabels.push(l);
-            filteredRegularData.push(regularData[i]);
-          }
-        });
-        regularLabels = filteredRegularLabels;
-        regularData = filteredRegularData;
-      }
 
-      // Calcular percentagem total de labels regulares
-      const totalLabels = regularData.reduce((sum, value) => sum + value, 0);
-      
-      // Atualizar o elemento HTML com a percentagem total
+      // Soma dos regulares
+      const regularTotal = regularData.reduce((sum, value) => sum + value, 0);
+
+      // Reescalar para 100%
+      const scaledData = regularData.map(v => regularTotal > 0 ? (v / regularTotal) * 100 : 0);
+
+      // Atualizar o elemento HTML com a percentagem total (sempre 100%)
       this.$nextTick(() => {
         const totalElement = document.getElementById(`total-labels-${exampleId}`);
-        if (totalElement) {
-          totalElement.textContent = `${totalLabels.toFixed(1)}%`;
-        }
+        if (totalElement) totalElement.textContent = `100%`;
         const summaryElement = document.getElementById(`summary-labels-${exampleId}`);
-        if (summaryElement) {
-          summaryElement.textContent = `${totalLabels.toFixed(1)}%`;
-        }
+        if (summaryElement) summaryElement.textContent = `100%`;
       });
-      
-      // Ordenar labels e valores
-      const sorted = this.combineAndSort(regularLabels, regularData);
-      regularLabels = sorted.labels;
-      regularData = sorted.data;
-      
+
+      // Gráfico só com labels regulares reescalados
       const refName = 'labelsChart' + exampleId;
       const ctxArr = this.$refs[refName];
       const ctx = Array.isArray(ctxArr) ? ctxArr[0] : ctxArr;
@@ -1220,7 +1186,7 @@ export default {
           labels: regularLabels,
           datasets: [{
             label: 'Label Distribution (%)',
-            data: regularData,
+            data: scaledData,
             backgroundColor: 'rgba(54, 162, 235, 0.8)',
             borderColor: 'rgba(54, 162, 235, 1)',
             borderWidth: 1
@@ -1238,7 +1204,7 @@ export default {
             },
             title: {
               display: true,
-              text: `Total Labels: ${totalLabels.toFixed(1)}%`,
+              text: `Total Labels: 100%`,
               font: {
                 size: 26,
                 weight: 'bold'
