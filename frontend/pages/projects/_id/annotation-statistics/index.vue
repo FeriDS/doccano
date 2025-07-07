@@ -87,6 +87,7 @@
                   :label="field.name"
                   :items="field.choices"
                   clearable
+                  multiple
                   :disabled="!useLocalFiltering"
                 />
               </v-col>
@@ -149,8 +150,9 @@
                   readonly
                   v-bind="attrs"
                   clearable
-                  v-on="on"
                   :disabled="!useLocalFiltering"
+                  v-on="on"
+                  
                 />
               </template>
               <v-date-picker
@@ -175,8 +177,9 @@
                   readonly
                   v-bind="attrs"
                   clearable
-                  v-on="on"
                   :disabled="!useLocalFiltering"
+                  v-on="on"
+                  
                 />
               </template>
               <v-date-picker
@@ -189,8 +192,9 @@
             <v-btn
               color="primary"
               :loading="loading"
-              @click="applyFilters"
               :disabled="!useLocalFiltering"
+              @click="applyFilters"
+              
             >
               <v-icon left>mdi-filter-check</v-icon>
               Apply Filters
@@ -199,8 +203,9 @@
           <v-col cols="12" md="3">
             <v-btn
               outlined
-              @click="clearFilters"
               :disabled="!useLocalFiltering"
+              @click="clearFilters"
+              
             >
               <v-icon left>mdi-filter-remove</v-icon>
               Clear Filters
@@ -561,9 +566,18 @@ export default {
             if (this.filters.perspective && this.filters.perspectiveValues) {
               const fields = Object.entries(this.filters.perspectiveValues);
               for (const [fieldId, value] of fields) {
-                if (value && (!example.perspective_fields ||
-                 example.perspective_fields[fieldId] !== value)) {
-                  return false;
+                if (value && value.length > 0) {
+                  // Se o valor é um array (seleção múltipla)
+                  if (Array.isArray(value)) {
+                    if (!example.perspective_fields || 
+                        !value.includes(example.perspective_fields[fieldId])) {
+                      return false;
+                    }
+                  } else if (!example.perspective_fields ||
+                     example.perspective_fields[fieldId] !== value) {
+                    // Se o valor é uma string (seleção única)
+                    return false;
+                  }
                 }
               }
             }
@@ -597,8 +611,18 @@ export default {
 
           // Adicionar filtros específicos de campos de perspectiva
           Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
-            if (value) {
-              params[`perspective_${fieldId}`] = value
+            if (value && value.length > 0) {
+              if (Array.isArray(value)) {
+                // Filtrar valores vazios
+                const filtered = value.filter(v => v && v.trim() !== '');
+                if (filtered.length === 1) {
+                  params[`perspective_${fieldId}`] = filtered[0].trim();
+                } else if (filtered.length > 1) {
+                  params[`perspective_${fieldId}`] = filtered.map(v => v.trim()).join(',');
+                }
+              } else {
+                params[`perspective_${fieldId}`] = value;
+              }
             }
           })
 
@@ -658,8 +682,18 @@ export default {
         
         // Adicionar filtros específicos de campos de perspectiva
         Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
-          if (value) {
-            params[`perspective_${fieldId}`] = value
+          if (value && value.length > 0) {
+            if (Array.isArray(value)) {
+              // Filtrar valores vazios
+              const filtered = value.filter(v => v && v.trim() !== '');
+              if (filtered.length === 1) {
+                params[`perspective_${fieldId}`] = filtered[0].trim();
+              } else if (filtered.length > 1) {
+                params[`perspective_${fieldId}`] = filtered.map(v => v.trim()).join(',');
+              }
+            } else {
+              params[`perspective_${fieldId}`] = value;
+            }
           }
         })
 
@@ -1043,8 +1077,18 @@ export default {
       
       // Adicionar filtros específicos de campos de perspectiva
       Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
-        if (value) {
-          params.append(`perspective_${fieldId}`, value)
+        if (value && value.length > 0) {
+          if (Array.isArray(value)) {
+            // Filtrar valores vazios
+            const filtered = value.filter(v => v && v.trim() !== '');
+            if (filtered.length === 1) {
+              params.append(`perspective_${fieldId}`, filtered[0].trim());
+            } else if (filtered.length > 1) {
+              params.append(`perspective_${fieldId}`, filtered.map(v => v.trim()).join(','));
+            }
+          } else {
+            params.append(`perspective_${fieldId}`, value);
+          }
         }
       })
       
@@ -1056,18 +1100,31 @@ export default {
         // Construir parâmetros de filtro para a distribuição
         const params = {}
         Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
-          if (value) {
-            params[`perspective_${fieldId}`] = value
+          if (value && value.length > 0) {
+            if (Array.isArray(value)) {
+              // Filtrar valores vazios
+              const filtered = value.filter(v => v && v.trim() !== '');
+              if (filtered.length === 1) {
+                params[`perspective_${fieldId}`] = filtered[0].trim();
+              } else if (filtered.length > 1) {
+                params[`perspective_${fieldId}`] = filtered.map(v => v.trim()).join(',');
+              }
+            } else {
+              params[`perspective_${fieldId}`] = value;
+            }
           }
         })
-        
         // Usar o novo endpoint de distribuição
         const response = await this.$axios.$get(`/v1/projects/${this.projectId}/statistics/discrepancies/${exampleId}/distribution`, { params })
-        
         // Logs para debug
         console.log(`Debug - Example ${exampleId} distribution:`, response)
         console.log(`Debug - Filters applied:`, params)
-        
+        // NOVO: logar o tipo e conteúdo da resposta
+        if (!response || Object.keys(response).length === 0) {
+          console.warn('Atenção: resposta vazia para a distribuição!', response)
+        } else {
+          console.info('Resposta recebida para distribuição:', JSON.stringify(response, null, 2))
+        }
         return response
       } catch (error) {
         console.error('Error fetching label distribution:', error)

@@ -203,8 +203,14 @@ class AnnotationStatisticsAPI(APIView):
             # Verificar filtro geral de perspectiva
             if perspective:
                 user_perspective_value = user_perspective.field_values.get('role', 'Default')
-                if user_perspective_value != perspective:
-                    return False
+                # Suporte a múltiplos valores separados por vírgula
+                if isinstance(perspective, str) and ',' in perspective:
+                    allowed = [v.strip() for v in perspective.split(',')]
+                    if user_perspective_value not in allowed:
+                        return False
+                else:
+                    if user_perspective_value != perspective:
+                        return False
             
             # Verificar filtros específicos de campos de perspectiva
             if perspective_field_filters:
@@ -214,13 +220,24 @@ class AnnotationStatisticsAPI(APIView):
                         field = project_perspective.perspective.fields.get(id=field_id)
                         field_name = field.name
                         user_value = user_perspective.field_values.get(field_name)
-                        if user_value != expected_value:
-                            return False
+                        # Suporte a múltiplos valores separados por vírgula
+                        if isinstance(expected_value, str) and ',' in expected_value:
+                            allowed = [v.strip() for v in expected_value.split(',')]
+                            if user_value not in allowed:
+                                return False
+                        else:
+                            if user_value != expected_value:
+                                return False
                     except:
                         # Se não conseguir encontrar o campo, verificar se existe no field_values
                         user_value = user_perspective.field_values.get(field_id)
-                        if user_value != expected_value:
-                            return False
+                        if isinstance(expected_value, str) and ',' in expected_value:
+                            allowed = [v.strip() for v in expected_value.split(',')]
+                            if user_value not in allowed:
+                                return False
+                        else:
+                            if user_value != expected_value:
+                                return False
             
             return True
             
@@ -1172,8 +1189,14 @@ class LabelDistributionAPI(APIView):
             # Verificar filtro geral de perspectiva
             if perspective:
                 user_perspective_value = user_perspective.field_values.get('role', 'Default')
-                if user_perspective_value != perspective:
-                    return False
+                # Suporte a múltiplos valores separados por vírgula
+                if isinstance(perspective, str) and ',' in perspective:
+                    allowed = [v.strip() for v in perspective.split(',')]
+                    if user_perspective_value not in allowed:
+                        return False
+                else:
+                    if user_perspective_value != perspective:
+                        return False
             
             # Verificar filtros específicos de campos de perspectiva
             if perspective_field_filters:
@@ -1183,13 +1206,24 @@ class LabelDistributionAPI(APIView):
                         field = project_perspective.perspective.fields.get(id=field_id)
                         field_name = field.name
                         user_value = user_perspective.field_values.get(field_name)
-                        if user_value != expected_value:
-                            return False
+                        # Suporte a múltiplos valores separados por vírgula
+                        if isinstance(expected_value, str) and ',' in expected_value:
+                            allowed = [v.strip() for v in expected_value.split(',')]
+                            if user_value not in allowed:
+                                return False
+                        else:
+                            if user_value != expected_value:
+                                return False
                     except:
                         # Se não conseguir encontrar o campo, verificar se existe no field_values
                         user_value = user_perspective.field_values.get(field_id)
-                        if user_value != expected_value:
-                            return False
+                        if isinstance(expected_value, str) and ',' in expected_value:
+                            allowed = [v.strip() for v in expected_value.split(',')]
+                            if user_value not in allowed:
+                                return False
+                        else:
+                            if user_value != expected_value:
+                                return False
             
             return True
             
