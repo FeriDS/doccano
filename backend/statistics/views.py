@@ -68,7 +68,7 @@ class AnnotationStatisticsAPI(APIView):
             if k == 'label' and v:
                 label_ids = v.split(',') if isinstance(v, str) else v
                 label_names = list(Category.objects.filter(id__in=label_ids).values_list('label', flat=True))
-                applied_filters['Label'] = ', '.join(label_names)
+                applied_filters['Label'] = ', '.join(str(x) for x in label_names)
             elif k == 'resolved' and v:
                 applied_filters['Status'] = 'resolved' if v.lower() == 'true' else 'non-resolved'
             elif k.startswith('perspective_'):
