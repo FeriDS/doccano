@@ -638,7 +638,7 @@ export default {
       }
 
       // Configurar headers e dados finais
-      this.configureTableHeaders(allLabels);
+      this.configureTableHeaders();
       this.reportData = groupedData;
     },
 
@@ -758,24 +758,25 @@ export default {
         }
       });
 
-      // Dados de labels
+      // Dados de labels: garantir todos os headers de label presentes
       const labelData = {};
-      Object.entries(processedData.percentLabels).forEach(([key, value]) => {
-        const labelName = key.replace(/^label_/, '');
-        labelData[labelName] = value;
-      });
-
-      // Calcular percentual de "não votou" (null)
-      let nullPercent = '0%';
-      if (votingStats.total_users > 0) {
-        const usersNotVoted = votingStats.users_not_voted || 0;
-        nullPercent = `${((usersNotVoted / votingStats.total_users) * 100).toFixed(2)}%`;
+      let labelHeaders = [];
+      if (this.filters.category && this.filters.category.length > 0) {
+        labelHeaders = this.categoryOptions
+          .filter(opt => this.filters.category.includes(opt.value))
+          .map(opt => String(opt.text));
+      } else {
+        labelHeaders = this.categoryOptions.map(opt => String(opt.text));
       }
+      labelHeaders.forEach(labelName => {
+        // Se não existe, preencher com 0%
+        labelData[labelName] = processedData.percentLabels[`label_${labelName}`] || '0%';
+      });
 
       // Status se aplicável
       const statusData = {};
-          if (this.filters.status !== null && this.filters.status !== undefined) {
-            const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status);
+      if (this.filters.status !== null && this.filters.status !== undefined) {
+        const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status);
         statusData.Status = statusOpt ? statusOpt.text : this.filters.status;
       }
 
@@ -784,11 +785,18 @@ export default {
       if (this.filters.startDate) dateData['Begin Date'] = this.filters.startDate;
       if (this.filters.endDate) dateData['End Date'] = this.filters.endDate;
 
+      // Calcular percentual de "não votou" (null)
+      let nullPercent = '0%';
+      if (votingStats.total_users > 0) {
+        const usersNotVoted = votingStats.users_not_voted || 0;
+        nullPercent = `${((usersNotVoted / votingStats.total_users) * 100).toFixed(2)}%`;
+      }
+
       return {
         example: exampleId,
         version,
-            ...perspectiveData,
-            ...labelData,
+        ...perspectiveData,
+        ...labelData,
         ...statusData,
         ...dateData,
         abstention: processedData.abstentionPercent,
@@ -802,7 +810,7 @@ export default {
       };
     },
 
-    configureTableHeaders(allLabels) {
+    configureTableHeaders() {
       // Campos de perspectiva filtrados
       const perspectiveHeaders = [];
       Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
@@ -814,37 +822,25 @@ export default {
         }
       });
 
-      // Labels selecionados ou todos
-      let labelHeaders = Array.from(allLabels);
+      // Garantir que todos os labels do filtro (ou todos do projeto) estejam presentes
+      let labelHeaders = [];
       if (this.filters.category && this.filters.category.length > 0) {
-        const selectedCats = this.categoryOptions
+        // Apenas os labels filtrados
+        labelHeaders = this.categoryOptions
           .filter(opt => this.filters.category.includes(opt.value))
-          .map(opt => String(opt.text).toLowerCase().trim());
-        
-        labelHeaders = labelHeaders.filter(lab => {
-          const labelName = lab.replace(/^label_/, '').toLowerCase().trim();
-          return selectedCats.includes(labelName);
-        });
+          .map(opt => String(opt.text));
+      } else {
+        // Todos os labels do projeto
+        labelHeaders = this.categoryOptions.map(opt => String(opt.text));
       }
 
-      // Remover 'null' dos headers de labels
-      labelHeaders = labelHeaders.filter(lab => 
-        lab.replace(/^label_/, '').toLowerCase() !== 'null'
-      );
-
       // Ordenar labels alfabeticamente
-      labelHeaders.sort((a, b) => {
-        const nameA = a.replace(/^label_/, '').toLowerCase();
-        const nameB = b.replace(/^label_/, '').toLowerCase();
-        return nameA.localeCompare(nameB);
-      });
+      labelHeaders.sort((a, b) => a.localeCompare(b));
 
       // Montar headers finais
-      const labelColumnNames = labelHeaders.map(lab => lab.replace(/^label_/, ''));
-      
       this.tableHeaders = [
         ...perspectiveHeaders,
-        ...labelColumnNames,
+        ...labelHeaders,
         ...(this.filters.status !== null ? ['Status'] : []),
         ...(this.filters.startDate ? ['Begin Date'] : []),
         ...(this.filters.endDate ? ['End Date'] : []),
