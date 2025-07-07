@@ -190,84 +190,158 @@ class DatasetVersion(models.Model):
 
     @classmethod
     def get_voting_statistics(cls, example_id, version, perspective_filters=None):
+        """
+        Retorna estatísticas de votação para um exemplo e versão específicos.
+        Se perspective_filters for fornecido, filtra apenas pelos utilizadores com esses valores de perspectiva.
+        """
+        from perspectives.models import get_users_with_perspective_value, ProjectPerspective
+        
         qs = cls.objects.filter(example_id=example_id, version=version)
+        
+        # Se há filtros de perspectiva, obter primeiro os utilizadores válidos
+        valid_users = None
         if perspective_filters:
-            for field, value in perspective_filters.items():
-                # Supondo que o campo JSON está em user.profile.perspective
-                lookup = {f'user__profile__perspective__{field}': value}
-                qs = qs.filter(**lookup)
+            try:
+                # Obter o ProjectPerspective para este exemplo
+                from examples.models import Example
+                example = Example.objects.get(id=example_id)
+                project_perspective = ProjectPerspective.objects.get(project=example.project)
+                
+                # Para cada filtro de perspectiva, obter os utilizadores correspondentes
+                user_sets = []
+                for field_name, value in perspective_filters.items():
+                    users = get_users_with_perspective_value(project_perspective, field_name, value)
+                    user_sets.append(set(users))
+                
+                # Fazer interseção de todos os conjuntos para obter utilizadores que atendem TODOS os filtros
+                if user_sets:
+                    valid_users = user_sets[0]
+                    for user_set in user_sets[1:]:
+                        valid_users = valid_users.intersection(user_set)
+                else:
+                    valid_users = set()
+                    
+            except Exception as e:
+                print(f"Error filtering by perspective: {e}")
+                valid_users = set()
+        
+        # Filtrar por utilizadores válidos se especificado
+        if valid_users is not None:
+            qs = qs.filter(user__in=valid_users)
+        
         total = qs.count()
         labels = {}
+        
+        # Contar votos por label
         for dv in qs:
             if dv.label is None:
                 label_name = 'abstencao'
             else:
                 label_name = f'label_{dv.label.text}'
             labels[label_name] = labels.get(label_name, 0) + 1
-        # Converter para percentagem com símbolo %
+        
+        # Converter para percentagem
         percent_labels = {}
         for k, v in labels.items():
             percent_labels[k] = f'{round((v / total) * 100, 2)}%' if total > 0 else '0%'
-        # NOVO: lista de votos
-        votes = [
-            {
+        
+        # Lista de votos detalhada
+        votes = []
+        for dv in qs:
+            votes.append({
                 "label": dv.label.text if dv.label else None,
                 "user": dv.user.username,
+                "user_id": dv.user.id,
                 "created_at": dv.created_at.isoformat()
-            }
-            for dv in qs
-        ]
-        return {
+            })
+        
+        result = {
             'total': total,
-            **percent_labels,
-            'votes': votes,  # <--- ADICIONADO
+            'votes': votes,
+            **percent_labels  # Adicionar percentuais como campos diretos
         }
+        
+        return result
 
     @classmethod
     def get_voting_user_stats(cls, example_id, version, abstention_labels=("abstention", "null"), perspective_filters=None):
         """
-        Retorna estatísticas de votação dos membros do projeto para um exemplo e versão:
-        - total_users: total de membros do projeto
-        - users_voted: membros que votaram em qualquer label (exceto só abstenção/null)
-        - users_only_abstention: membros que só votaram em abstenção/null
-        - users_not_voted: membros que não votaram nada
+        Retorna estatísticas de votação dos membros do projeto para um exemplo e versão.
+        Se perspective_filters for fornecido, conta apenas os utilizadores que atendem aos critérios de perspectiva.
         """
         from projects.models import Member
         from examples.models import Example
+        from perspectives.models import get_users_with_perspective_value, ProjectPerspective
+        
         example = Example.objects.get(id=example_id)
         project = example.project
+        
+        # Obter todos os membros do projeto
         members = Member.objects.filter(project=project)
-        usernames = set(m.username for m in members)
-        qs = cls.objects.filter(example_id=example_id, version=version)
+        all_usernames = set(m.username for m in members)
+        all_users = set(m.user for m in members)
+        
+        # Se há filtros de perspectiva, filtrar os membros
+        valid_users = all_users
         if perspective_filters:
-            for field, value in perspective_filters.items():
-                lookup = {f'user__profile__perspective__{field}': value}
-                qs = qs.filter(**lookup)
+            try:
+                project_perspective = ProjectPerspective.objects.get(project=project)
+                
+                # Para cada filtro de perspectiva, obter os utilizadores correspondentes
+                user_sets = []
+                for field_name, value in perspective_filters.items():
+                    users = get_users_with_perspective_value(project_perspective, field_name, value)
+                    user_sets.append(set(users))
+                
+                # Fazer interseção de todos os conjuntos
+                if user_sets:
+                    valid_users = user_sets[0]
+                    for user_set in user_sets[1:]:
+                        valid_users = valid_users.intersection(user_set)
+                else:
+                    valid_users = set()
+                    
+            except Exception as e:
+                print(f"Error filtering by perspective: {e}")
+                valid_users = set()
+        
+        # Obter votos apenas dos utilizadores válidos
+        qs = cls.objects.filter(example_id=example_id, version=version, user__in=valid_users)
+        
+        # Agrupar votos por utilizador
         votes_by_user = {}
         for dv in qs.select_related('user', 'label'):
-            uname = dv.user.username
+            username = dv.user.username
             if dv.label is None:
                 label = None
             else:
-             label = dv.label.text.lower()
-            votes_by_user.setdefault(uname, []).append(label)
-        # Usuários que votaram em pelo menos uma label regular
+                label = dv.label.text.lower()
+            votes_by_user.setdefault(username, []).append(label)
+        
+        # Determinar usernames válidos (só os que atendem aos filtros de perspectiva)
+        valid_usernames = set(u.username for u in valid_users)
+        
+        # Utilizadores que votaram em pelo menos uma label regular (não abstenção)
         users_voted = set(
-            uname for uname, labels in votes_by_user.items()
+            username for username, labels in votes_by_user.items()
             if any(lab is not None and lab not in abstention_labels for lab in labels)
         )
-        # Usuários que votaram pelo menos uma vez em branco
+        
+        # Utilizadores que votaram apenas em abstenção/null
         users_with_abstention = set(
-            uname for uname, labels in votes_by_user.items()
-            if any(lab is None for lab in labels)
+            username for username, labels in votes_by_user.items()
+            if any(lab is None for lab in labels) and username not in users_voted
         )
-        users_not_voted = usernames - users_voted
+        
+        # Utilizadores que não votaram (da lista de utilizadores válidos)
+        users_not_voted = valid_usernames - set(votes_by_user.keys())
+        
         return {
-            'total_users': len(usernames),
+            'total_users': len(valid_usernames),
             'users_voted': len(users_voted),
             'users_only_abstention': len(users_with_abstention),
             'users_not_voted': len(users_not_voted),
-            'usernames': list(usernames),
+            'usernames': list(valid_usernames),
             'usernames_voted': list(users_voted),
             'usernames_only_abstention': list(users_with_abstention),
             'usernames_not_voted': list(users_not_voted),

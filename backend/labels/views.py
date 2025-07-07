@@ -156,10 +156,113 @@ class SegmentationDetailAPI(BaseDetailAPI):
 
 class DatasetVersionVotingStatsAPI(APIView):
     permission_classes = [AllowAny]
+    
     def get(self, request, project_id, example_id, version):
-        stats = DatasetVersion.get_voting_statistics(example_id, version)
-        return Response(stats, status=status.HTTP_200_OK)
+        """
+        Retorna estatísticas de votação para um exemplo/versão específicos.
+        Suporta filtros de perspectiva via query parameters.
+        """
+        # Extrair filtros de perspectiva dos query parameters
+        perspective_filters = {}
+        for key, value in request.query_params.items():
+            if key.startswith('perspective_'):
+                field_name = key.replace('perspective_', '')
+                perspective_filters[field_name] = value
+        
+        # Filtros de data
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        try:
+            stats = DatasetVersion.get_voting_statistics(
+                example_id, 
+                version, 
+                perspective_filters=perspective_filters if perspective_filters else None
+            )
+            
+            # Aplicar filtros de data aos votos se especificado
+            if (start_date or end_date) and 'votes' in stats:
+                from datetime import datetime
+                
+                filtered_votes = []
+                for vote in stats['votes']:
+                    vote_date = datetime.fromisoformat(vote['created_at'].replace('Z', '+00:00'))
+                    
+                    # Verificar se está dentro do intervalo de datas
+                    if start_date:
+                        start_dt = datetime.fromisoformat(start_date + 'T00:00:00+00:00')
+                        if vote_date < start_dt:
+                            continue
+                    
+                    if end_date:
+                        end_dt = datetime.fromisoformat(end_date + 'T23:59:59+00:00')
+                        if vote_date > end_dt:
+                            continue
+                    
+                    filtered_votes.append(vote)
+                
+                # Recalcular estatísticas baseado nos votos filtrados
+                if filtered_votes != stats['votes']:
+                    total_filtered = len(filtered_votes)
+                    labels = {}
+                    
+                    for vote in filtered_votes:
+                        if vote['label'] is None:
+                            label_name = 'abstencao'
+                        else:
+                            label_name = f'label_{vote["label"]}'
+                        labels[label_name] = labels.get(label_name, 0) + 1
+                    
+                    # Recalcular percentagens
+                    percent_labels = {}
+                    for k, v in labels.items():
+                        percent_labels[k] = f'{round((v / total_filtered) * 100, 2)}%' if total_filtered > 0 else '0%'
+                    
+                    # Atualizar stats com dados filtrados
+                    stats.update({
+                        'total': total_filtered,
+                        'votes': filtered_votes,
+                        **percent_labels
+                    })
+            
+            return Response(stats, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Error getting voting statistics: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
+
+class DatasetVersionVotingUserStatsAPI(APIView):
+    permission_classes = [IsAuthenticated & IsProjectMember]
+    
+    def get(self, request, project_id, example_id, version):
+        """
+        Retorna estatísticas de utilizadores para um exemplo/versão específicos.
+        Suporta filtros de perspectiva via query parameters.
+        """
+        # Extrair filtros de perspectiva dos query parameters
+        perspective_filters = {}
+        for key, value in request.query_params.items():
+            if key.startswith('perspective_'):
+                field_name = key.replace('perspective_', '')
+                perspective_filters[field_name] = value
+        
+        try:
+            stats = DatasetVersion.get_voting_user_stats(
+                example_id, 
+                version, 
+                perspective_filters=perspective_filters if perspective_filters else None
+            )
+            
+            return Response(stats, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Error getting voting user statistics: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class DatasetVersionAllVersionsAPI(APIView):
     permission_classes = [AllowAny]
