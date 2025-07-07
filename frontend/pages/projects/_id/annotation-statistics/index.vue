@@ -26,6 +26,10 @@
           <v-icon left>mdi-file-excel</v-icon>
           Export XLSX
         </v-btn>
+        <v-btn text aria-label="Return" @click="$router.back()">
+          <v-icon left>{{ mdiArrowLeft }}</v-icon>
+          Return
+        </v-btn>
       </v-col>
     </v-row>
           <v-alert
@@ -83,6 +87,7 @@
                   :label="field.name"
                   :items="field.choices"
                   clearable
+                  :disabled="!useLocalFiltering"
                 />
               </v-col>
             </template>
@@ -97,6 +102,7 @@
               item-value="value"
               label="Status"
               clearable
+              :disabled="!useLocalFiltering"
             />
           </v-col>
           <v-col cols="12" md="4">
@@ -108,6 +114,7 @@
               label="Labels"
               clearable
               multiple
+              :disabled="!useLocalFiltering"
             />
           </v-col>
           <v-col cols="12" md="4">
@@ -121,6 +128,7 @@
               clearable
               :return-object="false"
               multiple
+              :disabled="!useLocalFiltering"
             />
           </v-col>
         </v-row>
@@ -142,6 +150,7 @@
                   v-bind="attrs"
                   clearable
                   v-on="on"
+                  :disabled="!useLocalFiltering"
                 />
               </template>
               <v-date-picker
@@ -167,6 +176,7 @@
                   v-bind="attrs"
                   clearable
                   v-on="on"
+                  :disabled="!useLocalFiltering"
                 />
               </template>
               <v-date-picker
@@ -180,6 +190,7 @@
               color="primary"
               :loading="loading"
               @click="applyFilters"
+              :disabled="!useLocalFiltering"
             >
               <v-icon left>mdi-filter-check</v-icon>
               Apply Filters
@@ -189,6 +200,7 @@
             <v-btn
               outlined
               @click="clearFilters"
+              :disabled="!useLocalFiltering"
             >
               <v-icon left>mdi-filter-remove</v-icon>
               Clear Filters
@@ -240,6 +252,16 @@
         </v-card-text>
       </v-card>
     </div>
+    
+    <!-- Botão Return no final da página -->
+    <v-row class="mt-6">
+      <v-col class="text-right">
+        <v-btn text aria-label="Return" @click="$router.back()">
+          <v-icon left>{{ mdiArrowLeft }}</v-icon>
+          Return
+        </v-btn>
+      </v-col>
+    </v-row>
   </v-container>
 </template>
 
@@ -256,6 +278,7 @@ export default {
 
   data() {
     return {
+      mdiArrowLeft, 
       filters: {
         startDate: null,
         endDate: null,
@@ -269,7 +292,7 @@ export default {
         startDateMenu: false,
         endDateMenu: false,
         perspectiveValues: {},
-        mdiArrowLeft
+        
       },
       statistics: {
         disagreementRate: 0,
