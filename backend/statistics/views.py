@@ -68,7 +68,7 @@ class AnnotationStatisticsAPI(APIView):
             if k == 'label' and v:
                 label_ids = v.split(',') if isinstance(v, str) else v
                 label_names = list(Category.objects.filter(id__in=label_ids).values_list('label', flat=True))
-                applied_filters['Label'] = ', '.join(str(x) for x in label_names)
+                applied_filters['Label'] = ', '.join(label_names)
             elif k == 'resolved' and v:
                 applied_filters['Status'] = 'resolved' if v.lower() == 'true' else 'non-resolved'
             elif k.startswith('perspective_'):
@@ -541,7 +541,7 @@ class AnnotationStatisticsAPI(APIView):
                         value = abstraction_data['data'][idx]
                     else:
                         value = 0
-                    buffer.write(f'{label};{value}%\n')
+                    buffer.write(f'{label};{float(value):.2f}%\n')
                     if (label.lower().find('abstração') != -1 or 
                         label.lower().find('abstraction') != -1 or 
                         label.lower().find('abstenção') != -1 or
@@ -561,8 +561,8 @@ class AnnotationStatisticsAPI(APIView):
                         elif label in abstraction_data.get('labels', []):
                             idx = abstraction_data['labels'].index(label)
                             regular_total += float(abstraction_data['data'][idx])
-                buffer.write(f'Total Regular Labels;{regular_total:.1f}%\n')
-                buffer.write(f'Total Non-Voted;{non_voted_total:.1f}%\n')
+                buffer.write(f'Total Regular Labels;{regular_total:.2f}%\n')
+                buffer.write(f'Total Non-Voted;{non_voted_total:.2f}%\n')
                 buffer.write('\n')
         else:
             buffer.write('No example displayed for the applied filters.\n\n')
