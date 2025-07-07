@@ -166,11 +166,11 @@
       <div class="d-flex align-center justify-space-between">
         <div>
           <v-btn color="primary" class="mr-2" @click="fetchReport">
-            GENERATE REPORT
-          </v-btn>
+        GENERATE REPORT
+      </v-btn>
           <v-btn color="error" text class="mt-2 mr-2" @click="clearFilters">
-            CLEAR ALL FILTERS
-          </v-btn>
+        CLEAR ALL FILTERS
+      </v-btn>
           <v-chip
             v-if="hasActiveFilters"
             small
@@ -197,7 +197,7 @@
 
       <!-- Tabela principal -->
       <div class="mt-8">
-        <div v-if="Object.keys(reportData).length === 0">
+        <div v-if="!reportGenerated">
           <v-simple-table>
             <tbody>
               <tr>
@@ -224,21 +224,18 @@
                   <div class="text-body-1">
                     Users that voted: {{ getVoteStats(rows).usersVoted }}
                   </div>
-                  <div class="text-body-2" style="color: #1976d2;">
-                    <span v-if="getFilteredUsernames(rows).length">Filtered users:
-                     {{ getFilteredUsernames(rows).join(', ') }}</span>
-                  </div>
+                 
                 </div>
-                <v-simple-table>
-                  <thead>
-                    <tr>
+        <v-simple-table>
+          <thead>
+            <tr>
                       <th v-for="header in tableHeaders" :key="header">
                         {{ header === 'X (no vote)' ? 'X (no vote)' : 
                           (header === 'abstention' ? 'Abstention' : header) }}
                       </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            </tr>
+          </thead>
+          <tbody>
                     <tr v-for="(row, idx) in rows" :key="idx">
                       <td v-for="header in tableHeaders" :key="header"
                         :class="isMaxLabelCell(header, row) ? 'highlight-label' : ''">
@@ -246,12 +243,12 @@
                           {{ formatPercent(row[header === 'X (no vote)' ? 'null' : header]) }}
                         </template>
                         <template v-else>
-                          {{ row[header] }}
+                {{ row[header] }}
                         </template>
-                      </td>
-                    </tr>
-                  </tbody>
-                </v-simple-table>
+              </td>
+            </tr>
+          </tbody>
+        </v-simple-table>
               </div>
             </div>
           </v-card>
@@ -271,7 +268,19 @@
 import { mdiArrowLeft } from '@mdi/js'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
-import user from '~/i18n/de/user'
+
+// Função debounce helper
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 export default {
   name: 'AnnotationReportView',
@@ -315,65 +324,122 @@ export default {
       exportingPDF: false,
       voteStatsByExampleVersion: {},
       filteredPerspectiveUsers: [],
+      reportGenerated: false,
     }
   },
   computed: {
     finalizedExamplesCount() {
-      return this.exampleOptions.length
+      return this.exampleOptions.length;
     },
+    
     activeFiltersCount() {
       let count = 0;
-      if (this.filters.examples && 
-      Array.isArray(this.filters.examples)) 
-      count += this.filters.examples.length;
-      if (this.filters.versions && 
-      Array.isArray(this.filters.versions)) 
-      count += this.filters.versions.length;
-      if (this.filters.category && 
-      Array.isArray(this.filters.category)) 
-      count += this.filters.category.length;
+      
+      // Contar filtros de array
+      ['examples', 'versions', 'category'].forEach(key => {
+        if (this.filters[key] && Array.isArray(this.filters[key])) {
+          count += this.filters[key].length;
+        }
+      });
+      
+      // Contar filtros simples
       if (this.filters.status !== null && this.filters.status !== undefined) count += 1;
       if (this.filters.startDate) count += 1;
       if (this.filters.endDate) count += 1;
+      
+      // Contar filtros de perspectiva
       if (this.filters.perspectiveValues && typeof this.filters.perspectiveValues === 'object') {
         Object.values(this.filters.perspectiveValues).forEach(val => {
-          if (Array.isArray(val)) count += val.length;
-          else if (val) count += 1;
+          if (val && val !== '') count += 1;
         });
       }
+      
       return count;
     },
+    
     hasActiveFilters() {
       return this.activeFiltersCount > 0;
+    },
+    
+    // Verificar se há filtros de perspectiva ativos
+    hasActivePerspectiveFilters() {
+      return Object.values(this.filters.perspectiveValues || {})
+        .some(val => val && val !== '');
     }
   },
   watch: {
-    'filters.examples'() {
-      this.filters.versions = []
-      this.versionOptions = []
-      if (this.filters.examples.length) this.fetchVersions()
-    },
-    'filters.versions'() {
-      if (this.filters.versions.length) this.fetchPerspectives()
-    },
-    'filters.perspectiveValues': {
-      deep: true,
-      handler() {
-        this.fetchFilteredPerspectiveUsers();
-        // Filtrar diretamente os membros do projeto pelos valores dos campos de perspectiva
-        if (!this.projectMembers || !Object.keys(this.filters.perspectiveValues).length) return;
-        const filteredUsers = this.projectMembers.filter(member => {
-          if (!member.perspective) return false;
-          for (const [fieldId, value] of Object.entries(this.filters.perspectiveValues)) {
-            if (value && (!member.perspective[fieldId] || member.perspective[fieldId] !== value)) {
-              return false;
-            }
-          }
-          return true;
-        }).map(u => u.username || u.id);
-        console.log('Utilizadores filtrados por perspectiva (após seleção):', filteredUsers);
+    'filters.examples'(newVal, oldVal) {
+      // Só resetar se realmente mudou
+      if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+        this.filters.versions = [];
+        this.versionOptions = [];
+        if (this.filters.examples.length) {
+          this.fetchVersions();
+        }
       }
     },
+    
+    'filters.versions'() {
+      if (this.filters.versions.length) {
+        this.fetchPerspectives();
+      }
+    },
+    
+    'filters.perspectiveValues': {
+      deep: true,
+      handler: debounce(async function(newVal, oldVal) {
+        // Verificar se realmente mudou
+        if (JSON.stringify(newVal) === JSON.stringify(oldVal)) return;
+        
+        // Se tem filtros ativos, buscar usuários filtrados
+        if (this.hasActivePerspectiveFilters) {
+          await this.fetchFilteredPerspectiveUsers();
+          
+          // Log para debug
+          if (this.filteredPerspectiveUsers.length > 0) {
+            console.log('Usuários filtrados por perspectiva:', 
+              this.filteredPerspectiveUsers.map(u => ({
+                id: u.id,
+                username: u.username,
+                perspective: u.perspective
+              }))
+            );
+          } else {
+            console.log('Nenhum usuário encontrado com os filtros de perspectiva selecionados');
+          }
+        } else {
+          // Limpar se não há filtros
+          this.filteredPerspectiveUsers = [];
+        }
+      }, 500) // Debounce de 500ms para evitar muitas chamadas
+    },
+    
+    // Watch para atualizar o relatório automaticamente quando mudam filtros importantes
+    'filters.startDate'() {
+      if (this.reportData && Object.keys(this.reportData).length > 0) {
+        // Só regenerar se já tem dados
+        this.debouncedFetchReport();
+      }
+    },
+    
+    'filters.endDate'() {
+      if (this.reportData && Object.keys(this.reportData).length > 0) {
+        this.debouncedFetchReport();
+      }
+    },
+    
+    'filters.category': {
+      deep: true,
+      handler() {
+        if (this.reportData && Object.keys(this.reportData).length > 0) {
+          this.debouncedFetchReport();
+        }
+      }
+    }
+  },
+  created() {
+    // Criar versão debounced do fetchReport
+    this.debouncedFetchReport = debounce(this.fetchReport, 1000);
   },
   mounted() {
     this.fetchExamples()
@@ -387,17 +453,6 @@ export default {
         const { items } = await this.$services.example.list(this.$route.params.id, {})
         this.exampleOptions = items
           .filter(ex => ex.is_finished)
-          // Filtro por data de início e fim
-          .filter(ex => {
-            let pass = true;
-            if (this.filters.startDate && ex.annotation_start_date) {
-              pass = pass && (ex.annotation_start_date >= this.filters.startDate);
-            }
-            if (this.filters.endDate && ex.annotation_end_date) {
-              pass = pass && (ex.annotation_end_date <= this.filters.endDate);
-            }
-            return pass;
-          })
           .map(ex => ({
             text: ex.name || ex.content || ex.title || ex.text || `Example ${ex.id}`,
             value: ex.id
@@ -406,6 +461,7 @@ export default {
         this.loading.examples = false
       }
     },
+
     async fetchVersions() {
       this.loading.versions = true
       this.versionsByExample = {}
@@ -422,20 +478,7 @@ export default {
 
         for (const { id, res } of results) {
           const raw = Array.isArray(res.versions) ? res.versions : []
-          let filteredVersions = raw
-          if (raw.length && typeof raw[0] === 'object' && (raw[0].created_at || raw[0].annotation_start_date)) {
-            filteredVersions = raw.filter(v => {
-              let pass = true
-              if (this.filters.startDate && v.annotation_start_date) {
-                pass = pass && (v.annotation_start_date >= this.filters.startDate)
-              }
-              if (this.filters.endDate && v.annotation_end_date) {
-                pass = pass && (v.annotation_end_date <= this.filters.endDate)
-              }
-              return pass
-            })
-          }
-          const vals = filteredVersions.map(v => v.version || v).filter(n => Number.isFinite(n))
+          const vals = raw.map(v => typeof v === 'number' ? v : v.version).filter(n => Number.isFinite(n))
           this.versionsByExample[id] = vals
 
           const exampleLabel = this.exampleOptions.find(o => o.value === id)?.text || `Example ${id}`
@@ -454,6 +497,7 @@ export default {
         this.loading.versions = false
       }
     },
+
     async fetchPerspectives() {
       this.loading.perspectives = true
       try {
@@ -474,6 +518,7 @@ export default {
         this.loading.perspectives = false
       }
     },
+
     async fetchCategories() {
       try {
         const response = await this.$services.categoryType.list(this.$route.params.id)
@@ -485,276 +530,534 @@ export default {
         this.categoryOptions = []
       }
     },
+
     async fetchReport() {
-      // Aguarde a atualização dos usuários filtrados, se houver filtro de perspectiva
-      if (Object.keys(this.filters.perspectiveValues).length > 0) {
+      // Limpar dados anteriores
+      this.reportData = {};
+      this.voteStatsByExampleVersion = {};
+      
+      // Se há filtros de perspectiva, buscar usuários filtrados primeiro
+      if (Object.keys(this.filters.perspectiveValues).some(
+        k => this.filters.perspectiveValues[k])) {
         await this.fetchFilteredPerspectiveUsers();
         await this.$nextTick();
       }
-      // Lógica de geração do relatório (original)
+      
+      // Gerar o relatório uma única vez
       await this._generateReportCore();
-      // Chame novamente para garantir atualização total
-      if (Object.keys(this.filters.perspectiveValues).length > 0) {
-        await this.fetchFilteredPerspectiveUsers();
-        await this.$nextTick();
-      }
-      await this._generateReportCore();
+      this.reportGenerated = true;
     },
+
     async _generateReportCore() {
       let { examples } = this.filters;
-      const { versions, perspective, perspectiveValues } = this.filters;
+      const { versions } = this.filters;
+
       // Se nenhum exemplo for selecionado, usar todos os exemplos disponíveis
       if (!examples.length) {
-        // Buscar todos os exemplos possíveis
         examples = this.exampleOptions.map(opt => opt.value);
-        // Buscar as versões para todos os exemplos se ainda não estiverem carregadas
-        const projectId = this.$route.params.id;
-        const calls = examples.map(id =>
-          this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${id}/versions/`).then(res => {
-            return { id, res };
-          })
-        );
-        const results = await Promise.all(calls);
-        this.versionsByExample = {};
-        for (const { id, res } of results) {
-          const raw = Array.isArray(res.versions) ? res.versions : [];
-          const vals = raw.map(v => +v).filter(n => Number.isFinite(n));
-          this.versionsByExample[id] = vals;
-        }
+        // Buscar versões para todos os exemplos
+        await this.fetchVersionsForExamples(examples);
       }
 
-      const projectId = this.$route.params.id
+      const projectId = this.$route.params.id;
       const versionsToUse = versions.length
         ? versions.map(v => {
-            const [ex, ver] = v.split(":")
-            return { ex: +ex, ver: +ver }
+            const [ex, ver] = v.split(":");
+            return { ex: +ex, ver: +ver };
           })
         : Object.entries(this.versionsByExample).flatMap(([ex, vers]) =>
             vers.map(ver => ({ ex: +ex, ver }))
-          )
-
-      const rows = []
-      let allPerspectiveFields = []
-      let allLabels = new Set()
-      // Novo: objeto para armazenar estatísticas de votação por exemplo/versão
-      this.voteStatsByExampleVersion = {};
-      const groupedData = {};
-      for (const { ex, ver } of versionsToUse) {
-        if (!this.versionsByExample[ex]?.includes(ver)) continue
-        let stats = {}
-        try {
-          const params = {}
-          if (perspective) params.perspective = perspective
-          if (perspectiveValues && Object.keys(perspectiveValues).length) {
-            Object.entries(perspectiveValues).forEach(([k, val]) => {
-              if (val) params[`perspective_${k}`] = val
-            })
-          }
-          if (this.filters.startDate) params.start_date = this.filters.startDate;
-          if (this.filters.endDate) params.end_date = this.filters.endDate;
-          stats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/stats/`, { params })
-
-          // Filtrar votos por data para decidir se a versão deve aparecer
-          let votesInRange = stats.votes || [];
-          if (votesInRange.length && (this.filters.startDate || this.filters.endDate)) {
-            const start = this.filters.startDate ? new Date(this.filters.startDate) : null;
-            const end = this.filters.endDate ? new Date(this.filters.endDate) : null;
-            votesInRange = votesInRange.filter(vote => {
-              const voteDate = new Date(vote.created_at);
-              if (start && voteDate < start) return false;
-              if (end && voteDate > end) return false;
-              return true;
-            });
-          }
-          // Só adiciona a versão se houver pelo menos um voto no intervalo
-          if (!votesInRange.length) continue;
-
-          // NOVO: buscar estatísticas de votação do backend
-          let votingStats = {};
-          try {
-            // Remover filtros perspective_* para voting-user-stats
-            const votingStatsParams = { ...params };
-            Object.keys(votingStatsParams).forEach(key => {
-              if (key.startsWith('perspective_')) {
-                delete votingStatsParams[key];
-              }
-            });
-            votingStats = await this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${ex}/${ver}/voting-user-stats/`, { params: votingStatsParams });
-            console.log('votingStats', votingStats);
-          } catch (e) {
-            votingStats = {};
-          }
-          this.voteStatsByExampleVersion[`${ex}:${ver}`] = votingStats;
-
-          // NOVO: Filtragem local dos votos por data e perspectiva, se votes estiver presente
-          let filteredVotes = stats.votes || [];
-          // Filtrar por data
-          if (filteredVotes.length && (this.filters.startDate || this.filters.endDate)) {
-            const start = this.filters.startDate ? new Date(this.filters.startDate) : null;
-            const end = this.filters.endDate ? new Date(this.filters.endDate) : null;
-            filteredVotes = filteredVotes.filter(vote => {
-              const voteDate = new Date(vote.created_at);
-              if (start && voteDate < start) return false;
-              if (end && voteDate > end) return false;
-              return true;
-            });
-          }
-          // Filtrar por perspectiva: só entram votos dos usuários filtrados (interseção)
-          const allowedUserIds = new Set(this.filteredPerspectiveUsers.map(u => u.id));
-          filteredVotes = filteredVotes.filter(
-            vote => allowedUserIds.has(vote.user) || allowedUserIds.has(vote.user_id)
           );
-          // Log detalhado: usuários filtrados e suas respostas (sempre imprime, mesmo se vazio)
-          const userMap = {};
-          this.filteredPerspectiveUsers.forEach(u => { userMap[u.id] = { user: u, votes: [] }; });
-          filteredVotes.forEach(vote => {
-            const uid = allowedUserIds.has(vote.user) ? vote.user : vote.user_id;
-            if (userMap[uid]) userMap[uid].votes.push(vote);
-          });
-          console.log('DEBUG - Usuários filtrados (interseção das perspectivas):', this.filteredPerspectiveUsers);
-          console.log('DEBUG - Respostas dos usuários filtrados:', Object.values(userMap));
-          // Se filtrou, recalcula os percentuais
-          const labelCounts = {};
-          const totalVotes = filteredVotes.length;
-          if (filteredVotes.length) {
-            filteredVotes.forEach(vote => {
-              const labelKey = `label_${vote.label}`;
-              labelCounts[labelKey] = (labelCounts[labelKey] || 0) + 1;
+
+      const groupedData = {};
+      const allLabels = new Set();
+
+      // Obter IDs dos usuários filtrados por perspectiva
+      const allowedUserIds = new Set();
+      const allowedUsernames = new Set();
+      
+      if (this.filteredPerspectiveUsers.length > 0) {
+        this.filteredPerspectiveUsers.forEach(user => {
+          if (user.id) allowedUserIds.add(user.id);
+          if (user.username) allowedUsernames.add(user.username);
+        });
+      }
+
+      for (const { ex, ver } of versionsToUse) {
+        if (!this.versionsByExample[ex]?.includes(ver)) continue;
+
+        try {
+          // Buscar estatísticas
+          const params = this.buildStatsParams();
+          const stats = await this.$axios.$get(
+            `/v1/projects/${projectId}/dataset-version/${ex}/${ver}/stats/`,
+            { params }
+          );
+
+          // Buscar estatísticas de votação de usuários
+          const votingStats = await this.fetchVotingUserStats(projectId, ex, ver, params);
+          this.voteStatsByExampleVersion[`${ex}:${ver}`] = {
+            total_users: votingStats.total_users,
+            users_voted: votingStats.users_voted,
+            users_not_voted: votingStats.users_not_voted,
+            users_only_abstention: votingStats.users_only_abstention,
+            totalVotes: votingStats.total_votes
+          };
+
+          // Processar votos e recalcular percentuais se necessário
+          const processedData = this.processVotesAndCalculatePercentages(
+            stats,
+            allowedUserIds,
+            allowedUsernames
+          );
+
+          // Só adicionar se houver votos após filtragem
+          if (processedData.totalVotes > 0 || !this.hasActivePerspectiveFilters) {
+            const exampleName = this.getExampleName(ex);
+            if (!groupedData[exampleName]) groupedData[exampleName] = {};
+            if (!groupedData[exampleName][ver]) groupedData[exampleName][ver] = [];
+
+            // Coletar labels únicos
+            Object.keys(processedData.percentLabels).forEach(k => {
+              if (k.startsWith('label_')) allLabels.add(k);
             });
-          }
-          // Percentuais recalculados
-          const percentLabels = {};
-          Object.keys(labelCounts).forEach(k => {
-            percentLabels[k] = totalVotes > 0 ? `${((labelCounts[k] / totalVotes) * 100).toFixed(2)}%` : '0%';
-          });
-          // Substitui os percentuais originais pelos recalculados, se votes foi filtrado
-          if (filteredVotes.length || (this.filters.startDate || this.filters.endDate)) {
-            Object.keys(percentLabels).forEach(k => { stats[k] = percentLabels[k]; });
-            // Zera labels não presentes
-            Object.keys(stats).forEach(k => {
-              if (k.startsWith('label_') && !(k in percentLabels)) stats[k] = '0%';
-            });
-            stats.total = totalVotes;
-          }
-          // Coletar todos os campos de perspectiva e labels
-          if (stats.perspective_fields) {
-            allPerspectiveFields = 
-              allPerspectiveFields.concat(Object.keys(stats.perspective_fields))
-          }
-          Object.keys(stats).forEach(k => {
-            if (k.startsWith('label_')) allLabels.add(k)
-          })
-          // Preencher os campos de perspectiva na linha
-          const perspectiveData = {};
-          this.tableHeaders.forEach(header => {
-            const field = this.perspectiveFields.find(
-              f => f.name === header || String(f.id) === String(header));
-            if (field && this.filters.perspectiveValues[field.id]) {
-              perspectiveData[header] = this.filters.perspectiveValues[field.id];
-            }
-          });
-          const labelData = {}
-          const labelHeaders = Array.from(allLabels)
-          labelHeaders.forEach((label) => {
-            let val = stats[label];
-            if (!val || val === '0%' || val === 0) val = '0%';
-            const colName = label.replace(/^label_/, '');
-            labelData[colName] = val;
-          });
-          let statusValue = '';
-          if (this.filters.status !== null && this.filters.status !== undefined) {
-            const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status);
-            statusValue = statusOpt ? statusOpt.text : this.filters.status;
-          }
-          // Agrupamento e push devem acontecer aqui, onde ex e ver existem
-          const exampleName = this.exampleOptions.find(o => o.value === ex)?.text || `Example ${ex}`;
-          if (!groupedData[exampleName]) groupedData[exampleName] = {};
-          if (!groupedData[exampleName][ver]) groupedData[exampleName][ver] = [];
 
-          // Novo cálculo para null
-          const voteStats = this.getVoteStats([{ example: ex, version: ver }]);
-          let nullPercent = 0;
-          if (voteStats.totalUsers > 0) {
-            nullPercent = ((voteStats.totalUsers - voteStats.usersVoted) /
-               voteStats.totalUsers) * 100;
-          }
+            // Criar linha de dados
+            const rowData = this.createRowData(
+              ex,
+              ver,
+              processedData,
+              votingStats
+            );
 
-          let abstentionPercent = '0%';
-          if (voteStats.totalUsers > 0 && stats.votes && Array.isArray(stats.votes)) {
-            const totalAbstVotes = stats.votes.filter(v => v.label === null).length;
-            abstentionPercent = ((totalAbstVotes / voteStats.totalUsers) * 100).toFixed(2) + '%';
+            groupedData[exampleName][ver].push(rowData);
           }
-
-          groupedData[exampleName][ver].push({
-            example: ex,
-            version: ver,
-            ...perspectiveData,
-            ...labelData,
-            ...(this.filters.status !== null ? { Status: statusValue } : {}),
-            ...(this.filters.startDate ? { 'Begin Date': this.filters.startDate } : {}),
-            ...(this.filters.endDate ? { 'End Date': this.filters.endDate } : {}),
-            abstention: abstentionPercent,
-            null: nullPercent.toFixed(2) + '%'
-          });
-        } catch {
-          rows.push({
-            example: ex,
-            exampleName: this.exampleOptions.find(o => o.value === ex)?.text,
-            version: ver,
-            total: 0,
-            concordant: 0,
-            discordant: 0
-          })
+        } catch (error) {
+          console.error(`Erro ao buscar dados para exemplo ${ex}, versão ${ver}:`, error);
         }
       }
-      // Remover duplicatas dos campos de perspectiva
-      allPerspectiveFields = [...new Set(allPerspectiveFields)]
-      allLabels = Array.from(allLabels)
-      // Determinar os campos de perspectiva filtrados
-      const filteredPerspectiveFields = Object.keys(
-          this.filters.perspectiveValues).filter(k => this.filters.perspectiveValues[k]);
-      const perspectiveFieldHeaders = filteredPerspectiveFields.map(id => {
-        const field = this.perspectiveFields.find(f => String(f.id) === String(id));
-        return field ? field.name : id;
-      });
-      // Determinar labels a exibir: todos ou apenas os escolhidos
-      let labelHeaders = allLabels;
-      if (this.filters.category && this.filters.category.length > 0) {
-        const selectedCats = 
-          this.categoryOptions.filter(opt => this.filters.category.includes(opt.value));
-        const selectedTexts = selectedCats.map(opt => String(opt.text).toLowerCase().trim());
-        labelHeaders = allLabels.filter(lab => {
-          const labelSuffix = lab.replace(/^label_/, '').toLowerCase().trim();
-          return selectedTexts.includes(labelSuffix);
-        });
-        // Se não encontrar nenhum, mostra todos como fallback
-        if (labelHeaders.length === 0) labelHeaders = allLabels;
+
+      // Configurar headers e dados finais
+      this.configureTableHeaders(allLabels);
+      this.reportData = groupedData;
+    },
+
+    processVotesAndCalculatePercentages(stats, allowedUserIds, allowedUsernames) {
+          let filteredVotes = stats.votes || [];
+      const hasUserFilter = allowedUserIds.size > 0 || allowedUsernames.size > 0;
+
+      // Filtrar por data se necessário
+      if (this.filters.startDate || this.filters.endDate) {
+        filteredVotes = this.filterVotesByDate(filteredVotes);
       }
-      // Remover o label 'null' dos headers dinâmicos para evitar coluna duplicada
-      labelHeaders = labelHeaders.filter(lab => lab.replace(/^label_/, '').toLowerCase() !== 'null');
-      // Ordenar alfabeticamente pelo nome amigável
-      labelHeaders = labelHeaders.sort((a, b) => {
+
+      // Filtrar por usuários permitidos (perspectiva)
+      if (hasUserFilter) {
+            filteredVotes = filteredVotes.filter(vote => {
+          // Verificar por ID ou username
+          return (vote.user && allowedUserIds.has(vote.user)) ||
+                 (vote.user_id && allowedUserIds.has(vote.user_id)) ||
+                 (vote.username && allowedUsernames.has(vote.username));
+        });
+      }
+
+      // Separar votos válidos e abstenções
+          const labelCounts = {};
+      let nullCount = 0;
+      const validVotes = filteredVotes.filter(
+          vote => vote.label !== null && vote.label !== undefined);
+      const totalVotes = validVotes.length; // Só votos válidos contam para percentuais
+      const totalVotesWithNull = filteredVotes.length; // Para abstenção
+
+            filteredVotes.forEach(vote => {
+        if (vote.label === null || vote.label === undefined) {
+          nullCount++;
+        } else {
+              const labelKey = `label_${vote.label}`;
+              labelCounts[labelKey] = (labelCounts[labelKey] || 0) + 1;
+          }
+      });
+
+      // Calcular percentuais
+          const percentLabels = {};
+      Object.entries(labelCounts).forEach(([key, count]) => {
+        percentLabels[key] = totalVotes > 0 
+          ? `${((count / totalVotes) * 100).toFixed(2)}%` 
+          : '0%';
+      });
+
+      // Adicionar percentual de abstenção (em relação ao total de votos originais)
+      const abstentionPercent = totalVotesWithNull > 0 
+        ? `${((nullCount / totalVotesWithNull) * 100).toFixed(2)}%`
+        : '0%';
+
+      return {
+        totalVotes,
+        percentLabels,
+        abstentionPercent,
+        filteredVotes,
+        labelCounts
+      };
+    },
+
+    filterVotesByDate(votes) {
+      if (!votes || !votes.length) return votes;
+
+      const start = this.filters.startDate ? new Date(this.filters.startDate) : null;
+      const end = this.filters.endDate ? new Date(this.filters.endDate) : null;
+
+      return votes.filter(vote => {
+        if (!vote.created_at) return true;
+        const voteDate = new Date(vote.created_at);
+        if (start && voteDate < start) return false;
+        if (end && voteDate > end) return false;
+        return true;
+      });
+    },
+
+    buildStatsParams() {
+      const params = {};
+      
+      // Não enviar filtros de perspectiva para o backend nas estatísticas gerais
+      // Vamos filtrar localmente
+      
+      if (this.filters.startDate) params.start_date = this.filters.startDate;
+      if (this.filters.endDate) params.end_date = this.filters.endDate;
+      
+      return params;
+    },
+
+    async fetchVotingUserStats(projectId, exampleId, version, baseParams) {
+      try {
+        // Para voting-user-stats, não enviamos filtros de perspectiva
+        const params = { ...baseParams };
+        Object.keys(params).forEach(key => {
+          if (key.startsWith('perspective_')) {
+            delete params[key];
+          }
+        });
+
+        const stats = await this.$axios.$get(
+          `/v1/projects/${projectId}/dataset-version/${exampleId}/${version}/voting-user-stats/`,
+          { params }
+        );
+        
+        return stats;
+      } catch (error) {
+        console.error('Erro ao buscar voting-user-stats:', error);
+        return {};
+      }
+    },
+
+    createRowData(exampleId, version, processedData, votingStats) {
+      // Dados de perspectiva
+      const perspectiveData = {};
+      this.perspectiveFields.forEach(field => {
+        if (this.filters.perspectiveValues[field.id]) {
+          perspectiveData[field.name] = this.filters.perspectiveValues[field.id];
+        }
+      });
+
+      // Dados de labels
+      const labelData = {};
+      Object.entries(processedData.percentLabels).forEach(([key, value]) => {
+        const labelName = key.replace(/^label_/, '');
+        labelData[labelName] = value;
+      });
+
+      // Calcular percentual de "não votou" (null)
+      let nullPercent = '0%';
+      if (votingStats.total_users > 0) {
+        const usersNotVoted = votingStats.users_not_voted || 0;
+        nullPercent = `${((usersNotVoted / votingStats.total_users) * 100).toFixed(2)}%`;
+      }
+
+      // Status se aplicável
+      const statusData = {};
+          if (this.filters.status !== null && this.filters.status !== undefined) {
+            const statusOpt = this.statusOptions.find(opt => opt.value === this.filters.status);
+        statusData.Status = statusOpt ? statusOpt.text : this.filters.status;
+      }
+
+      // Datas se aplicável
+      const dateData = {};
+      if (this.filters.startDate) dateData['Begin Date'] = this.filters.startDate;
+      if (this.filters.endDate) dateData['End Date'] = this.filters.endDate;
+
+      return {
+        example: exampleId,
+        version,
+            ...perspectiveData,
+            ...labelData,
+        ...statusData,
+        ...dateData,
+        abstention: processedData.abstentionPercent,
+        null: nullPercent,
+        // Metadados para ajudar no processamento
+        _meta: {
+          votes: processedData.filteredVotes,
+          totalVotes: processedData.totalVotes,
+          votingStats
+        }
+      };
+    },
+
+    configureTableHeaders(allLabels) {
+      // Campos de perspectiva filtrados
+      const perspectiveHeaders = [];
+      Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
+        if (value) {
+          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+          if (field) {
+            perspectiveHeaders.push(field.name);
+          }
+        }
+      });
+
+      // Labels selecionados ou todos
+      let labelHeaders = Array.from(allLabels);
+      if (this.filters.category && this.filters.category.length > 0) {
+        const selectedCats = this.categoryOptions
+          .filter(opt => this.filters.category.includes(opt.value))
+          .map(opt => String(opt.text).toLowerCase().trim());
+        
+        labelHeaders = labelHeaders.filter(lab => {
+          const labelName = lab.replace(/^label_/, '').toLowerCase().trim();
+          return selectedCats.includes(labelName);
+        });
+      }
+
+      // Remover 'null' dos headers de labels
+      labelHeaders = labelHeaders.filter(lab => 
+        lab.replace(/^label_/, '').toLowerCase() !== 'null'
+      );
+
+      // Ordenar labels alfabeticamente
+      labelHeaders.sort((a, b) => {
         const nameA = a.replace(/^label_/, '').toLowerCase();
         const nameB = b.replace(/^label_/, '').toLowerCase();
         return nameA.localeCompare(nameB);
       });
-      // Montar nomes amigáveis para os labels nas colunas
+
+      // Montar headers finais
       const labelColumnNames = labelHeaders.map(lab => lab.replace(/^label_/, ''));
-      const tableHeaders = [
-        ...perspectiveFieldHeaders,
+      
+      this.tableHeaders = [
+        ...perspectiveHeaders,
         ...labelColumnNames,
         ...(this.filters.status !== null ? ['Status'] : []),
         ...(this.filters.startDate ? ['Begin Date'] : []),
         ...(this.filters.endDate ? ['End Date'] : []),
         'abstention',
         'X (no vote)'
-      ]
-      // Ordenar rows por exampleName
-      rows.sort((a, b) => (a.exampleName || '').localeCompare(b.exampleName || ''));
-      
-      this.reportData = groupedData;
-      this.tableHeaders = tableHeaders;
+      ];
     },
+
+    // Métodos auxiliares
+    getExampleName(exampleId) {
+      return this.exampleOptions.find(o => o.value === exampleId)?.text || `Example ${exampleId}`;
+    },
+
+    async fetchVersionsForExamples(exampleIds) {
+      const projectId = this.$route.params.id;
+      const calls = exampleIds.map(id =>
+        this.$axios.$get(`/v1/projects/${projectId}/dataset-version/${id}/versions/`)
+          .then(res => ({ id, res }))
+          .catch(() => ({ id, res: { versions: [] } }))
+      );
+
+      const results = await Promise.all(calls);
+      this.versionsByExample = {};
+      
+      results.forEach(({ id, res }) => {
+        const versions = Array.isArray(res.versions) ? res.versions : [];
+        this.versionsByExample[id] = versions
+          .map(v => typeof v === 'number' ? v : v.version)
+          .filter(v => Number.isFinite(v));
+      });
+    },
+
+    // Método melhorado para obter estatísticas de voto
+    getVoteStats(rows) {
+      if (!Array.isArray(rows) || !rows.length) {
+        return {
+          totalUsers: 0,
+          usersVoted: 0,
+          usersNotVoted: 0,
+          usersOnlyAbstention: 0,
+          totalVotes: 0
+        };
+      }
+
+      const row = rows[0];
+      if (row._meta && row._meta.votingStats) {
+        const stats = row._meta.votingStats;
+        return {
+          totalUsers: stats.total_users || 0,
+          usersVoted: stats.users_voted || 0,
+          usersNotVoted: stats.users_not_voted || 0,
+          usersOnlyAbstention: stats.users_only_abstention || 0,
+          totalVotes: row._meta.totalVotes || 0
+        };
+      }
+
+      // Fallback para formato antigo
+      const key = `${row.example}:${row.version}`;
+      if (this.voteStatsByExampleVersion[key]) {
+        const stats = this.voteStatsByExampleVersion[key];
+        return {
+          totalUsers: stats.total_users || 0,
+          usersVoted: stats.users_voted || 0,
+          usersNotVoted: stats.users_not_voted || 0,
+          usersOnlyAbstention: stats.users_only_abstention || 0,
+          totalVotes: row.total || 0
+        };
+      }
+
+      return {
+        totalUsers: 0,
+        usersVoted: 0,
+        usersNotVoted: 0,
+        usersOnlyAbstention: 0,
+        totalVotes: 0
+      };
+    },
+
+    // Obter usernames filtrados
+    getFilteredUsernames(rows) {
+      if (!Array.isArray(rows) || !rows.length) return [];
+      
+      const usernames = new Set();
+      rows.forEach(row => {
+        if (row._meta && row._meta.votes) {
+          row._meta.votes.forEach(vote => {
+            if (vote.user) usernames.add(vote.user);
+          });
+        }
+      });
+      
+      return Array.from(usernames);
+    },
+
+    // Método melhorado para buscar usuários filtrados por perspectiva
+    async fetchFilteredPerspectiveUsers() {
+      // Limpar usuários anteriores
+      this.filteredPerspectiveUsers = [];
+
+      // Obter apenas campos com valores selecionados
+      const activeFilters = Object.entries(this.filters.perspectiveValues)
+        .filter(([_, value]) => value && value !== '');
+
+      if (!this.projectPerspective || activeFilters.length === 0) {
+        return;
+      }
+
+      const projectPerspectiveId = this.projectPerspective.id;
+
+      try {
+        if (activeFilters.length === 1) {
+          // Caso simples: apenas um filtro
+          const [fieldId, value] = activeFilters[0];
+          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+          const fieldName = field ? field.name : fieldId;
+
+          console.log('Buscando usuários com filtro único:', { fieldName, value });
+
+          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
+            params: {
+              project_perspective_id: projectPerspectiveId,
+              field_name: fieldName,
+              value
+            }
+          });
+
+          this.filteredPerspectiveUsers = this.normalizeUserResponse(response);
+          console.log(`Usuários encontrados: ${this.filteredPerspectiveUsers.length}`);
+
+        } else {
+          // Múltiplos filtros: buscar cada um e fazer interseção
+          console.log('Buscando usuários com múltiplos filtros:', activeFilters);
+          
+          const userSetPromises = activeFilters.map(async ([fieldId, value]) => {
+            const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
+            const fieldName = field ? field.name : fieldId;
+
+            const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
+              params: {
+                project_perspective_id: projectPerspectiveId,
+                field_name: fieldName,
+                value
+              }
+            });
+
+            const users = this.normalizeUserResponse(response);
+            return {
+              fieldName,
+              value,
+              users,
+              userIds: new Set(users.map(u => u.id))
+            };
+          });
+
+          const userSets = await Promise.all(userSetPromises);
+
+          // Log detalhado de cada conjunto
+          userSets.forEach(({ fieldName, value, users }) => {
+            console.log(`Campo "${fieldName}" = "${value}": ${users.length} usuários`);
+          });
+
+          // Calcular interseção
+          const intersection = this.calculateUserIntersection(userSets);
+          
+          console.log(`Interseção final: ${intersection.length} usuários`);
+          console.log('Usuários na interseção:', intersection.map(u => u.username || u.id));
+
+          this.filteredPerspectiveUsers = intersection;
+        }
+      } catch (error) {
+        console.error('Erro ao buscar usuários filtrados:', error);
+        this.filteredPerspectiveUsers = [];
+      }
+    },
+
+    // Normalizar resposta da API de usuários
+    normalizeUserResponse(response) {
+      if (Array.isArray(response)) {
+        return response;
+      } else if (response && Array.isArray(response.users)) {
+        return response.users;
+      }
+      return [];
+    },
+
+    // Calcular interseção de conjuntos de usuários
+    calculateUserIntersection(userSets) {
+      if (userSets.length === 0) return [];
+      if (userSets.length === 1) return userSets[0].users;
+
+      // Começar com os IDs do primeiro conjunto
+      let intersectionIds = userSets[0].userIds;
+
+      // Fazer interseção com cada conjunto subsequente
+      for (let i = 1; i < userSets.length; i++) {
+        intersectionIds = new Set(
+          [...intersectionIds].filter(id => userSets[i].userIds.has(id))
+        );
+      }
+
+      // Recuperar objetos de usuário completos da interseção
+      const userMap = new Map();
+      userSets.forEach(({ users }) => {
+        users.forEach(user => {
+          if (intersectionIds.has(user.id)) {
+            userMap.set(user.id, user);
+          }
+        });
+      });
+
+      return Array.from(userMap.values());
+    },
+
     clearFilters() {
       this.filters.examples = []
       this.filters.versions = []
@@ -766,34 +1069,15 @@ export default {
       this.filters.startDateMenu = false
       this.filters.endDateMenu = false
       this.filters.status = null
+      this.filteredPerspectiveUsers = []
     },
-    getTotalLabels(rows) {
-      // Soma os percentuais das labels regulares (exclui 'abstention' e 'null')
-      if (!Array.isArray(rows) || !rows.length) return '0.0';
-      const labelKeys = this.tableHeaders.filter(h => h !== 'abstention' && h !== 'null' && h !== 'Status' && h !== 'Begin Date' && h !== 'End Date');
-      let total = 0;
-      for (const row of rows) {
-        for (const key of labelKeys) {
-          let val = row[key];
-          if (typeof val === 'string' && val.endsWith('%')) val = parseFloat(val);
-          if (!isNaN(val) && val !== '-' && key !== 'abstention' && key !== 'null') total += Number(val);
-        }
-      }
-      return total.toFixed(1);
+
+    getExampleTotalUsers(versions) {
+      const firstVersionRows = Object.values(versions)[0];
+      if (!Array.isArray(firstVersionRows) || !firstVersionRows.length) return 0;
+      return this.getVoteStats(firstVersionRows).totalUsers;
     },
-    getTotalAbstentionNull(rows) {
-      // Soma os percentuais das colunas 'abstention' e 'null'
-      if (!Array.isArray(rows) || !rows.length) return '0.0';
-      let total = 0;
-      for (const row of rows) {
-        ['abstention', 'null'].forEach(key => {
-          let val = row[key];
-          if (typeof val === 'string' && val.endsWith('%')) val = parseFloat(val);
-          if (!isNaN(val) && val !== '-') total += Number(val);
-        });
-      }
-      return total.toFixed(1);
-    },
+
     formatPercent(val) {
       if (val === undefined || val === null || val === '' || val === '-' || val === 0 || val === '0' || val === '0.0') return '0%';
       if (typeof val === 'string' && val.endsWith('%')) return val;
@@ -801,18 +1085,26 @@ export default {
       if (isNaN(num)) return '0%';
       return num.toFixed(1) + '%';
     },
-    buildExportParams() {
-      const params = new URLSearchParams();
-      if (this.filters.startDate) params.append('start_date', this.filters.startDate);
-      if (this.filters.endDate) params.append('end_date', this.filters.endDate);
-      if (this.filters.category && this.filters.category.length > 0) params.append('label', this.filters.category.join(','));
-      if (this.filters.status !== null && this.filters.status !== undefined) params.append('resolved', this.filters.status);
-      if (this.filters.perspective) params.append('perspective', this.filters.perspective);
-      Object.entries(this.filters.perspectiveValues).forEach(([fieldId, value]) => {
-        if (value) params.append(`perspective_${fieldId}`, value);
+
+    // Retorna true se este header é o label de maior valor da linha
+    isMaxLabelCell(header, row) {
+      // Só aplica para colunas de label regular
+      if (['abstention', 'null', 'Status', 'Begin Date', 'End Date'].includes(header)) return false;
+      // Pega só os valores das colunas de label
+      const labelKeys = this.tableHeaders.filter(h => !['abstention', 'null', 'Status', 'Begin Date', 'End Date'].includes(h));
+      let max = -Infinity;
+      let maxKey = null;
+      labelKeys.forEach(h => {
+        let val = row[h];
+        if (typeof val === 'string' && val.endsWith('%')) val = parseFloat(val);
+        if (!isNaN(val) && val > max) {
+          max = val;
+          maxKey = h;
+        }
       });
-      return params.toString();
+      return header === maxKey && max > 0;
     },
+
     exportReportCSV() {
       this.exportingCSV = true;
       try {
@@ -837,8 +1129,9 @@ export default {
             const versionNames = this.versionOptions
               .filter(opt => this.filters.versions.includes(opt.value))
               .map(opt => opt.text || opt.header)
+              .filter(text => text && !text.includes('Example'))
               .join(', ');
-            parts.push(`Versions: ${versionNames}`);
+            if (versionNames) parts.push(`Versions: ${versionNames}`);
           }
           // Categories nomes
           if (this.filters.category && this.filters.category.length) {
@@ -856,56 +1149,36 @@ export default {
           }
           if (this.filters.startDate) parts.push(`Start Date: ${this.filters.startDate}`);
           if (this.filters.endDate) parts.push(`End Date: ${this.filters.endDate}`);
-          // Perspective nome
-          if (this.filters.perspective) {
-            const perspName = (this.perspectives.find(
-              p => p.id === this.filters.perspective) || {}).name || this.filters.perspective;
-            parts.push(`Perspective: ${perspName}`);
-          }
           // Perspective Values nomes
           if (this.filters.perspectiveValues &&
              Object.keys(this.filters.perspectiveValues).length) {
-            const pvParts = Object.entries(this.filters.perspectiveValues).map(([fid, val]) => {
-              const field = this.perspectiveFields.find(f => String(f.id) === String(fid));
-              const label = field ? field.name : fid;
-              let valueLabel = val;
-              if (field && field.choices && Array.isArray(val)) {
-                valueLabel = val.map(v => {
-                  const choice = field.choices.find(
-                    c => c === v || (c.value !== undefined && c.value === v));
-                  return choice && choice.text ? choice.text : v;
-                }).join(', ');
-              } else if (field && field.choices) {
-                const choice = field.choices.find(
-                  c => c === val || (c.value !== undefined && c.value === val));
-                valueLabel = choice && choice.text ? choice.text : val;
-              }
-              return `${label}: ${valueLabel}`;
-            });
-            parts.push(`Perspective Values: ${pvParts.join(' | ')}`);
+            const pvParts = Object.entries(this.filters.perspectiveValues)
+              .filter(([_, val]) => val && val !== '')
+              .map(([fid, val]) => {
+                const field = this.perspectiveFields.find(f => String(f.id) === String(fid));
+                const label = field ? field.name : fid;
+                return `${label}: ${val}`;
+              });
+            if (pvParts.length) parts.push(`Perspective Values: ${pvParts.join(' | ')}`);
           }
           filterDesc += parts.join(' | ');
         } else {
           filterDesc = 'No filters applied. Showing all perspectives and options.';
         }
-        csv += `"${filterDesc}"
-
-`;
+        csv += `"${filterDesc}"\n\n`;
+        
         // Para cada exemplo
         Object.entries(this.reportData).forEach(([exampleName, versions]) => {
           // Total de usuários por exemplo
           const totalUsers = this.getExampleTotalUsers(versions);
-          csv += `"${exampleName}";"Total users: ${totalUsers}"
-`;
+          csv += `"${exampleName}";"Total users: ${totalUsers}"\n`;
           Object.entries(versions).forEach(([version, rows]) => {
             // Cabeçalho de bloco
-            csv += `"Version ${version}";"Users that voted: ${this.getVoteStats(rows).usersVoted}"
-`;
+            csv += `"Version ${version}";"Users that voted: ${this.getVoteStats(rows).usersVoted}"\n`;
             // Adicionar lista de usuários filtrados
             const filteredUsers = this.getFilteredUsernames(rows);
             if (filteredUsers.length) {
-              csv += `"Filtered users: ${filteredUsers.join(', ')}"
-`;
+              csv += `"Filtered users: ${filteredUsers.join(', ')}"\n`;
             }
             // Cabeçalho de colunas (apenas uma vez por bloco)
             csv += headers.map(h => `"${h}"`).join(';') + '\n';
@@ -945,6 +1218,7 @@ export default {
         this.exportingCSV = false;
       }
     },
+
     exportReportPDF() {
       this.exportingPDF = true;
       this.$nextTick(async () => {
@@ -973,8 +1247,9 @@ export default {
               const versionNames = this.versionOptions
                 .filter(opt => this.filters.versions.includes(opt.value))
                 .map(opt => opt.text || opt.header)
+                .filter(text => text && !text.includes('Example'))
                 .join(', ');
-              parts.push(`Versions: ${versionNames}`);
+              if (versionNames) parts.push(`Versions: ${versionNames}`);
             }
             // Categories nomes
             if (this.filters.category && this.filters.category.length) {
@@ -992,33 +1267,17 @@ export default {
             }
             if (this.filters.startDate) parts.push(`Start Date: ${this.filters.startDate}`);
             if (this.filters.endDate) parts.push(`End Date: ${this.filters.endDate}`);
-            // Perspective nome
-            if (this.filters.perspective) {
-              const perspName = (this.perspectives.find(
-                  p => p.id === this.filters.perspective) || {}).name || this.filters.perspective;
-              parts.push(`Perspective: ${perspName}`);
-            }
             // Perspective Values nomes
             if (this.filters.perspectiveValues &&
                Object.keys(this.filters.perspectiveValues).length) {
-              const pvParts = Object.entries(this.filters.perspectiveValues).map(([fid, val]) => {
-                const field = this.perspectiveFields.find(f => String(f.id) === String(fid));
-                const label = field ? field.name : fid;
-                let valueLabel = val;
-                if (field && field.choices && Array.isArray(val)) {
-                  valueLabel = val.map(v => {
-                    const choice = field.choices.find(
-                      c => c === v || (c.value !== undefined && c.value === v));
-                    return choice && choice.text ? choice.text : v;
-                  }).join(', ');
-                } else if (field && field.choices) {
-                  const choice = field.choices.find(
-                    c => c === val || (c.value !== undefined && c.value === val));
-                  valueLabel = choice && choice.text ? choice.text : val;
-                }
-                return `${label}: ${valueLabel}`;
-              });
-              parts.push(`Perspective Values: ${pvParts.join(' | ')}`);
+              const pvParts = Object.entries(this.filters.perspectiveValues)
+                .filter(([_, val]) => val && val !== '')
+                .map(([fid, val]) => {
+                  const field = this.perspectiveFields.find(f => String(f.id) === String(fid));
+                  const label = field ? field.name : fid;
+                  return `${label}: ${val}`;
+                });
+              if (pvParts.length) parts.push(`Perspective Values: ${pvParts.join(' | ')}`);
             }
             filterDesc += parts.join(' | ') + '</div>';
           } else {
@@ -1059,7 +1318,9 @@ export default {
                   }
                   if (h === 'abstention' || h === 'X (no vote)') val = this.formatPercent(val);
                   if (val === undefined || val === null) val = '';
-                  table += `<td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${val}</td>`;
+                  const isMax = this.isMaxLabelCell(h, row);
+                  const bgColor = isMax ? 'background:#fff9c4;font-weight:bold;' : '';
+                  table += `<td style="border:1px solid #ccc;padding:6px 8px;text-align:center;${bgColor}">${val}</td>`;
                 });
                 table += '</tr>';
               });
@@ -1112,191 +1373,7 @@ export default {
           this.exportingPDF = false;
         }
       });
-    },
-    // Retorna true se este header é o label de maior valor da linha
-    isMaxLabelCell(header, row) {
-      // Só aplica para colunas de label regular
-      if (['abstention', 'null', 'Status', 'Begin Date', 'End Date'].includes(header)) return false;
-      // Pega só os valores das colunas de label
-      const labelKeys = this.tableHeaders.filter(h => !['abstention', 'null', 'Status', 'Begin Date', 'End Date'].includes(h));
-      let max = -Infinity;
-      let maxKey = null;
-      labelKeys.forEach(h => {
-        let val = row[h];
-        if (typeof val === 'string' && val.endsWith('%')) val = parseFloat(val);
-        if (!isNaN(val) && val > max) {
-          max = val;
-          maxKey = h;
-        }
-      });
-      return header === maxKey && max > 0;
-    },
-    // Calcula estatísticas de votos/abstenção/null por versão
-    getVoteStats(rows) {
-      if (!Array.isArray(rows) || !rows.length)
-        return {
-          totalUsers: 0,
-          usersVoted: 0,
-          usersNotVoted: 0,
-          usersOnlyAbstention: 0,
-          totalVotes: 0
-        };
-      const row = rows[0];
-      const key = row && row.example !== undefined && row.version !== undefined
-        ? `${row.example}:${row.version}`
-        : null;
-      if (key && this.voteStatsByExampleVersion && this.voteStatsByExampleVersion[key]) {
-        const stats = this.voteStatsByExampleVersion[key];
-        return {
-          totalUsers: stats.total_users || 0,
-          usersVoted: stats.users_voted || 0,
-          usersNotVoted: stats.users_not_voted || 0,
-          usersOnlyAbstention: stats.users_only_abstention || 0,
-          totalVotes: row.total || 0
-        };
-      }
-      // fallback antigo
-      return {
-        totalUsers: 0,
-        usersVoted: 0,
-        usersNotVoted: 0,
-        usersOnlyAbstention: 0,
-        totalVotes: 0
-      };
-    },
-    getExampleTotalUsers(versions) {
-      const firstVersionRows = Object.values(versions)[0];
-      if (!Array.isArray(firstVersionRows) || !firstVersionRows.length) return 0;
-      return this.getVoteStats(firstVersionRows).totalUsers;
-    },
-    getAbstentionPercent(stats, voteStats) {
-      // Lógica igual ao discrepancy_automatic.vue: soma dos valores de stats.abstencao
-      if (stats && stats.abstencao && voteStats && voteStats.totalUsers > 0) {
-        const totalAbst = Object.values(stats.abstencao).reduce((a, b) => a + Number(b), 0);
-        return ((totalAbst / voteStats.totalUsers) * 100).toFixed(2) + '%';
-      }
-      return '0%';
-    },
-    getFilteredUsernames(rows) {
-      // Retorna a lista de usernames dos votos filtrados (sem duplicatas)
-      if (!Array.isArray(rows) || !rows.length) return [];
-      const usernames = new Set();
-      rows.forEach(row => {
-        if (row.votes && Array.isArray(row.votes)) {
-          row.votes.forEach(vote => {
-            if (vote.user) usernames.add(vote.user);
-          });
-        } else if (row.user) {
-          usernames.add(row.user);
-        }
-      });
-      return Array.from(usernames);
-    },
-    async fetchFilteredPerspectiveUsers() {
-      // Só busca se houver filtro ativo
-      const perspectiveFieldEntries = 
-        Object.entries(this.filters.perspectiveValues).filter(([_, v]) => v);
-      if (!this.projectPerspective || !perspectiveFieldEntries.length) {
-        this.filteredPerspectiveUsers = [];
-        return;
-      }
-      // Corrigir para enviar o NOME do campo (field.name) como field_name
-      const projectPerspectiveId = this.projectPerspective?.id;
-      // Se só um campo, lógica antiga
-      if (perspectiveFieldEntries.length === 1) {
-        const [fieldId, value] = perspectiveFieldEntries[0];
-        const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
-        // Enviar o nome do campo, não o id
-        const fieldName = field ? field.name : fieldId;
-        try {
-          console.log('URL chamada:', '/api/v1/users_with_perspective_value/', {
-            project_perspective_id: projectPerspectiveId,
-            field_name: fieldName,
-            value
-          });
-          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
-            params: {
-              project_perspective_id: projectPerspectiveId,
-              field_name: fieldName,
-              value
-            }
-          });
-          let users = [];
-          if (Array.isArray(response)) {
-            users = response;
-          } else if (response && Array.isArray(response.users)) {
-            users = response.users;
-          }
-          this.filteredPerspectiveUsers = users;
-          console.log('Usuários filtrados pelo backend:', users);
-        } catch (e) {
-          this.filteredPerspectiveUsers = [];
-        }
-        return;
-      }
-      // Múltiplos campos: buscar todos e fazer interseção
-      try {
-        const userSets = [];
-        for (const [fieldId, value] of perspectiveFieldEntries) {
-          const field = this.perspectiveFields.find(f => String(f.id) === String(fieldId));
-          // Enviar o nome do campo, não o id
-          const fieldName = field ? field.name : fieldId;
-          console.log('URL chamada:', '/api/v1/users_with_perspective_value/', {
-            project_perspective_id: projectPerspectiveId,
-            field_name: fieldName,
-            value,
-          });
-          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
-            params: {
-              project_perspective_id: projectPerspectiveId,
-              field_name: fieldName,
-              value,
-              user
-            }
-          });
-          let users = [];
-          if (Array.isArray(response)) {
-            users = response;
-          } else if (response && Array.isArray(response.users)) {
-            users = response.users;
-          }
-          userSets.push(new Set(users.map(u => u.id)));
-        }
-        // Interseção dos conjuntos
-        const filteredUserIds = userSets.reduce((acc, set) => {
-          if (acc === null) return set;
-          return new Set([...acc].filter(x => set.has(x)));
-        }, null);
-        // Buscar dados completos dos usuários (opcional)
-        // Aqui, pegue os dados do primeiro conjunto que bater com o id
-        let allUsers = [];
-        if (userSets.length > 0) {
-          // Pegue todos os users do primeiro campo
-          const firstField = perspectiveFieldEntries[0];
-          const field = this.perspectiveFields.find(f => String(f.id) === String(firstField[0]));
-          // Enviar o nome do campo, não o id
-          const fieldName = field ? field.name : firstField[0];
-          const response = await this.$axios.$get('/api/v1/users_with_perspective_value/', {
-            params: {
-              project_perspective_id: projectPerspectiveId,
-              field_name: fieldName,
-              value: firstField[1]
-            }
-          });
-          if (Array.isArray(response)) {
-            allUsers = response;
-          } else if (response && Array.isArray(response.users)) {
-            allUsers = response.users;
-          }
-        }
-        // Filtrar os dados completos para manter só os que estão na interseção
-        const filteredUsers = allUsers.filter(u => filteredUserIds.has(u.id));
-        console.log('Lista final de usuários filtrados por perspectiva:', filteredUsers);
-        this.filteredPerspectiveUsers = filteredUsers;
-      } catch (e) {
-        this.filteredPerspectiveUsers = [];
-      }
-    },
+    }
   }
 }
 </script>
