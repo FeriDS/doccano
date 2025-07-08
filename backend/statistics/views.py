@@ -541,7 +541,7 @@ class AnnotationStatisticsAPI(APIView):
                         value = abstraction_data['data'][idx]
                     else:
                         value = 0
-                    buffer.write(f'{label};{float(value):.2f}%\n')
+                    buffer.write(f'{label};{float(value):.1f}%\n')
                     if (label.lower().find('abstração') != -1 or 
                         label.lower().find('abstraction') != -1 or 
                         label.lower().find('abstenção') != -1 or
@@ -561,8 +561,8 @@ class AnnotationStatisticsAPI(APIView):
                         elif label in abstraction_data.get('labels', []):
                             idx = abstraction_data['labels'].index(label)
                             regular_total += float(abstraction_data['data'][idx])
-                buffer.write(f'Total Regular Labels;{regular_total:.2f}%\n')
-                buffer.write(f'Total Non-Voted;{non_voted_total:.2f}%\n')
+                buffer.write(f'Total Regular Labels;{regular_total:.1f}%\n')
+                buffer.write(f'Total Non-Voted;{non_voted_total:.1f}%\n')
                 buffer.write('\n')
         else:
             buffer.write('No example displayed for the applied filters.\n\n')
@@ -670,7 +670,7 @@ class AnnotationStatisticsAPI(APIView):
                     all_values = [x[1] for x in combined]
                     dist_data = [['Label', 'Percentage (%)']]
                     for label, value in zip(all_labels, all_values):
-                        dist_data.append([label, f"{value}%"])
+                        dist_data.append([label, f"{float(value):.1f}%"])
                     regular_total = 0
                     non_voted_total = 0
                     for label, value in zip(all_labels, all_values):
@@ -815,7 +815,7 @@ class AnnotationStatisticsAPI(APIView):
                         ws2.write(row, 0, example_id if first else '', data_format)
                         ws2.write(row, 1, example_text if first else '', data_format)
                         ws2.write(row, 2, label, data_format)
-                        ws2.write(row, 3, value / 100, percent_format)
+                        ws2.write(row, 3, float(f"{value/100:.3f}"), percent_format)
                         first = False
 
         if chartImages:
@@ -850,7 +850,7 @@ class AnnotationStatisticsAPI(APIView):
                 if reg_labels and reg_values:
                     for i, label in enumerate(reg_labels):
                         ws3.write(data_start_row + i, 0, label)
-                        ws3.write(data_start_row + i, 1, reg_values[i])
+                        ws3.write(data_start_row + i, 1, float(f"{reg_values[i]:.1f}"))
                     chart1 = workbook.add_chart({'type': 'column'})
                     chart1.add_series({
                         'name': f'Label Distribution - Example {example_id}',
@@ -868,7 +868,7 @@ class AnnotationStatisticsAPI(APIView):
                 if abs_labels and abs_values:
                     for i, label in enumerate(abs_labels):
                         ws3.write(data_start_row + 10 + i, 0, label)
-                        ws3.write(data_start_row + 10 + i, 1, abs_values[i])
+                        ws3.write(data_start_row + 10 + i, 1, float(f"{abs_values[i]:.1f}"))
                     chart2.add_series({
                         'name': f'Abstention/Null - Example {example_id}',
                         'categories': ['Charts', data_start_row + 10, 0, data_start_row + 10 + len(abs_labels) - 1, 0],

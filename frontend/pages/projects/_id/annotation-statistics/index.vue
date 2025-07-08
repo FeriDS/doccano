@@ -1154,7 +1154,7 @@ export default {
       allLabels.forEach((label, i) => {
         if (!['null', 'Null', 'abstention', 'Abstention', 'abstenção', 'Abstração'].includes(label.toLowerCase())) {
           regularLabels.push(label);
-          regularData.push(allData[i]);
+          regularData.push(Number(allData[i].toFixed(2)));
         }
       });
 
