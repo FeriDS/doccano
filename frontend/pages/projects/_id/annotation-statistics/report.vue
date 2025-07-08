@@ -18,149 +18,117 @@
     </div>
 
     <v-card class="pa-8">
-      <v-row dense class="mb-6">
+      <!-- Filtros principais em grid -->
+      <div class="report-filters-grid mb-6">
         <!-- Examples -->
-        <v-col cols="12" md="6">
-          <v-card class="pa-4" outlined>
-            <h2 class="text-h6 mb-4 primary--text">Examples</h2>
-            <v-select
-              v-model="filters.examples"
-              :items="exampleOptions"
-              label="Select Examples"
-              multiple
-              chips
-              color="primary"
-              class="mb-4"
-              item-text="text"
-              item-value="value"
-              :loading="loading.examples"
-              :disabled="!exampleOptions.length"
-            />
-            <v-select
-              v-model="filters.versions"
-              :items="versionOptions"
-              label="Select Versions (por example)"
-              multiple
-              chips
-              color="primary"
-              class="mb-4"
-              item-text="text"
-              item-value="value"
-              :loading="loading.versions"
-              :disabled="false"
-            />
-          </v-card>
-        </v-col>
-
-        <!-- Perspective -->
-        <v-col cols="12" md="6">
-          <v-card class="pa-4" outlined>
-            <h2 v-if="projectPerspective" class="text-h6 mb-4 primary--text" >
-              Perspective: {{ projectPerspective.name }}
-            </h2>
-            <v-row dense>
-              <template v-if="perspectiveFields && perspectiveFields.length">
-                <template v-for="field in perspectiveFields">
-                  <v-col :key="field.id" cols="12" sm="6">
-                    <v-select
-                      v-model="filters.perspectiveValues[field.id]"
-                      :items="field.choices"
-                      :label="field.name"
-                      clearable
-                      color="primary"
-                      class="mb-4"
-                    />
-                  </v-col>
-                </template>
-              </template>
-            </v-row>
-          </v-card>
-        </v-col>
-      </v-row>
-
-      <!-- Filtros adicionais -->
-      <v-row dense class="mb-6">
-        <v-col cols="12" md="6">
-          <v-card class="pa-4" outlined>
-            <h2 class="text-h6 mb-4 primary--text">Labels e Status</h2>
-            <v-select
-              v-model="filters.category"
-              :items="categoryOptions"
-              label="Labels"
-              multiple
-              chips
-              clearable
-              color="primary"
-              class="mb-4"
-            />
-            <v-select
-              v-model="filters.status"
-              :items="statusOptions"
-              label="Status"
-              clearable
-              color="primary"
-              class="mb-4"
-            />
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="6">
-          <v-card class="pa-4 pl-0" outlined>
-            <h2 class="text-h6 mb-4 primary--text" style="padding-left: 16px;">Date Interval</h2>
-            <div class="d-flex" style="gap: 24px;">
-              <div style="flex:1;">
-                <v-menu
-                  v-model="filters.startDateMenu"
-                  :close-on-content-click="false"
-                  transition="scale-transition"
-                  offset-y
-                  min-width="auto"
-                >
-                  <template #activator="{ on, attrs }">
-                    <v-text-field
-                      v-model="filters.startDate"
-                      label="Begin Date"
-                      prepend-icon="mdi-calendar"
-                      readonly
-                      v-bind="attrs"
-                      clearable
-                      v-on="on"
-                    />
-                  </template>
-                  <v-date-picker
+        <div class="filter-block">
+          <h2 class="text-h6 mb-4 primary--text">Examples</h2>
+          <v-select
+            v-model="filters.examples"
+            :items="exampleOptions"
+            label="Select Examples"
+            multiple
+            chips
+            color="primary"
+            class="mb-4"
+            item-text="text"
+            item-value="value"
+            :loading="loading.examples"
+            :disabled="!exampleOptions.length"
+          />
+          <v-select
+            v-model="filters.versions"
+            :items="versionOptions"
+            label="Select Versions (por example)"
+            multiple
+            chips
+            color="primary"
+            class="mb-4"
+            item-text="text"
+            item-value="value"
+            :loading="loading.versions"
+            :disabled="false"
+          />
+        </div>
+        <!-- Labels e Status -->
+        <div class="filter-block">
+          <h2 class="text-h6 mb-4 primary--text">Labels e Status</h2>
+          <v-select
+            v-model="filters.category"
+            :items="categoryOptions"
+            label="Labels"
+            multiple
+            chips
+            clearable
+            color="primary"
+            class="mb-4"
+          />
+          <v-select
+            v-model="filters.status"
+            :items="statusOptions"
+            label="Status"
+            clearable
+            color="primary"
+            class="mb-4"
+          />
+        </div>
+        <!-- Date Interval -->
+        <div class="filter-block">
+          <h2 class="text-h6 mb-4 primary--text">Date Interval</h2>
+          <div class="d-flex" style="gap: 24px;">
+            <div style="flex:1;">
+              <v-menu
+                v-model="filters.startDateMenu"
+                :close-on-content-click="false"
+                transition="scale-transition"
+                offset-y
+                min-width="auto"
+              >
+                <template #activator="{ on, attrs }">
+                  <v-text-field
                     v-model="filters.startDate"
-                    @input="filters.startDateMenu = false"
+                    label="Begin Date"
+                    prepend-icon="mdi-calendar"
+                    readonly
+                    v-bind="attrs"
+                    clearable
+                    v-on="on"
                   />
-                </v-menu>
-              </div>
-              <div style="flex:1;">
-                <v-menu
-                  v-model="filters.endDateMenu"
-                  :close-on-content-click="false"
-                  transition="scale-transition"
-                  offset-y
-                  min-width="auto"
-                >
-                  <template #activator="{ on, attrs }">
-                    <v-text-field
-                      v-model="filters.endDate"
-                      label="End Date"
-                      prepend-icon="mdi-calendar"
-                      readonly
-                      v-bind="attrs"
-                      clearable
-                      v-on="on"
-                    />
-                  </template>
-                  <v-date-picker
-                    v-model="filters.endDate"
-                    @input="filters.endDateMenu = false"
-                  />
-                </v-menu>
-              </div>
+                </template>
+                <v-date-picker
+                  v-model="filters.startDate"
+                  @input="filters.startDateMenu = false"
+                />
+              </v-menu>
             </div>
-          </v-card>
-        </v-col>
-      </v-row>
+            <div style="flex:1;">
+              <v-menu
+                v-model="filters.endDateMenu"
+                :close-on-content-click="false"
+                transition="scale-transition"
+                offset-y
+                min-width="auto"
+              >
+                <template #activator="{ on, attrs }">
+                  <v-text-field
+                    v-model="filters.endDate"
+                    label="End Date"
+                    prepend-icon="mdi-calendar"
+                    readonly
+                    v-bind="attrs"
+                    clearable
+                    v-on="on"
+                  />
+                </template>
+                <v-date-picker
+                  v-model="filters.endDate"
+                  @input="filters.endDateMenu = false"
+                />
+              </v-menu>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Botões -->
       <div class="d-flex align-center justify-space-between">
@@ -1170,11 +1138,6 @@ export default {
           Object.entries(versions).forEach(([version, rows]) => {
             // Cabeçalho de bloco
             csv += `"Version ${version}";"Users that voted: ${this.getVoteStats(rows).usersVoted}"\n`;
-            // Adicionar lista de usuários filtrados
-            const filteredUsers = this.getFilteredUsernames(rows);
-            if (filteredUsers.length) {
-              csv += `"Filtered users: ${filteredUsers.join(', ')}"\n`;
-            }
             // Cabeçalho de colunas (apenas uma vez por bloco)
             csv += headers.map(h => `"${h}"`).join(';') + '\n';
             // Dados (apenas uma vez por linha)
@@ -1289,11 +1252,6 @@ export default {
               container.innerHTML += `<div style="border:1px solid #eee;border-radius:6px;padding:12px 8px;margin-bottom:16px;">`;
               container.innerHTML += `<h3 style="color:#333;">Version ${version}</h3>`;
               container.innerHTML += `<div style="margin-bottom:8px;font-weight:bold;">Users that voted: ${this.getVoteStats(rows).usersVoted}</div>`;
-              // Adicionar lista de usuários filtrados
-              const filteredUsers = this.getFilteredUsernames(rows);
-              if (filteredUsers.length) {
-                container.innerHTML += `<div style='margin-bottom:8px;font-weight:bold;color:#1976d2;'>Filtered users: ${filteredUsers.join(', ')}</div>`;
-              }
               // tabela
               let table = '<table style="border-collapse:collapse;width:100%;margin-top:12px;">';
               table += '<thead><tr>';
@@ -1381,5 +1339,21 @@ export default {
 td.highlight-label {
   background: #fff9c4;
   font-weight: bold;
+}
+.report-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+.filter-block {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  padding: 24px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 </style>
