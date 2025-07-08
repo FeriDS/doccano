@@ -608,7 +608,8 @@ export default {
           const processedData = this.processVotesAndCalculatePercentages(
             stats,
             allowedUserIds,
-            allowedUsernames
+            allowedUsernames,
+            votingStats // <-- passar votingStats aqui
           );
 
           // Só adicionar se houver votos após filtragem
@@ -642,7 +643,7 @@ export default {
       this.reportData = groupedData;
     },
 
-    processVotesAndCalculatePercentages(stats, allowedUserIds, allowedUsernames) {
+    processVotesAndCalculatePercentages(stats, allowedUserIds, allowedUsernames, votingStats) {
           let filteredVotes = stats.votes || [];
       const hasUserFilter = allowedUserIds.size > 0 || allowedUsernames.size > 0;
 
@@ -667,7 +668,6 @@ export default {
       const validVotes = filteredVotes.filter(
           vote => vote.label !== null && vote.label !== undefined);
       const totalVotes = validVotes.length; // Só votos válidos contam para percentuais
-      const totalVotesWithNull = filteredVotes.length; // Para abstenção
 
             filteredVotes.forEach(vote => {
         if (vote.label === null || vote.label === undefined) {
@@ -685,10 +685,9 @@ export default {
           ? `${((count / totalVotes) * 100).toFixed(2)}%` 
           : '0%';
       });
-
-      // Adicionar percentual de abstenção (em relação ao total de votos originais)
-      const abstentionPercent = totalVotesWithNull > 0 
-        ? `${((nullCount / totalVotesWithNull) * 100).toFixed(2)}%`
+      // Adicionar percentual de abstenção (em relação ao total de usuários do projeto)
+      const abstentionPercent = votingStats && votingStats.total_users > 0
+        ? `${((nullCount / votingStats.total_users) * 100).toFixed(2)}%`
         : '0%';
 
       return {
